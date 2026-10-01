@@ -131,7 +131,7 @@ commit_base: 37f1ec7
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 
@@ -139,7 +139,7 @@ commit_base: 37f1ec7
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-01 | T1 | fb08f0f | PASA (verificador 15/15; verificador-b 15/15) | ruta: delegada · commit T1: fb08f0f |
 | | T2 | | | |
 | | T3 | | | |
 | | TODO | | | |
