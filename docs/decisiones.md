@@ -1,0 +1,18 @@
+# Decisiones de MAControl
+
+Formato: `- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)`. La más reciente abajo.
+Una decisión no se edita: se agrega otra que la reemplaza y la nombra por su fecha.
+
+- 2026-09-28 — Un único proyecto Django (sitio público + panel + API) sobre una misma base; la app móvil (Expo) es la última etapa y vive en `mobile/` como repositorio aparte — el cliente quiere web, panel y app sobre los mismos datos; la app depende de una API estable — reemplaza a: (nada)
+- 2026-09-28 — Razón social en textos: MAControl S.A.; el logo "MAControl Group" entregado se usa de forma provisoria — indicación del dueño — reemplaza a: (nada)
+- 2026-09-28 — Dirección visual A ("Industrial certificada": fondo carbón, amarillo #FFC600 del logo, Barlow Condensed) para el sitio público; el panel usa la variante clara del mismo sistema — elección del dueño sobre tres propuestas — reemplaza a: (nada)
+- 2026-09-29 — Dos roles: administrador (panel) y empleado (app); cuentas creadas a mano; sin acceso de clientes, sin notificaciones, sin rutas, sin presupuestos ni facturación — alcance de etapa 1 definido por el dueño — reemplaza a: (nada)
+- 2026-09-29 — El sitio público no ofrece "pedir presupuesto" ni formularios que envíen correo; el contacto es telefónico (y WhatsApp si el número lo atiende) — los presupuestos se hacen por contacto directo con la empresa — reemplaza a: (nada)
+- 2026-09-29 — Un QR por sitio físico (`Sitio.qr_codigo`, UUID). El empleado solo puede registrar una visita tras escanear un QR válido, con geolocalización y al menos una foto; si el QR es ilegible, el administrador carga la visita a mano con `origen=manual` y motivo obligatorio — el QR es la prueba de presencia — reemplaza a: (nada)
+- 2026-09-29 — Visitas programables (asignadas por un administrador con fecha y empleado) y no programadas (creadas al escanear sin asignación previa); la frecuencia por proyecto es opcional (`frecuencia_dias`) — el jefe manda a los empleados según lo que ve en el panel; no se sabe si la frecuencia es fija — reemplaza a: (nada)
+- 2026-09-29 — Planilla de visita dinámica por tipo de servicio (`CampoPlanilla`, respuestas en `Visita.datos` JSON) más tres bloques fijos: productos utilizados (del catálogo, con lote y dosis), fotos, incidencia/observaciones — cada servicio anota cosas distintas; el contenido de las planillas lo define la empresa y se edita a mano — reemplaza a: (nada)
+- 2026-09-29 — Catálogo de productos precargado por administradores; el empleado elige de la lista (nunca escribe nombres) y completa lote y dosis — pedido de la administración de MAControl — reemplaza a: (nada)
+- 2026-09-29 — Certificado generado automáticamente desde las visitas de un rango (cliente, CUIT, fechas, productos con registro, lote y dosis, director técnico), numerado por año, inmutable una vez emitido (una corrección emite uno nuevo con `reemplaza_a`) — hoy se hace a mano; pedido de la administración — reemplaza a: (nada)
+- 2026-09-29 — Mapa con Leaflet + OpenStreetMap y coordenadas como `DecimalField`; sin PostGIS ni Google Maps en etapa 1 — sin costo ni clave; migrar a PostGIS es directo si hiciera falta — reemplaza a: (nada)
+- 2026-09-29 — Tests con el runner de Django (`manage.py test --keepdb`), no pytest — es la forma que ejecutan los agentes y hooks heredados de TerritoryOS — reemplaza a: (nada)
+- 2026-09-29 — El esquema de trabajo con agentes (plan → delegación → verificación, congelado por git, hooks SessionStart/Stop) se copia de TerritoryOS adaptado a un solo repositorio; el hook de cierre arranca en modo aviso — forma estándar de trabajo del dueño — reemplaza a: (nada)

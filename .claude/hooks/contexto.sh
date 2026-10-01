@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Hook SessionStart de Claude Code: inyecta en el contexto de la sesión la bitácora,
+# el encabezado y la tabla de estado del plan activo, y las últimas decisiones.
+# Lo que se imprime por stdout con exit 0 se agrega al contexto. Termina siempre con exit 0.
+set +e
+
+raiz="${CLAUDE_PROJECT_DIR:-.}"
+if command -v cygpath >/dev/null 2>&1; then
+  normalizada="$(cygpath -u "$raiz" 2>/dev/null)"
+  [ -n "$normalizada" ] && raiz="$normalizada"
+fi
+
+bitacora="$raiz/docs/bitacora.md"
+decisiones="$raiz/docs/decisiones.md"
+
+# 1. Primeras 40 líneas de la bitácora.
+if [ -f "$bitacora" ]; then
+  echo "=== docs/bitacora.md (primeras 40 líneas) ==="
+  head -n 40 "$bitacora" 2>/dev/null | tr -d '\r'
+  echo
+fi
+
+# 2. Plan activo: encabezado hasta el primer "### T" y la tabla "### Estado de subtareas".
+if [ -f "$bitacora" ]; then
+  plan="$(grep -m1 '^Plan activo:' "$bitacora" 2>/dev/null | tr -d '\r' \
+    | sed -e 's/^Plan activo:[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^`//' -e 's/`$//')"
+  # Solo se acepta un archivo .md directamente dentro de docs/planes/, sin "..", sin ruta
+  # absoluta, sin subcarpetas, sin barras invertidas y sin symlinks.
+  plan_valido=0
+  case "$plan" in
+    docs/planes/*.md)
+      resto="${plan#docs/planes/}"
+      plan_valido=1
+      case "$plan" in
+        *..*|/*|*\\*|[A-Za-z]:*) plan_valido=0 ;;
+      esac
+      case "$resto" in
+        */*|.md) plan_valido=0 ;;
+      esac
+      if [ -L "$raiz/docs" ] || [ -L "$raiz/docs/planes" ] || [ -L "$raiz/$plan" ]; then
+        plan_valido=0
+      fi
+      ;;
+  esac
+  if [ -n "$plan" ] && [ "$plan" != "(ninguno)" ] && [ "$plan_valido" -ne 1 ]; then
+    echo "(Plan activo ignorado: fuera de docs/planes/)"
+    echo
+  fi
+  if [ "$plan_valido" -eq 1 ] && [ -f "$raiz/$plan" ]; then
+    echo "=== Plan activo: $plan (encabezado, sin subtareas) ==="
+    tr -d '\r' < "$raiz/$plan" 2>/dev/null | awk '/^### T/ { exit } { print }'
+    echo
+    echo "=== Plan activo: $plan (estado de subtareas) ==="
+    tr -d '\r' < "$raiz/$plan" 2>/dev/null | awk '
+      /^### Estado de subtareas/ { dentro = 1; print; next }
+      dentro && /^#/ { exit }
+      dentro && /^[[:space:]]*$/ { if (visto_tabla) exit; next }
+      dentro { print; if ($0 ~ /^\|/) visto_tabla = 1 }
+    '
+    echo
+  fi
+fi
+
+# 3. Últimas 10 líneas de las decisiones.
+if [ -f "$decisiones" ]; then
+  echo "=== docs/decisiones.md (últimas 10 líneas) ==="
+  tail -n 10 "$decisiones" 2>/dev/null | tr -d '\r'
+  echo
+fi
+
+exit 0

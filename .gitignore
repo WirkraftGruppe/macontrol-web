@@ -1,0 +1,31 @@
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+*.sqlite3
+db.sqlite3
+.env
+.env.*
+!.env.example
+media/
+staticfiles/
+static/css/app.css
+node_modules/
+.ruff_cache/
+.pytest_cache/
+
+# Claude Code
+.claude/settings.local.json
+.claude/settings.local.json.bak
+.claude/hooks/__pycache__/
+.claude/.ultimo-verificado
+worktrees/
+
+# App móvil (repositorio aparte, etapa final)
+mobile/
+
+# Material de la empresa que no se versiona
+images-for-content/
+*.jpeg
+*.jpg
+!static/img/**
