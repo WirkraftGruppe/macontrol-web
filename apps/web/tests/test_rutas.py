@@ -1,6 +1,7 @@
 import uuid
 
 from django.test import TestCase
+from django.urls import NoReverseMatch, reverse
 
 
 class RutasTests(TestCase):
@@ -24,3 +25,14 @@ class RutasTests(TestCase):
 
     def test_api_v1_responde_200(self):
         self.assertEqual(self.client.get("/api/v1/").status_code, 200)
+
+    def test_rutas_con_espacio_de_nombres(self):
+        codigo = uuid.uuid4()
+        self.assertEqual(reverse("web:inicio"), "/")
+        self.assertEqual(reverse("panel:inicio"), "/panel/")
+        self.assertEqual(reverse("api:raiz"), "/api/v1/")
+        self.assertEqual(reverse("web:qr", args=[codigo]), f"/q/{codigo}/")
+
+    def test_inicio_sin_espacio_de_nombres_no_resuelve(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("inicio")
