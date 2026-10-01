@@ -1,8 +1,8 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
-Rama: main (repositorio recién creado, sin código Django todavía)
+Plan activo: docs/planes/2026-10-01-esqueleto.md
+Rama: main
 Pendiente inmediato: ejecutar el prompt de arranque `docs/prompts/00-arranque.md` en modo plan para crear el esqueleto del proyecto (T1 del plan que resulte).
 Problemas abiertos:
 - Falta el ejemplo del certificado que la empresa entrega hoy (diseño y texto legal del PDF). Ver `docs/01-modelo-y-arquitectura.md` § 7.

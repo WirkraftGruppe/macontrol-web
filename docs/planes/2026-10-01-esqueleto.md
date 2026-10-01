@@ -125,7 +125,7 @@ Nada: las subtareas son secuenciales y cada una deja el proyecto integrado. La v
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: 37f1ec7
 
 ### Estado de subtareas
 
