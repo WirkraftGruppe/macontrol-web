@@ -142,4 +142,4 @@ commit_base: 37f1ec7
 | 2026-10-01 | T1 | fb08f0f | PASA (verificador 15/15; verificador-b 15/15) | ruta: delegada · commit T1: fb08f0f |
 | 2026-10-01 | T1+T2 | f9677fa | PASA (verificador 35/35; verificador-b 34/34, cuenta distinta de los [existe]) | ruta: delegada · commit T2: f9677fa |
 | 2026-10-01 | T1+T2+T3 | ced36a0 | PASA (verificador 43/43; verificador-b PASA) | ruta: delegada · commit T3: ced36a0 · obs. no bloqueante: test_base.py:13 no distingue el atributo del selector |
-| | TODO | | | |
+| 2026-10-01 | TODO | b44c4bf | PASA (verificador 50/50: T1 15, T2 20, T3 8, cierre global 7) | auditor-seguridad: 0 bloqueantes, 1 importante y 3 menores abiertos (ver bitácora) |
