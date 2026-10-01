@@ -62,11 +62,11 @@ commit_base: 734d06a
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
-| | TODO | | | |
+| 2026-10-01 | T1 | 24e44a0 | PASA (en la corrida TODO) | ruta: inline (principal) · tests vistos fallar antes del fix |
+| 2026-10-01 | TODO | 24e44a0 | PASA (verificador 12/12) | |
