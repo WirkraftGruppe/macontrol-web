@@ -56,7 +56,7 @@ Nada.
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: 734d06a
 
 ### Estado de subtareas
 
