@@ -1,7 +1,7 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-01-hallazgos-esqueleto.md
 Rama: main
 Pendiente inmediato: decidir qué hacer con los hallazgos abiertos del auditor (abajo) y planificar el siguiente: modelos de dominio (clientes, sitios, servicios, proyectos, productos), según `docs/ARRANQUE.md` paso 6.
 Problemas abiertos:

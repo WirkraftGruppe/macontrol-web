@@ -149,7 +149,7 @@ Nada fuera de T4.
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: 8f23dee
 
 ### Estado de subtareas
 
