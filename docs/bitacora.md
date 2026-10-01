@@ -1,11 +1,11 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-01-hallazgos-esqueleto.md
+Plan activo: (ninguno)
 Rama: main
-Pendiente inmediato: decidir qué hacer con los hallazgos abiertos del auditor (abajo) y planificar el siguiente: modelos de dominio (clientes, sitios, servicios, proyectos, productos), según `docs/ARRANQUE.md` paso 6.
+Pendiente inmediato: decidir el hosting y cerrar el hueco de la barrera de `dev.py` (abajo); después, plan de modelos de dominio (clientes, sitios, servicios, proyectos, productos), según `docs/ARRANQUE.md` paso 6.
 Problemas abiertos:
-- Auditoría del esqueleto (2026-10-01), sin corregir, a decisión del usuario: [importante] `.env.example` presenta `DJANGO_ENV=development` como requerida y `dev.py` arranca con `DEBUG=True` sin barrera contra hosts no locales; [menor] los nombres de URL `inicio` de `apps/web` y `apps/panel` chocan (sin `app_name`); [menor] `base.html` carga Google Fonts de un tercero (IP de visitantes, CSP futura); [menor] `prod.py` activa HSTS con subdominios y preload desde el primer despliegue.
+- [importante, abierto] La barrera de `config/settings/dev.py` solo mira `ALLOWED_HOSTS`. Con `DJANGO_ENV=development` y `ALLOWED_HOSTS` vacío en un hosting, el sitio arranca con `DEBUG=True` y la página técnica del 400 expone tracebacks y settings; con `runserver`, también `DATABASE_URL`, porque no coincide con el patrón de ocultamiento (comprobado por el auditor). Propuesta del auditor: abortar si hay variables propias del hosting (`RAILWAY_ENVIRONMENT`, `RENDER`, `DYNO`, `FLY_APP_NAME`, `K_SERVICE`…), que hay que ajustar al hosting real. [menor] Las IP privadas en `ALLOWED_HOSTS` no limitan quién se conecta (el Host lo elige el cliente). [menor] Falta `.strip()` en `env.list("ALLOWED_HOSTS")` de `dev.py` y `prod.py`.
 - El plan de autenticación tiene que invertir `test_panel_responde_200` y `test_api_v1_responde_200` (hoy fijan el acceso anónimo) y seguir la lista de condiciones del auditor: mixin por `es_administrador`, DRF con `IsAuthenticated` y JWT, `AdminSite` restringido, `simple_history` en `User`, LOGGING sin datos personales y CSP.
 - WeasyPrint está instalado pero no se probó en tiempo de ejecución (en Windows suele necesitar GTK/Pango).
 - Inconsistencia de infraestructura: `CLAUDE.md` y `docs/plantilla-plan.md` piden `[test]` con la ruta punteada sola, pero `verificar_plan.py` ejecuta el criterio tal cual con bash; en este plan se escribieron como comando completo de `manage.py test`.
@@ -16,6 +16,9 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-01 — Corrección de los hallazgos de la auditoría del esqueleto
+Hecho: plan `docs/planes/2026-10-01-hallazgos-esqueleto.md` (congelado en 8f23dee; juez-plan en dos rondas, pasó de 7 bloqueantes a 1 y ese último se corrigió moviendo el trabajo del principal a T4). T1 barrera de hosts en `dev.py`, `.env.example` sin `DJANGO_ENV` fijo y HSTS de 3600 s sin subdominios ni preload (afdfc0e); T2 `app_name` en web, panel y api (a5f8b65); T3 fuentes Barlow en `static/fonts/` sin Google Fonts, y corrección del test de `data-tema` (a91fc9f); T4 decisiones y `docs/02-diseno.md` (338b81b, inline). verificador y verificador-b PASA en cada subtarea; verificación final TODO PASA 43/43 en 1c43751. auditor-seguridad: hallazgos 2, 3 y 4 corregidos; el 1 corregido a medias (ver Problemas abiertos). · A medias: el hueco de la barrera, que depende de saber qué hosting se usa.
 
 ### 2026-10-01 — Arranque del repositorio y plan esqueleto
 Hecho: pasos 2 a 5 de `docs/ARRANQUE.md`. Hooks y 16 skills copiados de TerritoryOS (tests de hooks: 70 OK), `git init`, venv con Python 3.13, `.gitattributes` (`*.sh` en LF), `images-for-content/` fuera de git. Plan `docs/planes/2026-10-01-esqueleto.md` (congelado en 37f1ec7, juez-plan en dos rondas: 4 bloqueantes corregidos antes de congelar): T1 base del proyecto y `accounts.User` con rol (fb08f0f), T2 diez apps y prefijos de URL con vistas provisorias (f9677fa), T3 `base.html` con tokens de ambos temas y logo (ced36a0). verificador y verificador-b PASA en cada subtarea; verificación final TODO PASA 50/50 en b44c4bf; `check --deploy` con settings de producción sin avisos. auditor-seguridad: 0 bloqueantes, 4 hallazgos abiertos (ver Problemas abiertos). · A medias: nada del plan; los hallazgos del auditor quedan para decidir.

@@ -168,4 +168,4 @@ commit_base: 8f23dee
 | 2026-10-01 | T1+T2 | a5f8b65 | PASA (verificador 21/21; verificador-b 21/21) | ruta: delegada · commit T2: a5f8b65 |
 | 2026-10-01 | T1..T4 | 338b81b | PASA (verificador 37/37; verificador-b 41/41, cuenta distinta de agrupación) | ruta: delegada · commit T3: a91fc9f |
 | 2026-10-01 | T4 | 338b81b | PASA (en la misma corrida) | ruta: inline (principal) · commit T4: 338b81b |
-| | TODO | | | |
+| 2026-10-01 | TODO | 1c43751 | PASA (verificador 43/43: T1 13, T2 8, T3 11, T4 5, cierre global 6) | auditor-seguridad: 2, 3 y 4 corregidos; 1 corregido a medias (hueco nuevo, importante, abierto) |
