@@ -156,7 +156,7 @@ commit_base: 8f23dee
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
+| T2 | hecha |
 | T3 | pendiente |
 | T4 | pendiente |
 
@@ -165,7 +165,7 @@ commit_base: 8f23dee
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-01 | T1 | afdfc0e | PASA (verificador 13/13; verificador-b 13/13) | ruta: delegada · commit T1: afdfc0e |
-| | T2 | | | |
+| 2026-10-01 | T1+T2 | a5f8b65 | PASA (verificador 21/21; verificador-b 21/21) | ruta: delegada · commit T2: a5f8b65 |
 | | T3 | | | |
 | | T4 | | | |
 | | TODO | | | |
