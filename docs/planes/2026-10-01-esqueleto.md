@@ -132,7 +132,7 @@ commit_base: 37f1ec7
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
+| T2 | hecha |
 | T3 | pendiente |
 
 ### Corridas
@@ -140,6 +140,6 @@ commit_base: 37f1ec7
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-01 | T1 | fb08f0f | PASA (verificador 15/15; verificador-b 15/15) | ruta: delegada · commit T1: fb08f0f |
-| | T2 | | | |
+| 2026-10-01 | T1+T2 | f9677fa | PASA (verificador 35/35; verificador-b 34/34, cuenta distinta de los [existe]) | ruta: delegada · commit T2: f9677fa |
 | | T3 | | | |
 | | TODO | | | |
