@@ -1,0 +1,7 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+extend-exclude = ["venv", "worktrees", ".agents", ".claude", "**/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
