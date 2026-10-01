@@ -155,7 +155,7 @@ macontrol/
 
 ## 6. Decisiones técnicas
 
-- **Python 3.12, Django 5.x, PostgreSQL.** Sin PostGIS en etapa 1: lat/lng como `DecimalField`; el mapa es Leaflet con OpenStreetMap (sin costo ni clave de API). Si más adelante hacen falta consultas espaciales, migrar a PostGIS es directo.
+- **Python 3.13, Django 5.x, PostgreSQL (SQLite por defecto en desarrollo si no hay `DATABASE_URL`).** Sin PostGIS en etapa 1: lat/lng como `DecimalField`; el mapa es Leaflet con OpenStreetMap (sin costo ni clave de API). Si más adelante hacen falta consultas espaciales, migrar a PostGIS es directo.
 - **Panel con templates + HTMX**, no un frontend separado: menos superficie de mantenimiento y coherente con el sitio público.
 - **API versionada** (`/api/v1/`) desde el primer día aunque la app llegue al final: el panel también puede consumirla para el mapa.
 - **JWT** (`djangorestframework-simplejwt`) con refresh largo para el empleado.

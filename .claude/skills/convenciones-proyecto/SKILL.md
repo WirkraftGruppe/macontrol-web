@@ -14,8 +14,8 @@ Sistema de MAControl S.A. (control de plagas, Castelli y Chascomús, Buenos Aire
 Fuente de verdad del dominio: `docs/01-modelo-y-arquitectura.md`. Del contenido público: `docs/00-contenido-fuente.md`. Del diseño: `docs/02-diseno.md`.
 
 ## Stack
-- Python 3.12 · Django 5.x · Django REST Framework · `djangorestframework-simplejwt`
-- PostgreSQL (desarrollo: `DATABASE_URL`; fallback SQLite solo para tests rápidos)
+- Python 3.13 · Django 5.x · Django REST Framework · `djangorestframework-simplejwt`
+- PostgreSQL en producción (`DATABASE_URL` obligatoria); en desarrollo, `DATABASE_URL` si está definida y si no SQLite (`db.sqlite3`)
 - Templates de Django + Tailwind CSS (CLI, sin Node en producción) + HTMX + Leaflet/OpenStreetMap
 - WeasyPrint (PDF: certificados, informes, historial, etiquetas QR) · `segno` (QR) · Pillow (fotos)
 - `django-simple-history` (auditoría de Sitio, Proyecto, Visita) · `django-storages` (fotos, backend intercambiable)
