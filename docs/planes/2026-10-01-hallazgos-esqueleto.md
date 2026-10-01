@@ -157,8 +157,8 @@ commit_base: 8f23dee
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | pendiente |
-| T4 | pendiente |
+| T3 | hecha |
+| T4 | hecha |
 
 ### Corridas
 
@@ -166,6 +166,6 @@ commit_base: 8f23dee
 |---|---|---|---|---|
 | 2026-10-01 | T1 | afdfc0e | PASA (verificador 13/13; verificador-b 13/13) | ruta: delegada · commit T1: afdfc0e |
 | 2026-10-01 | T1+T2 | a5f8b65 | PASA (verificador 21/21; verificador-b 21/21) | ruta: delegada · commit T2: a5f8b65 |
-| | T3 | | | |
-| | T4 | | | |
+| 2026-10-01 | T1..T4 | 338b81b | PASA (verificador 37/37; verificador-b 41/41, cuenta distinta de agrupación) | ruta: delegada · commit T3: a91fc9f |
+| 2026-10-01 | T4 | 338b81b | PASA (en la misma corrida) | ruta: inline (principal) · commit T4: 338b81b |
 | | TODO | | | |
