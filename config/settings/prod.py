@@ -7,7 +7,8 @@ DEBUG = False
 
 SECRET_KEY = env("SECRET_KEY")
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
+# Recortados y sin vacíos: un host con espacios nunca coincide con el Host pedido.
+ALLOWED_HOSTS = [h.strip() for h in env.list("ALLOWED_HOSTS", default=[]) if h.strip()]
 
 DATABASES = {"default": env.db("DATABASE_URL")}
 

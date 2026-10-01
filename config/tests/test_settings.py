@@ -56,6 +56,32 @@ class SettingsTests(SimpleTestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(r.stdout.strip().splitlines()[-1], "3600 False False")
 
+    def test_dev_recorta_espacios_de_allowed_hosts(self):
+        r = _correr(
+            ["check"],
+            DJANGO_ENV="development",
+            ALLOWED_HOSTS="localhost, 192.168.1.10 ",
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_prod_recorta_espacios_de_allowed_hosts(self):
+        r = _correr(
+            [
+                "shell",
+                "-c",
+                "from django.conf import settings as s; print(s.ALLOWED_HOSTS)",
+            ],
+            DJANGO_ENV="production",
+            SECRET_KEY="x" * 60,
+            DATABASE_URL="sqlite:///prod-test.sqlite3",
+            ALLOWED_HOSTS=" macontrol.com.ar , ,www.macontrol.com.ar",
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(
+            r.stdout.strip().splitlines()[-1],
+            "['macontrol.com.ar', 'www.macontrol.com.ar']",
+        )
+
     def test_env_example_no_fija_django_env(self):
         texto = Path(settings.BASE_DIR, ".env.example").read_text(encoding="utf-8")
         lineas = [linea.strip() for linea in texto.splitlines()]

@@ -13,7 +13,12 @@ SECRET_KEY = env(
     "SECRET_KEY", default="clave-solo-para-desarrollo-no-usar-en-produccion"
 )
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+# Recortados y sin vacíos: "localhost, 192.168.1.10" no debe dejar " 192.168.1.10".
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+    if h.strip()
+]
 
 _HOSTS_LOCALES = {"localhost", "127.0.0.1", "[::1]", "::1", "testserver"}
 
