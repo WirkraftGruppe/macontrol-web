@@ -37,7 +37,7 @@ Los marcadores del mapa Leaflet usan estos cuatro colores con el mismo significa
 
 - **Display**: `Barlow Condensed` 600 / 700 / 800 — títulos, cifras grandes, botones. Mayúsculas en títulos de sección del sitio público; en el panel, mayúsculas solo en cifras y etiquetas.
 - **Texto**: `Barlow` 400 / 500 / 600 — cuerpo, tablas, formularios.
-- Fallback: `system-ui, sans-serif`. Se sirven desde Google Fonts en la web; en el panel se pueden autohospedar en `static/fonts/` para funcionar sin internet.
+- Fallback: `system-ui, sans-serif`. Se sirven desde `static/fonts/` (woff2, subconjunto latin, licencia OFL) en la web y en el panel, sin pedidos a terceros.
 
 Escala (px):
 
