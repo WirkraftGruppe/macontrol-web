@@ -178,7 +178,7 @@ No lleva criterios propios, porque el hook no los ejecuta fuera de `### T<n>`. L
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): modelos-dominio>
+commit_base: ced3334
 
 ### Estado de subtareas
 
