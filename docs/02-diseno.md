@@ -83,5 +83,15 @@ Responsive: a menos de 900 px las grillas pasan a 1 columna, el H1 baja a 48 px,
 ## Recursos
 
 - Logo: `static/img/logo.png` (amarillo, fondo transparente), `logo-blanco.png`, `logo-negro.png` para fondos donde el amarillo no contrasta. Provisorio: dice "Group"; la razón social es MAControl S.A.
-- Fotos: no hay todavía. Los tableros usan marcadores; el sitio se publica con los marcadores reemplazados por fotos reales de la empresa (aplicación en planta, monitoreo de estaciones, sellado de techos, equipo con vehículo).
+- Fotos: la empresa entregó cinco (originales en `images-for-content/edited-with-ai/`, fuera de git). Antes de usarlas en el sitio se copian a `static/img/` convertidas a WebP, máximo 1600 px de lado mayor, sin metadatos EXIF, con nombre descriptivo. Asignación prevista:
+
+| Original | Orientación | Contenido | Uso previsto | Nombre en `static/img/` |
+|---|---|---|---|---|
+| `image1.jpg` | vertical | Pulverización con mochila en un quincho | Hero de la home (marcador vertical) o sector Hogares | `hero-pulverizacion-quincho.webp` |
+| `image2.jpg` | horizontal | Operario preparando equipo en la oficina, logo en la pared | Bloque Empresa / Cómo trabajamos | `empresa-oficina-equipo.webp` |
+| `image3.webp` | vertical | Hidrolavado de fachada desde andamio, con arnés | Franja Mantenimiento edilicio; página de exclusión de aves | `mantenimiento-fachada-andamio.webp` |
+| `image4.jpg` | vertical | Termonebulización en una cocina | Cabecera de Desinfección y de Fumigaciones; alternativa de hero | `fumigacion-termonebulizacion-cocina.webp` |
+| `image5.jpg` | horizontal | Camioneta y utilitario ploteados frente a contenedores | Sector Industria y puertos; respalda "logística propia" | `flota-vehiculos-industria.webp` |
+
+  Faltan todavía fotos de monitoreo de estaciones cebaderas y de sellado de techos; esos marcadores se mantienen hasta que la empresa las entregue.
 - Logotipos de clientes: la empresa los entrega; se guardan en `media/clientes/` y se administran desde `web.ClienteDestacado`.

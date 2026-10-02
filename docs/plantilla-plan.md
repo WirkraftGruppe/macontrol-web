@@ -50,6 +50,9 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - Comandos completos y literales. Los de Django llevan siempre el prefijo canónico:
   PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py …
 - Toda subtarea que agrega comportamiento lleva al menos un [test].
+- Un [test] se escribe como comando completo:
+  PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test <ruta.punteada.Clase.test_nombre> --keepdb
+  (el hook lo ejecuta tal cual con bash; la ruta punteada sola falla con exit 127).
 - Toda subtarea que corrige un defecto lleva un [test] que reproduzca el defecto.
 - Un [test] tiene que ser NUEVO respecto de commit_base.
 - Prohibido: "funciona", "tests pasando", "revisado", "sin regresiones", "quedó implementado".
@@ -68,8 +71,8 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - **Presupuesto**: <N> líneas agregadas (por defecto 400)
 - **Qué hacer**: <2 a 5 líneas concretas. Qué modelo, qué campo, qué comportamiento.>
 - **Criterios**:
-  - `[test]` `apps.sitios.tests.test_models.SitioTests.test_qr_codigo_se_genera_al_crear`
-  - `[test]` `apps.sitios.tests.test_models.SitioTests.test_qr_codigo_es_unico`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.SitioTests.test_qr_codigo_se_genera_al_crear --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.SitioTests.test_qr_codigo_es_unico --keepdb`
   - `[grep-1]` `grep -n "qr_codigo = models.UUIDField" apps/sitios/models.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
