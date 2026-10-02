@@ -7,10 +7,12 @@ from django.db import models
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from apps.accounts.models import User
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
 
 UMBRAL_PROXIMA_DIAS = 7
+FILTRO_ENCARGADO = {"rol": User.Rol.EMPLEADO, "is_active": True}
 
 
 class EstadoVisita(models.TextChoices):
@@ -56,14 +58,14 @@ class Proyecto(models.Model):
         verbose_name="encargado inicial",
         on_delete=models.PROTECT,
         related_name="proyectos_iniciados",
-        limit_choices_to={"rol": "empleado"},
+        limit_choices_to=FILTRO_ENCARGADO,
     )
     encargado_actual = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="encargado actual",
         on_delete=models.PROTECT,
         related_name="proyectos_a_cargo",
-        limit_choices_to={"rol": "empleado"},
+        limit_choices_to=FILTRO_ENCARGADO,
     )
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
@@ -74,6 +76,33 @@ class Proyecto(models.Model):
         verbose_name = "proyecto"
         verbose_name_plural = "proyectos"
         ordering = ["sitio__nombre", "titulo"]
+
+    def save(self, *args, **kwargs):
+        """Valida que los encargados que se asignan sean empleados activos.
+
+        El encargado inicial se fija al crear, y dar de baja o cambiar de rol
+        a un empleado ya asignado no debe bloquear guardados posteriores (por
+        ejemplo, el flujo de visita guarda el proyecto). Por eso solo se
+        validan los encargados nuevos o los que cambiaron.
+        """
+        campos = ("encargado_inicial", "encargado_actual")
+        if self._state.adding:
+            a_validar = campos
+        else:
+            guardado = (
+                Proyecto.objects.filter(pk=self.pk)
+                .values("encargado_inicial_id", "encargado_actual_id")
+                .first()
+            )
+            a_validar = [
+                campo
+                for campo in campos
+                if guardado is None
+                or guardado[f"{campo}_id"] != getattr(self, f"{campo}_id")
+            ]
+        for campo in a_validar:
+            self._meta.get_field(campo).validate(getattr(self, f"{campo}_id"), self)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.titulo} - {self.sitio.nombre}"

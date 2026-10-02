@@ -69,3 +69,36 @@ class ProyectoTests(TestCase):
         proyecto.titulo = "Roedores quincenal"
         proyecto.save()
         self.assertEqual(proyecto.history.count(), 2)
+
+    def test_create_con_encargado_administrador_falla(self):
+        with self.assertRaises(ValidationError):
+            self._proyecto(encargado_actual=self.admin)
+        self.assertEqual(Proyecto.objects.count(), 0)
+
+    def test_encargado_inactivo_no_valida(self):
+        inactivo = User.objects.create_user(
+            username="inactivo1",
+            password="x",
+            rol=User.Rol.EMPLEADO,
+            is_active=False,
+        )
+        with self.assertRaises(ValidationError):
+            self._proyecto(encargado_actual=inactivo)
+        proyecto = self._proyecto()
+        proyecto.encargado_actual = inactivo
+        with self.assertRaises(ValidationError):
+            proyecto.full_clean()
+
+    def test_baja_del_encargado_no_bloquea_guardar_el_proyecto(self):
+        empleado = User.objects.create_user(
+            username="empleado2", password="x", rol=User.Rol.EMPLEADO
+        )
+        proyecto = self._proyecto(encargado_inicial=empleado, encargado_actual=empleado)
+        empleado.is_active = False
+        empleado.save()
+        proyecto.titulo = "Titulo nuevo"
+        proyecto.save()
+        proyecto.refresh_from_db()
+        self.assertEqual(proyecto.titulo, "Titulo nuevo")
+        with self.assertRaises(ValidationError):
+            self._proyecto(titulo="Otro", encargado_actual=empleado)
