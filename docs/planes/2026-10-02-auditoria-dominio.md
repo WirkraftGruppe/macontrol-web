@@ -155,15 +155,15 @@ commit_base: 4d8223d
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
-| | T2 | | | |
-| | T3 | | | |
+| 2026-10-02 | T1 | 1298e73 (worktree) · 9b2115d (main) | PASA (worktree: verificador 14/14, verificador-b 15/15 [conteo propio]; main: verificador 14/14) | ruta: delegada · commit T1: 1298e73 · merge c5174c1 · `# noqa: E501` en models.py:60 por el grep de una línea |
+| 2026-10-02 | T2 | 20456ae (worktree) · 9b2115d (main) | PASA (worktree: verificador 10/10, verificador-b 10/10; main: verificador 10/10) | ruta: delegada · commit T2: 20456ae · merge 99c2008 |
+| 2026-10-02 | T3 | 07e536e (worktree) · 9b2115d (main) | PASA (worktree: verificador 9/9, verificador-b 9/9; main: verificador 9/9) | ruta: delegada · commit T3: 07e536e · merge 9b2115d |
 | | TODO | | | |
