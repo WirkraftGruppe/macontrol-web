@@ -1,9 +1,9 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `modelos-dominio` cerrado con TODO PASA 51/51)
+Plan activo: `docs/planes/2026-10-02-auditoria-dominio.md` (congelado en 4d8223d)
 Rama: main
-Pendiente inmediato: decidir el hallazgo H1 del auditor (historial de Sitio con datos de contacto) antes de cargar datos reales; después, plan de Visita.
+Pendiente inmediato: ejecutar la ola de auditoria-dominio (T1 sitios, T2 proyectos, T3 clientes en paralelo con worktrees); después, plan de Visita.
 Problemas abiertos:
 - [importante, abierto, decisión del usuario] Auditoría de `modelos-dominio`, H1: `HistoricalSitio` guarda `contacto_en_sitio`, `telefono_en_sitio`, dirección y coordenadas sin mecanismo de borrado. Ante una supresión (Ley 25.326, art. 16), la fila histórica queda. Opciones: (a) `excluded_fields=["contacto_en_sitio", "telefono_en_sitio"]`; (b) mantenerlos con un procedimiento de supresión o `clean_old_history --days N`. Las dos requieren una migración: conviene decidir antes de tener datos reales.
 - [menor, abierto] Auditoría de `modelos-dominio`:

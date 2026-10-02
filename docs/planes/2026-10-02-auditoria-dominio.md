@@ -149,7 +149,7 @@ No lleva criterios propios, porque el hook no los ejecuta fuera de `### T<n>`. L
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): auditoria-dominio>
+commit_base: 4d8223d
 
 ### Estado de subtareas
 
