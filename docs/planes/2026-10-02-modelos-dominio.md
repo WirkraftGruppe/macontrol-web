@@ -187,7 +187,7 @@ commit_base: ced3334
 | T1 | hecha |
 | T2 | hecha |
 | T3 | hecha |
-| T4 | pendiente |
+| T4 | hecha |
 
 ### Corridas
 
@@ -196,5 +196,5 @@ commit_base: ced3334
 | 2026-10-02 | T1 | d296031 (worktree) · c4cb9cb (main) | PASA (worktree: verificador 15/15, verificador-b 15/15; main: verificador 15/15) | ruta: delegada · commit T1: d296031 · merge 271a00a |
 | 2026-10-02 | T2 | 2215f95 (worktree) · c4cb9cb (main) | PASA (worktree: verificador 11/11, verificador-b 11/11; main: verificador 11/11) | ruta: delegada · commit T2: 2215f95 · merge 23c5055 |
 | 2026-10-02 | T3 | a272650 (worktree) · c4cb9cb (main) | PASA (worktree: verificador 6/6, verificador-b 6/6; main: verificador 6/6) | ruta: delegada · commit T3: a272650 · merge c4cb9cb |
-| | T4 | | | |
+| 2026-10-02 | T4 | d126350 | PASA (verificador 12/12; verificador-b 12/12) | ruta: delegada · commit T4: d126350 · sin worktree |
 | | TODO | | | |
