@@ -197,4 +197,4 @@ commit_base: ced3334
 | 2026-10-02 | T2 | 2215f95 (worktree) · c4cb9cb (main) | PASA (worktree: verificador 11/11, verificador-b 11/11; main: verificador 11/11) | ruta: delegada · commit T2: 2215f95 · merge 23c5055 |
 | 2026-10-02 | T3 | a272650 (worktree) · c4cb9cb (main) | PASA (worktree: verificador 6/6, verificador-b 6/6; main: verificador 6/6) | ruta: delegada · commit T3: a272650 · merge c4cb9cb |
 | 2026-10-02 | T4 | d126350 | PASA (verificador 12/12; verificador-b 12/12) | ruta: delegada · commit T4: d126350 · sin worktree |
-| | TODO | | | |
+| 2026-10-02 | TODO | 60d41f8 | PASA (verificador 51/51: T1 15, T2 11, T3 6, T4 12, cierre global 7) | auditor-seguridad: 0 bloqueantes; H1 importante (historial de Sitio con datos de contacto) y H2–H4 menores, abiertos en la bitácora |
