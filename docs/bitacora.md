@@ -1,9 +1,9 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `auditoria-dominio` cerrado con TODO PASA 40/40)
+Plan activo: `docs/planes/2026-10-02-acciones-sitio.md` (congelado en e6f47e4)
 Rama: main
-Pendiente inmediato: decidir H1-a y H3-a (re-auditoría de `auditoria-dominio`); después, plan de Visita.
+Pendiente inmediato: ejecutar T1 de acciones-sitio (H1-a opción b y H3-a aprobados por el usuario); después, plan de Visita.
 Problemas abiertos:
 - [importante, abierto, decisión del usuario] Re-auditoría de `auditoria-dominio`, H1-a: `suprimir_sitio` no se llama desde ningún flujo. "Eliminar" en el admin usa el borrado común: conserva todo el historial (dirección, coordenadas, notas) y `SimpleHistoryAdmin` permite recuperar el sitio. Opciones: (a) `delete_model`/`delete_queryset` del admin que llamen a `suprimir_sitio`; (b) una acción separada "Suprimir datos (Ley 25.326)" con permiso de borrado y confirmación.
 - [importante, abierto] Re-auditoría, H3-a: la acción `regenerar_qr` no declara `permissions`. Cualquier staff con solo `view_sitio` la ve y puede invalidar todos los QR de una vez, sin confirmación (comprobado en el shell). Propuesta: `permissions=["regenerar_qr"]` con `has_regenerar_qr_permission` por `rol == administrador`, página de confirmación, tope de cantidad y un test con un staff que solo tenga `view_sitio`.

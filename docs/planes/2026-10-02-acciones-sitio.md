@@ -108,7 +108,7 @@ Nada: una sola subtarea sobre `main`, sin migraciones nuevas.
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): acciones-sitio>
+commit_base: e6f47e4
 
 ### Estado de subtareas
 
