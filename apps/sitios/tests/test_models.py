@@ -1,3 +1,4 @@
+from django.core.exceptions import FieldDoesNotExist
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -30,3 +31,9 @@ class SitioTests(TestCase):
         sitio.nombre = "Planta Norte"
         sitio.save()
         self.assertEqual(sitio.history.count(), 2)
+
+    def test_historial_no_guarda_contacto_ni_telefono(self):
+        modelo = Sitio.history.model
+        for campo in ("contacto_en_sitio", "telefono_en_sitio"):
+            with self.assertRaises(FieldDoesNotExist):
+                modelo._meta.get_field(campo)
