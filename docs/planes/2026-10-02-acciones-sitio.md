@@ -121,4 +121,4 @@ commit_base: e6f47e4
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-02 | T1 | 084e253 | PASA (verificador 18/18; verificador-b 18/18) | ruta: delegada · commit T1: 084e253 · sin worktree · `ruff format` tocó models.py y se restauró (diff vacío) |
-| | TODO | | | |
+| 2026-10-02 | TODO | 1d03e23 | PASA (verificador 25/25: T1 18, cierre global 7) | auditor-seguridad: H1-a, H3-a y H3-b CERRADOS; 1 hallazgo menor nuevo (historial de Proyecto de un sitio suprimido), abierto en la bitácora |

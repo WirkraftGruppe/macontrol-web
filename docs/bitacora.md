@@ -1,16 +1,18 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: `docs/planes/2026-10-02-acciones-sitio.md` (congelado en e6f47e4)
+Plan activo: (ninguno; `acciones-sitio` cerrado con TODO PASA 25/25)
 Rama: main
-Pendiente inmediato: ejecutar T1 de acciones-sitio (H1-a opción b y H3-a aprobados por el usuario); después, plan de Visita.
+Pendiente inmediato: plan de Visita. Antes, decidir si se corrige el hallazgo menor del historial de Proyecto (ver abajo).
 Problemas abiertos:
-- [importante, abierto, decisión del usuario] Re-auditoría de `auditoria-dominio`, H1-a: `suprimir_sitio` no se llama desde ningún flujo. "Eliminar" en el admin usa el borrado común: conserva todo el historial (dirección, coordenadas, notas) y `SimpleHistoryAdmin` permite recuperar el sitio. Opciones: (a) `delete_model`/`delete_queryset` del admin que llamen a `suprimir_sitio`; (b) una acción separada "Suprimir datos (Ley 25.326)" con permiso de borrado y confirmación.
-- [importante, abierto] Re-auditoría, H3-a: la acción `regenerar_qr` no declara `permissions`. Cualquier staff con solo `view_sitio` la ve y puede invalidar todos los QR de una vez, sin confirmación (comprobado en el shell). Propuesta: `permissions=["regenerar_qr"]` con `has_regenerar_qr_permission` por `rol == administrador`, página de confirmación, tope de cantidad y un test con un staff que solo tenga `view_sitio`.
-- [menor, abierto] Re-auditoría:
+- [menor, abierto, decisión del usuario] Auditoría de `acciones-sitio` (PLAUSIBLE, no probado en ejecución): si un proyecto se borra y después su sitio se suprime, quedan dos problemas:
+  - `HistoricalProyecto` conserva `sitio_id`, el título y el detalle del proyecto, que podrían mencionar el domicilio o al titular.
+  - `/admin/proyectos/proyecto/<id>/history/` daría 500, porque `Proyecto.__str__` lee `self.sitio`.
+
+  Propuesta: borrar `Proyecto.history.filter(sitio_id=pk)` dentro de `suprimir_sitio`, hacer que `__str__` tolere un sitio inexistente y agregar un test. Se puede hacer en el plan de Visita, que vuelve a tocar Proyecto.
+- [menor, abierto] Re-auditoría de `auditoria-dominio`:
   - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
   - Las columnas borradas por `sitios/0002` siguen en disco hasta un `VACUUM FULL` y siguen en los backups (decisión de retención).
-  - H3-b: `regenerar_qr` hace `save()` sin `update_fields`, así que puede pisar ediciones concurrentes. Propuesta: `update_fields` y `_change_reason`.
   - H2: `bulk_create`/`update()` saltean la validación de encargados. Hoy no se usan.
   - H4: ante resto 10 se acepta 9 aunque AFIP nunca emite ese caso con el mismo prefijo, y los CUIT ya cargados no se revalidan.
 - [menor] `apps/sitios/models.py:60` lleva `# noqa: E501` porque el criterio del plan exigía la línea de `excluded_fields` en una sola línea; `ruff format` la partiría.
@@ -25,6 +27,21 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-02 — Acciones de Sitio por rol administrador (H1-a, H3-a)
+Hecho:
+- Plan `docs/planes/2026-10-02-acciones-sitio.md`, congelado en e6f47e4. El juez-plan dio 0 bloqueantes y 1 observación, que se aplicó.
+- Decisiones del usuario: H1-a con la opción (b) y H3-a aprobado. Las dos quedaron en `docs/decisiones.md`.
+- T1 (084e253):
+  - "Suprimir datos (Ley 25.326)" es una acción separada, con confirmación, que borra el sitio y su historial e informa qué sitios tienen proyectos.
+  - `regenerar_qr` exige rol administrador, pide confirmación, acepta como máximo 20 sitios y guarda el motivo en el historial con `update_fields`.
+- El test de permisos se vio fallar antes del cambio. Los tests de confirmación del admin no se corrieron antes de implementar.
+- verificador y verificador-b dieron PASA 18/18. Verificación final: TODO PASA 25/25 en 1d03e23, 54 tests.
+- auditor-seguridad: H1-a, H3-a y H3-b CERRADOS. Hay un hallazgo nuevo menor, sobre el historial de Proyecto de un sitio suprimido (ver Problemas abiertos).
+
+Incidente: el implementador corrió `ruff format` y tocó `apps/sitios/models.py`, que no tenía permitido. Lo restauró, y el diff del commit sobre ese archivo está vacío.
+
+A medias: nada del plan.
 
 ### 2026-10-02 — Correcciones de la auditoría de dominio (H1–H4)
 Hecho:
