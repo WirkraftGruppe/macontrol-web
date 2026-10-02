@@ -3,6 +3,8 @@
 from django.core.validators import RegexValidator
 from django.db import models
 
+from apps.clientes.validators import validar_cuit
+
 
 class Cliente(models.Model):
     """Empresa o persona a la que MAControl presta servicios."""
@@ -13,7 +15,8 @@ class Cliente(models.Model):
         max_length=11,
         blank=True,
         validators=[
-            RegexValidator(r"^\d{11}$", "El CUIT debe tener 11 dígitos, sin guiones.")
+            RegexValidator(r"^\d{11}$", "El CUIT debe tener 11 dígitos, sin guiones."),
+            validar_cuit,
         ],
     )
     contacto_nombre = models.CharField("nombre de contacto", max_length=150, blank=True)
