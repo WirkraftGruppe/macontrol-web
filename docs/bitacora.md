@@ -1,15 +1,19 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: `docs/planes/2026-10-02-auditoria-dominio.md` (congelado en 4d8223d)
+Plan activo: (ninguno; `auditoria-dominio` cerrado con TODO PASA 40/40)
 Rama: main
-Pendiente inmediato: ejecutar la ola de auditoria-dominio (T1 sitios, T2 proyectos, T3 clientes en paralelo con worktrees); después, plan de Visita.
+Pendiente inmediato: decidir H1-a y H3-a (re-auditoría de `auditoria-dominio`); después, plan de Visita.
 Problemas abiertos:
-- [importante, abierto, decisión del usuario] Auditoría de `modelos-dominio`, H1: `HistoricalSitio` guarda `contacto_en_sitio`, `telefono_en_sitio`, dirección y coordenadas sin mecanismo de borrado. Ante una supresión (Ley 25.326, art. 16), la fila histórica queda. Opciones: (a) `excluded_fields=["contacto_en_sitio", "telefono_en_sitio"]`; (b) mantenerlos con un procedimiento de supresión o `clean_old_history --days N`. Las dos requieren una migración: conviene decidir antes de tener datos reales.
-- [menor, abierto] Auditoría de `modelos-dominio`:
-  - H2: el `limit_choices_to` de los encargados de Proyecto solo se aplica con `full_clean` (no en `create()`/`save()`) y no filtra `is_active`. Propuesta: validar en `save()` y usar `User.Rol.EMPLEADO`.
-  - H3: `qr_codigo` no se puede rotar si la etiqueta se filtra. Propuesta: una acción `regenerar_qr()` en el plan de panel/QR.
-  - H4: el CUIT no valida el dígito verificador (módulo 11).
+- [importante, abierto, decisión del usuario] Re-auditoría de `auditoria-dominio`, H1-a: `suprimir_sitio` no se llama desde ningún flujo. "Eliminar" en el admin usa el borrado común: conserva todo el historial (dirección, coordenadas, notas) y `SimpleHistoryAdmin` permite recuperar el sitio. Opciones: (a) `delete_model`/`delete_queryset` del admin que llamen a `suprimir_sitio`; (b) una acción separada "Suprimir datos (Ley 25.326)" con permiso de borrado y confirmación.
+- [importante, abierto] Re-auditoría, H3-a: la acción `regenerar_qr` no declara `permissions`. Cualquier staff con solo `view_sitio` la ve y puede invalidar todos los QR de una vez, sin confirmación (comprobado en el shell). Propuesta: `permissions=["regenerar_qr"]` con `has_regenerar_qr_permission` por `rol == administrador`, página de confirmación, tope de cantidad y un test con un staff que solo tenga `view_sitio`.
+- [menor, abierto] Re-auditoría:
+  - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
+  - Las columnas borradas por `sitios/0002` siguen en disco hasta un `VACUUM FULL` y siguen en los backups (decisión de retención).
+  - H3-b: `regenerar_qr` hace `save()` sin `update_fields`, así que puede pisar ediciones concurrentes. Propuesta: `update_fields` y `_change_reason`.
+  - H2: `bulk_create`/`update()` saltean la validación de encargados. Hoy no se usan.
+  - H4: ante resto 10 se acepta 9 aunque AFIP nunca emite ese caso con el mismo prefijo, y los CUIT ya cargados no se revalidan.
+- [menor] `apps/sitios/models.py:60` lleva `# noqa: E501` porque el criterio del plan exigía la línea de `excluded_fields` en una sola línea; `ruff format` la partiría.
 - Para el plan de Visita (auditor): guardar una copia del esquema de planilla en cada Visita. `CampoPlanilla` no tiene historial, y cambiar una `clave` cambia cómo se leen las planillas viejas.
 - [importante, abierto, diferido al plan de despliegue por decisión del usuario: hoy es solo desarrollo] La barrera de `config/settings/dev.py` solo mira `ALLOWED_HOSTS`. Con `DJANGO_ENV=development` y `ALLOWED_HOSTS` vacío en un hosting, el sitio arranca con `DEBUG=True` y la página técnica del 400 expone tracebacks y settings; con `runserver`, también `DATABASE_URL`, porque no coincide con el patrón de ocultamiento (comprobado por el auditor). Propuesta del auditor: abortar si hay variables propias del hosting (`RAILWAY_ENVIRONMENT`, `RENDER`, `DYNO`, `FLY_APP_NAME`, `K_SERVICE`…), que hay que ajustar al hosting real. [menor] Las IP privadas en `ALLOWED_HOSTS` no limitan quién se conecta (el Host lo elige el cliente). (El `.strip()` de `ALLOWED_HOSTS` ya está corregido: plan `hosts-espacios`.)
 - El plan de autenticación tiene que invertir `test_panel_responde_200` y `test_api_v1_responde_200` (hoy fijan el acceso anónimo) y seguir la lista de condiciones del auditor: mixin por `es_administrador`, DRF con `IsAuthenticated` y JWT, `AdminSite` restringido, `simple_history` en `User` con `excluded_fields=["password", "last_login"]` (si no, copia el hash, y con el middleware de historial ya activo cada login genera un registro), LOGGING sin datos personales y CSP.
@@ -21,6 +25,19 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-02 — Correcciones de la auditoría de dominio (H1–H4)
+Hecho:
+- Plan `docs/planes/2026-10-02-auditoria-dominio.md`, congelado en 4d8223d. El juez-plan dio 0 bloqueantes y 3 observaciones, aplicadas antes de congelar. Decisión de H1 en `docs/decisiones.md`.
+- Una ola en paralelo con worktrees, integrada en 9b2115d:
+  - T1: historial de Sitio sin contacto ni teléfono, `suprimir_sitio`, `regenerar_qr` y la acción del admin (1298e73).
+  - T2: encargados validados en `save()` como empleados activos, solo al asignarlos (20456ae).
+  - T3: dígito verificador del CUIT (07e536e).
+- T1 y T2 vieron fallar sus tests antes de implementar; T3, uno de los dos.
+- verificador y verificador-b dieron PASA en cada subtarea. Verificación final: TODO PASA 40/40 en 64fb555, con 47 tests.
+- auditor-seguridad: H2 y H4 CERRADOS; H1 y H3 CERRADO PARCIAL, con dos hallazgos nuevos importantes (H1-a y H3-a) y varios menores (ver Problemas abiertos).
+
+A medias: H1-a y H3-a, que esperan una decisión del usuario.
 
 ### 2026-10-02 — Modelos de dominio
 Hecho:

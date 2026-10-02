@@ -166,4 +166,4 @@ commit_base: 4d8223d
 | 2026-10-02 | T1 | 1298e73 (worktree) · 9b2115d (main) | PASA (worktree: verificador 14/14, verificador-b 15/15 [conteo propio]; main: verificador 14/14) | ruta: delegada · commit T1: 1298e73 · merge c5174c1 · `# noqa: E501` en models.py:60 por el grep de una línea |
 | 2026-10-02 | T2 | 20456ae (worktree) · 9b2115d (main) | PASA (worktree: verificador 10/10, verificador-b 10/10; main: verificador 10/10) | ruta: delegada · commit T2: 20456ae · merge 99c2008 |
 | 2026-10-02 | T3 | 07e536e (worktree) · 9b2115d (main) | PASA (worktree: verificador 9/9, verificador-b 9/9; main: verificador 9/9) | ruta: delegada · commit T3: 07e536e · merge 9b2115d |
-| | TODO | | | |
+| 2026-10-02 | TODO | 64fb555 | PASA (verificador 40/40: T1 14, T2 10, T3 9, cierre global 7) | auditor-seguridad: H2 y H4 CERRADOS; H1 y H3 CERRADO PARCIAL; nuevos H1-a y H3-a importantes, abiertos en la bitácora |
