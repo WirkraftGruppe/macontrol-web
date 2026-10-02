@@ -114,11 +114,11 @@ commit_base: e6f47e4
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-02 | T1 | 084e253 | PASA (verificador 18/18; verificador-b 18/18) | ruta: delegada · commit T1: 084e253 · sin worktree · `ruff format` tocó models.py y se restauró (diff vacío) |
 | | TODO | | | |
