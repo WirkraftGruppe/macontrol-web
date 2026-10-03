@@ -268,7 +268,7 @@ commit_base: 071ecb5
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
+| T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
 | T5 | pendiente |
@@ -280,6 +280,7 @@ commit_base: 071ecb5
 | 2026-10-03 | T1 | db4f2d5 | verificador: PASA 7/7 · verificador-b: PASA 7/7 | auditor-seguridad: sin bloqueantes; 3 importantes (default NUM_PROXIES=0 en prod, token fuera de los baldes de usuario, 10 IP o un /64 bloquean al administrador) y 3 menores (parser de NUM_PROXIES, dos fuentes de NUM_PROXIES, LocMem). Integrada en a9acc82. |
 | 2026-10-03 | T4 | a8070b3 | verificador: PASA 12/12 · verificador-b: PASA 12/12 | Integrada en 9852214. |
 | 2026-10-03 | T3 | 7c09024 | verificador: PASA 7/7 · verificador-b: PASA 7/7 | Integrada en ac5f7d0. |
+| 2026-10-03 | T2 | edd90ae | verificador: 24/24 criterios PASA, veredicto FALLA solo por contrato MODIFICADO (387c9a7, decisión del usuario) · verificador-b: 26/26 PASA, mismo motivo | auditor-seguridad: sin bloqueantes; 2 importantes (throttles DRF sin agrupar IPv6 por /64; IPv4 mapeadas caen en ::/64) y 4 menores, pasan a pendientes del plan. Integrada en ff0bf06; tasa autenticacion quitada después. |
 
 ## Pendientes que deja este plan
 
