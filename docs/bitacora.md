@@ -7,11 +7,17 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `paralelismo` | `plan/paralelismo` | cerrado (olas 1-3 en PASA) | verificación TODO y decisión del usuario sobre el merge a `main` | principal en la raíz |
+| `paralelismo` | `plan/paralelismo` | cerrado (olas 1-3 en PASA, corrección del auditor integrada) | verificación TODO y decisión del usuario sobre el merge a `main` | principal en la raíz |
 
 Después: plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
 
 Problemas abiertos:
+- [menor, abierto, decisión del usuario] Auditoría de `paralelismo` sobre `worktree-integrar.sh`:
+  - el control de alcance compara prefijos de texto, no segmentos de ruta: `apps/clientes` acepta `apps/clientes_v2/…`, y un argumento vacío (`""`) acepta cualquier archivo. Propuesta: rechazar prefijos vacíos y comparar `"$p"|"$p"/*`;
+  - si fallan los tests o `makemigrations` después del merge, el commit de merge queda en el destino y el mensaje no lo dice;
+  - `rama_base` de `worktree-crear.sh` no se valida (un valor que empiece con `-` se toma como opción), e integrar no comprueba que la ruta sea un worktree registrado;
+  - si la prueba de humo falla, la junction queda viva en `worktrees/`: limpiar con `cmd /c rmdir <venv>` y después `git worktree remove`; nunca `Remove-Item -Recurse` de PowerShell 5.1, que sigue la junction y vacía el venv real.
+  - Observaciones de T1: `RE_FECHA_SLUG` usa `\d` (acepta dígitos Unicode, `contexto.sh` usa `[0-9]`); `plan_de_rama` vuelve a la bitácora sin avisar cuando `validar_plan` rechaza el candidato; una rama con el slug de un plan viejo hace verificar ese plan congelado (el mismo riesgo que ya existía con `Plan activo:`).
 - [menor, abierto, decisión del usuario] Auditoría de `acciones-sitio` (PLAUSIBLE, no probado en ejecución): si un proyecto se borra y después su sitio se suprime, quedan dos problemas:
   - `HistoricalProyecto` conserva `sitio_id`, el título y el detalle del proyecto, que podrían mencionar el domicilio o al titular.
   - `/admin/proyectos/proyecto/<id>/history/` daría 500, porque `Proyecto.__str__` lee `self.sitio`.
@@ -34,6 +40,17 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-02 — Paralelismo con multiagentes (worktrees, plan por rama, rutas por app)
+Hecho:
+- Plan `docs/planes/2026-10-02-paralelismo.md`, congelado en 2823e82 sobre la rama `plan/paralelismo`. El juez-plan encontró 4 bloqueantes y 1 observación; se corrigieron antes de congelar.
+- Ola 1: T2, scripts `worktree-crear.sh` y `worktree-integrar.sh` (junction de `venv`, control de alcance, merge `--no-ff`). Se hizo inline porque era el bootstrap.
+- Ola 2: T1 (el plan se deriva de la rama), T3 (`api_urls.py`/`panel_urls.py` por app, routers de una línea, `templates/panel/base.html`) y T4 (documentación). Las tres en paralelo, cada una en su worktree, integradas con los scripts.
+- Ola 3: T5, prueba de fuego. Dos worktrees (clientes y productos), dos implementadores en paralelo, integración con exit 0 y salida literal en el Registro.
+- pytest instalado en `py -3` por decisión del usuario.
+- Cada subtarea dio PASA con verificador y verificador-b.
+- auditor-seguridad: T1 sin hallazgos. En T2, 1 bloqueante (un renombre esquivaba el control de alcance), corregido en 1bf9878 con un test que se vio fallar antes del cambio. Los hallazgos menores quedan en Problemas abiertos.
+- Incidente: en T3, `git worktree remove` dio "Permission denied" porque el shell del principal tenía el cwd dentro del worktree. Quedó anotado en el Registro y como decisión.
 
 ### 2026-10-02 — Acciones de Sitio por rol administrador (H1-a, H3-a)
 Hecho:
