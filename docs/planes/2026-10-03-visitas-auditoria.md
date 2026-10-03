@@ -225,4 +225,4 @@ commit_base: 9ef9c1e
 | 2026-10-03 | T2 | 39caa50 | PASA 10/10 (verificador y verificador-b) | integrada en 9c5dd0a |
 | 2026-10-03 | T3 | 473d834 | PASA 9/9 (verificador y verificador-b) | integrada en e3f112d |
 | 2026-10-03 | T4 | 9de7a82 | PASA 9/9 (verificador y verificador-b) | una ronda de corrección del principal (FotoInline sin borrado, visita de solo lectura); integrada en 7dad5a5 |
-| | TODO | | | |
+| 2026-10-03 | TODO | 359505c | PASA 48/48 (verificador y verificador-b) | re-auditoría: 1-7, 9 y 11 cerrados; bloqueante nuevo N2 (revertir desde el historial) → plan `historial-revert`; N1, N3, N4, N5 en bitácora |
