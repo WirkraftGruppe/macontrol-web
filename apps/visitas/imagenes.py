@@ -25,7 +25,12 @@ def procesar_imagen(archivo) -> ContentFile:
                 if ancho * alto > MAX_PIXELES:
                     raise Image.DecompressionBombError("Demasiados píxeles.")
                 original.draft("RGB", (LADO_MAXIMO, LADO_MAXIMO))
-                imagen = ImageOps.exif_transpose(original)
+                try:
+                    imagen = ImageOps.exif_transpose(original)
+                except Exception:  # noqa: BLE001
+                    # La rotación es cosmética y el EXIF se descarta igual: un EXIF
+                    # corrupto (struct.error, SyntaxError, etc.) no debe dar un 500.
+                    imagen = original
                 imagen.thumbnail((LADO_MAXIMO, LADO_MAXIMO))
                 imagen = imagen.convert("RGB")
                 imagen.info = {}
