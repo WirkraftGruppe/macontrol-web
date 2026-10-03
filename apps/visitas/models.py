@@ -1,1 +1,149 @@
-"""Modelos de Visitas (aún sin modelos)."""
+"""Modelos de Visitas: Visita, Foto y ProductoAplicado."""
+
+from uuid import uuid4
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from simple_history.models import HistoricalRecords
+
+from apps.accounts.models import User
+
+from . import imagenes
+
+
+class Visita(models.Model):
+    class Origen(models.TextChoices):
+        APP = "app", "App móvil"
+        MANUAL = "manual", "Manual"
+
+    class Estado(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        REALIZADA = "realizada", "Realizada"
+        CANCELADA = "cancelada", "Cancelada"
+
+    proyecto = models.ForeignKey(
+        "proyectos.Proyecto",
+        on_delete=models.PROTECT,
+        related_name="visitas",
+        verbose_name="proyecto",
+    )
+    empleado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="visitas",
+        limit_choices_to={"rol": User.Rol.EMPLEADO},
+        verbose_name="empleado",
+    )
+    origen = models.CharField("origen", max_length=10, choices=Origen.choices)
+    motivo_manual = models.TextField("motivo manual", blank=True)
+    programada_para = models.DateField("programada para", null=True, blank=True)
+    asignada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="visitas_asignadas",
+        verbose_name="asignada por",
+    )
+    realizada_en = models.DateTimeField("realizada en", null=True, blank=True)
+    estado = models.CharField(
+        "estado", max_length=10, choices=Estado.choices, default=Estado.PENDIENTE
+    )
+    latitud = models.DecimalField(
+        "latitud", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitud = models.DecimalField(
+        "longitud", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    precision_m = models.DecimalField(
+        "precisión (m)", max_digits=7, decimal_places=1, null=True, blank=True
+    )
+    datos = models.JSONField("datos de la planilla", default=dict, blank=True)
+    esquema_planilla = models.JSONField(
+        "esquema de la planilla", default=list, blank=True
+    )
+    observaciones = models.TextField("observaciones", blank=True)
+    incidencia = models.BooleanField("incidencia", default=False)
+    incidencia_detalle = models.TextField("detalle de la incidencia", blank=True)
+    creado = models.DateTimeField("creado", auto_now_add=True)
+    actualizado = models.DateTimeField("actualizado", auto_now=True)
+
+    history = HistoricalRecords(
+        excluded_fields=["latitud", "longitud", "precision_m", "datos"]
+    )
+
+    class Meta:
+        verbose_name = "visita"
+        verbose_name_plural = "visitas"
+        ordering = ["-creado"]
+
+    def __str__(self):
+        return f"Visita {self.pk} - {self.proyecto_id}"
+
+    def clean(self):
+        super().clean()
+        if self.estado == self.Estado.REALIZADA and not self.realizada_en:
+            raise ValidationError({"realizada_en": "Falta la fecha de realización."})
+        if self.estado == self.Estado.CANCELADA and self.realizada_en:
+            raise ValidationError(
+                {"realizada_en": "Una cancelada no lleva fecha de realización."}
+            )
+
+
+def ruta_foto(instancia, nombre):
+    """Ruta de almacenamiento: UUID aleatorio, nunca el nombre original."""
+    return f"visitas/fotos/{uuid4().hex}.jpg"
+
+
+class Foto(models.Model):
+    visita = models.ForeignKey(
+        Visita,
+        on_delete=models.CASCADE,
+        related_name="fotos",
+        verbose_name="visita",
+    )
+    imagen = models.ImageField("imagen", upload_to=ruta_foto)
+    tomada_en = models.DateTimeField("tomada en", null=True, blank=True)
+    orden = models.PositiveSmallIntegerField("orden", default=0)
+
+    class Meta:
+        verbose_name = "foto"
+        verbose_name_plural = "fotos"
+        ordering = ["orden", "id"]
+
+    def __str__(self):
+        return f"Foto {self.pk} de visita {self.visita_id}"
+
+    def save(self, *args, **kwargs):
+        if self.imagen and not self.imagen._committed:
+            contenido = imagenes.procesar_imagen(self.imagen)
+            self.imagen.save("foto.jpg", contenido, save=False)
+        super().save(*args, **kwargs)
+
+
+class ProductoAplicado(models.Model):
+    visita = models.ForeignKey(
+        Visita,
+        on_delete=models.CASCADE,
+        related_name="productos",
+        verbose_name="visita",
+    )
+    producto = models.ForeignKey(
+        "productos.Producto",
+        on_delete=models.PROTECT,
+        verbose_name="producto",
+    )
+    lote = models.CharField("lote", max_length=60)
+    dosis = models.DecimalField("dosis", max_digits=10, decimal_places=3)
+    unidad = models.CharField("unidad", max_length=20)
+    cantidad = models.DecimalField(
+        "cantidad", max_digits=10, decimal_places=3, null=True, blank=True
+    )
+
+    class Meta:
+        verbose_name = "producto aplicado"
+        verbose_name_plural = "productos aplicados"
+
+    def __str__(self):
+        return f"{self.producto_id} en visita {self.visita_id}"
