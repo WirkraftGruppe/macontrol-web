@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
+from apps.sitios import services
 from apps.sitios.models import Sitio
 
 
@@ -90,3 +91,31 @@ class SitioAdminTests(TestCase):
         self.assertEqual(respuesta.status_code, 302)
         self.assertFalse(Sitio.objects.filter(pk=pk).exists())
         self.assertEqual(Sitio.history.filter(id=pk).count(), 0)
+
+    def test_revertir_sitio_desde_historial_esta_prohibido(self):
+        self.client.force_login(self.administrador)
+        anterior = self.sitio.qr_codigo
+        nuevo = services.regenerar_qr(self.sitio)
+        version_anterior = Sitio.history.filter(id=self.sitio.pk).order_by(
+            "history_date", "history_id"
+        )[0]
+        self.assertEqual(version_anterior.qr_codigo, anterior)
+        url = reverse(
+            "admin:sitios_sitio_simple_history",
+            args=[self.sitio.pk, version_anterior.history_id],
+        )
+
+        respuesta = self.client.post(
+            url,
+            {
+                "cliente": self.cliente.pk,
+                "nombre": "Planta 1",
+                "sector": self.sitio.sector,
+                "activo": "on",
+            },
+        )
+
+        self.assertEqual(respuesta.status_code, 403)
+        self.sitio.refresh_from_db()
+        self.assertEqual(self.sitio.qr_codigo, nuevo)
+        self.assertEqual(self.client.get(url).status_code, 200)

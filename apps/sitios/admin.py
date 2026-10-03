@@ -1,5 +1,5 @@
 from django.contrib import admin, messages
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.template.response import TemplateResponse
 from simple_history.admin import SimpleHistoryAdmin
 
@@ -14,6 +14,12 @@ class SitioAdmin(SimpleHistoryAdmin):
     list_filter = ("sector", "activo")
     readonly_fields = ("qr_codigo",)
     actions = ["regenerar_qr", "suprimir_datos"]
+
+    def history_form_view(self, request, object_id, version_id, extra_context=None):
+        """Prohíbe revertir desde el historial: solo se consulta."""
+        if request.method == "POST":
+            raise PermissionDenied
+        return super().history_form_view(request, object_id, version_id, extra_context)
 
     def _es_administrador_activo(self, request):
         return request.user.is_active and getattr(
