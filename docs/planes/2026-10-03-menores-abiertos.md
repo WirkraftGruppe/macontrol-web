@@ -213,19 +213,20 @@ commit_base: b437ec1
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
-| T2 | en curso |
-| T3 | en curso |
-| T4 | en curso |
+| T1 | en curso (presupuesto: FALLA por contrato modificado; 133/160 contra b437ec1, revisión manual del usuario) |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
-| | T2 | | | |
-| | T3 | | | |
-| | T4 | | | |
+| 2026-10-03 | T1 | 7d26c38 | PASA (verificador 32/32, verificador-b) | contrato original; auditor: 1 bloqueante, 2 importantes |
+| 2026-10-03 | T2 | 58bc965 | PASA (verificador, verificador-b) | auditor: sin hallazgos propios |
+| 2026-10-03 | T3 | 6d07ea9 | PASA (verificador, verificador-b) | |
+| 2026-10-03 | T4 | 906f590 | PASA (verificador, verificador-b) | |
+| 2026-10-03 | T1 (corrección) | 6d901dc | FALLA 1 (presupuesto, por contrato modificado 3478391); resto PASA (verificador, verificador-b) | re-auditoría: MPO y ValueError cerrados; memoria sigue abierta (importante) |
 | | TODO | | | |
 
 ## Al cerrar (principal)
