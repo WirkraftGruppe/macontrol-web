@@ -232,6 +232,8 @@ commit_base: 2823e82
 | 2026-10-02 | T3, T4 | 001e553 | PASA (verificador 30/30: T3 19, T4 11; verificador-b 32/32) | ruta: delegada en worktrees · T3: c2c7a90, merge 4b9ab09 · T4: 559dc87, merge 001e553 · incidente T3: `worktree-integrar.sh` exit 1 en `git worktree remove` por "Permission denied" (el shell del principal tenía el cwd dentro del worktree); merge, makemigrations y tests ya habían pasado y la junction estaba quitada; el principal borró el directorio vacío y la rama `paralelismo-T3` a mano. Regla aplicada desde entonces: el principal no hace `cd` a worktrees, usa `git -C` |
 | 2026-10-02 | T1 | f0dd286 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada en worktree · T1: 094fb8c, merge f0dd286 · skip preexistente: test de symlink en test_contexto.py |
 | 2026-10-02 | T5 | cafbaae | PASA (verificador 8/8; verificador-b 8/8) | ruta: el principal crea e integra; dos implementadores (haiku) en paralelo · T5a 18ebe6d, merge ee462fb · T5b 7ee924a, merge f001a0e · salida literal abajo |
+| 2026-10-02 | T2 (corrección) | ae87b3f | auditor-seguridad: bloqueante "renombre esquiva el control de alcance" CERRADO | commit 1bf9878 (`--no-renames -z`), test `test_integrar_rechaza_renombre_desde_fuera_de_alcance` visto fallar antes; menores del auditor abiertos en la bitácora |
+| 2026-10-02 | TODO | de25aee | PASA (verificador 69/69; verificador-b 69/69) | T1-T5 + cierre global; 82 tests de hooks + 59 de Django; 1 skip preexistente (symlink) |
 
 ### Prueba de fuego (T5): salida literal
 
