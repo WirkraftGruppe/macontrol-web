@@ -7,7 +7,9 @@ from . import views
 app_name = "panel"
 
 urlpatterns = [
-    path("", views.inicio, name="inicio"),
+    path("", views.InicioView.as_view(), name="inicio"),
+    path("ingresar/", views.IngresarView.as_view(), name="ingresar"),
+    path("salir/", views.SalirView.as_view(), name="salir"),
     path("sitios/", include("apps.sitios.panel_urls")),
     path("clientes/", include("apps.clientes.panel_urls")),
     path("servicios/", include("apps.servicios.panel_urls")),

@@ -1,0 +1,13 @@
+{% extends "panel/base.html" %}
+{% block title %}Ingresar · MAControl{% endblock %}
+{% block contenido %}
+  <h1>Ingresar al panel</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <p>{{ form.username.label_tag }} {{ form.username }}</p>
+    <p>{{ form.password.label_tag }} {{ form.password }}</p>
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button type="submit">Ingresar</button>
+  </form>
+{% endblock %}

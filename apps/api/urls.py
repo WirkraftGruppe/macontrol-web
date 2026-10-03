@@ -7,7 +7,9 @@ from . import views
 app_name = "api"
 
 urlpatterns = [
-    path("", views.raiz, name="raiz"),
+    path("", views.RaizView.as_view(), name="raiz"),
+    path("auth/token/", views.ObtenerToken.as_view(), name="token"),
+    path("auth/token/refresh/", views.RenovarToken.as_view(), name="token_refresh"),
     path("sitios/", include("apps.sitios.api_urls")),
     path("clientes/", include("apps.clientes.api_urls")),
     path("servicios/", include("apps.servicios.api_urls")),
