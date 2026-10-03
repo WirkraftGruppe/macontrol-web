@@ -60,13 +60,13 @@ class AccesoPanelTests(TestCase):
         )
 
     def test_ingreso_limita_intentos_fallidos(self):
-        codigos = [self._ingresar("adm", "mala").status_code for _ in range(11)]
-        self.assertEqual(codigos[:10], [200] * 10)
-        self.assertEqual(codigos[10], 429)
+        codigos = [self._ingresar("adm", "mala").status_code for _ in range(6)]
+        self.assertEqual(codigos[:5], [200] * 5)
+        self.assertEqual(codigos[5], 429)
         self.assertEqual(self._ingresar("adm", CLAVE).status_code, 429)
 
     def test_ingreso_limitado_no_confirma_clave_de_empleado(self):
-        for _ in range(10):
+        for _ in range(5):
             self._ingresar("emp", "mala")
         respuesta = self._ingresar("emp", CLAVE)
         self.assertEqual(respuesta.status_code, 429)

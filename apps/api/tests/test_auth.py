@@ -17,10 +17,10 @@ class AuthApiTests(TestCase):
         self.addCleanup(cache.clear)
         self.usuario = User.objects.create_user("emp", password=CLAVE)
 
-    def _pedir_token(self, clave=CLAVE):
+    def _pedir_token(self, clave=CLAVE, usuario="emp"):
         return self.client.post(
             TOKEN,
-            {"username": "emp", "password": clave},
+            {"username": usuario, "password": clave},
             content_type="application/json",
         )
 
@@ -68,7 +68,7 @@ class AuthApiTests(TestCase):
         self.assertEqual(self._renovar(refresh).status_code, 401)
 
     def test_token_limita_intentos_anonimos(self):
-        codigos = [self._pedir_token("mala").status_code for _ in range(11)]
+        codigos = [self._pedir_token("mala", f"x{i}").status_code for i in range(11)]
         self.assertEqual(codigos[:10], [401] * 10)
         self.assertEqual(codigos[10], 429)
 
@@ -84,7 +84,7 @@ class AuthApiTests(TestCase):
 
     def test_renovar_tiene_cupo_propio(self):
         refresh = self._tokens()["refresh"]
-        for _ in range(10):
-            self._pedir_token("mala")
-        self.assertEqual(self._pedir_token("mala").status_code, 429)
+        for i in range(10):
+            self._pedir_token("mala", f"x{i}")
+        self.assertEqual(self._pedir_token("mala", "x10").status_code, 429)
         self.assertEqual(self._renovar(refresh).status_code, 200)
