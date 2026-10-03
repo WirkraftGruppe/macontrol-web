@@ -1,31 +1,31 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `visitas`, `visitas-auditoria` e `historial-revert` cerrados con TODO PASA y fusionados en `main`)
+Plan activo: docs/planes/2026-10-03-menores-abiertos.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| (ninguno) | `main` | — | decidir los menores abiertos de fotos (abajo) o seguir con el plan de API/autenticación | — |
-
-Después: plan de API/autenticación (antes, decidir si se corrigen los menores de fotos y N5).
+| `menores-abiertos` | `plan/menores-abiertos` | 1 (integrada) | revisión manual del usuario: contrato MODIFICADO (5 FALLA esperados, ver entrada) y decidir el merge a `main` | 2026-10-03 |
+| `autenticacion` | `plan/autenticacion` (worktree `worktrees/autenticacion`) | — | otra sesión; no tocada desde esta | — |
 
 Problemas abiertos:
-- [menor, abierto, decisión del usuario] Auditoría de `paralelismo` sobre `worktree-integrar.sh`:
-  - el control de alcance compara prefijos de texto, no segmentos de ruta: `apps/clientes` acepta `apps/clientes_v2/…`, y un argumento vacío (`""`) acepta cualquier archivo. Propuesta: rechazar prefijos vacíos y comparar `"$p"|"$p"/*`;
-  - si fallan los tests o `makemigrations` después del merge, el commit de merge queda en el destino y el mensaje no lo dice;
-  - `rama_base` de `worktree-crear.sh` no se valida (un valor que empiece con `-` se toma como opción), e integrar no comprueba que la ruta sea un worktree registrado;
+- [menor, abierto] Restos de la auditoría de `paralelismo` (lo demás cerrado por `menores-abiertos` T3):
   - si la prueba de humo falla, la junction queda viva en `worktrees/`: limpiar con `cmd /c rmdir <venv>` y después `git worktree remove`; nunca `Remove-Item -Recurse` de PowerShell 5.1, que sigue la junction y vacía el venv real.
   - Observaciones de T1: `RE_FECHA_SLUG` usa `\d` (acepta dígitos Unicode, `contexto.sh` usa `[0-9]`); `plan_de_rama` vuelve a la bitácora sin avisar cuando `validar_plan` rechaza el candidato; una rama con el slug de un plan viejo hace verificar ese plan congelado (el mismo riesgo que ya existía con `Plan activo:`).
-- [menor, abierto] Pendientes de la auditoría de `visitas` (los importantes 1-7, 9, 11 y el bloqueante N2 de revertir desde el historial quedaron cerrados por `visitas-auditoria` e `historial-revert`):
-  - Regresión menor de `historial-revert` T2 (re-auditoría): en `apps/visitas/imagenes.py` el `except Exception` alrededor de `exif_transpose` también se traga errores de decodificación (`exif_transpose` llama a `load()`): un PNG con IDAT corrupto, un GIF corrupto o un ICNS con un PNG bomba embebido se aceptan como imagen gris/en blanco en vez de rechazarse. Corrección validada por el auditor: `original.load()` antes del `try`, y tests con PNG corrupto e ICNS bomba.
-  - N1 (latente hasta que la API reciba fotos): WebP/PNG/TIFF chicos por debajo de `MAX_PIXELES` usan cientos de MB (WebP 8000×4900 de 2 KB → 660 MB). Propuesta: `Image.open(..., formats=("JPEG", "PNG", "WEBP"))`, tope por formato y `exif_transpose(in_place=True)`. Con `formats` también se cierra el 500 por `ValueError` de ICNS.
-  - N4: la `ValidationError` de `Foto.save` da 500 en el admin; validar en el formulario (`clean_imagen`).
-  - N5 (decisión de producto): `observaciones`, `incidencia`, `incidencia_detalle`, `programada_para` y `asignada_por` siguen editables en una visita realizada (con historial).
+- [importante, abierto] Memoria de `procesar_imagen` (re-auditoría de `menores-abiertos` T1, hallazgo 3, quedó abierto tras dos rondas):
+  - un JPEG secuencial no entrelazado (SOF0, un scan por componente) de 0,47 MB y menos de 40 MP llega a ≈393 MB: Pillow no lo marca `progressive`;
+  - con proporción extrema (40000×1000), `draft()` no reduce nada (≈168 MB).
+  - Corrección propuesta y medida por el auditor (scratchpad `prop/`): tratar también como costoso un JPEG con `JpegImagePlugin.get_sampling(original) not in (1, 2)` y rechazar si después de `draft` quedan más de 16 MP. Baja el peor caso aceptado a ≈170 MB. Es urgente antes de que la API reciba fotos.
+- [menor, abierto] Nuevos de la re-auditoría de `menores-abiertos`:
+  - se rechazan JPEG progresivos de más de 16 MP (reexportados por un editor o una app de mensajería) y WebP de más de 8 MP: la app tiene que redimensionar a 1600 px antes de subir;
+  - todo rechazo dice "El archivo no es una imagen válida.", también cuando el motivo es la resolución; conviene un mensaje propio para `DecompressionBombError`;
+  - en un WebP, libwebp reserva el lienzo en `Image.open`, antes del tope (2 GB de commit con un archivo de 10 KB de 16383²; no se toca la memoria, así que en Linux no se cuenta en el RSS). Ya pasaba antes de este plan.
+- [menor, abierto] Pendientes de la auditoría de `visitas` (los demás quedaron cerrados por `visitas-auditoria`, `historial-revert` y `menores-abiertos`):
   - Diferidos: el original con GPS pasa por el temporal del sistema si pesa más de 2,5 MB; HEIC no se abre; el servicio no compara `empleado` con el asignado (plan de API); retención de `HistoricalVisita` y de visitas al suprimir un sitio (decisión legal; hoy `PROTECT` lo impide); servir MEDIA solo con vista autenticada por permiso sobre la visita.
   - Observaciones: `ProyectoAdmin` permite revertir desde el historial (no explotable: los mismos campos se editan en el formulario); `test_borrar_visita_borra_los_archivos_de_sus_fotos` y las aserciones agregadas en la corrección de T4 de `visitas-auditoria` no se vieron fallar antes; `select_for_update` no bloquea en SQLite (desarrollo), sí en Postgres; `ProyectoTests.test_str_tolera_sitio_inexistente` usa `count() + 99999`; `datos` todavía no se valida contra el esquema.
-- [menor, abierto] Los bloques `### Ola` de `docs/plantilla-plan.md` no los ejecuta ni `verificar_plan.py` ni `verificador`: en `visitas` los criterios de integración se pusieron en el cierre global. Corregir la plantilla o el hook.
+- [menor, abierto] Proceso: `congelado.sh` sale con 1 y no imprime el `commit_base` cuando hay un commit `docs(plan): <slug> — modificado: …`. Por eso, en cuanto se modifica un contrato, todo criterio de presupuesto que lo use falla, junto con el cierre global, y el plan no puede llegar a TODO PASA. Le pasó a `menores-abiertos`. Decidir si un contrato modificado por el usuario se vuelve a congelar (y cómo) o si los hallazgos del auditor van siempre a un plan aparte.
 - [menor, abierto] Re-auditoría de `auditoria-dominio`:
   - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
   - Las columnas borradas por `sitios/0002` siguen en disco hasta un `VACUUM FULL` y siguen en los backups (decisión de retención).
@@ -42,6 +42,25 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-03 — Cierre de los menores de fotos, worktree y plantilla (`menores-abiertos`)
+Hecho:
+- Plan `docs/planes/2026-10-03-menores-abiertos.md`: una ola, 4 subtareas en paralelo, integradas en `plan/menores-abiertos` (`88a449c`). El juez del plan marcó 3 bloqueantes, corregidos antes de congelar.
+  - T1: `imagenes.py` acepta solo JPEG, PNG, WebP y MPO, con tope por formato (16 MP para JPEG progresivo o CMYK), `load()` fuera del `try` y `exif_transpose(in_place=True)`.
+  - T2: `clean_imagen` en el inline y en `FotoAdmin` (error de formulario en vez de 500), y `programada_para` y `asignada_por` de solo lectura en una visita cerrada (N5).
+  - T3: `worktree-integrar.sh` rechaza prefijos vacíos, compara por segmento, exige un worktree registrado y deshace el merge si fallan los tests o las migraciones; `worktree-crear.sh` valida `rama_base`.
+  - T4: la plantilla lleva la integración en `### Trabajo del principal (integración de la ola N)` y aclara que el hook solo ejecuta `### T<n>` y el cierre global.
+- El auditor de seguridad encontró en T1:
+  - 1 bloqueante: un MPO daba `KeyError` y un 500;
+  - 2 importantes: un `ValueError` de un `zTXt` enorme daba un 500, y la memoria seguía sin acotarse.
+- El usuario decidió corregir los tres con el contrato ampliado (commit `3478391`, `docs(plan): … — modificado`). Re-auditoría: MPO y `ValueError` cerrados; la memoria sigue abierta como importante (ver Problemas abiertos).
+- Verificación final TODO en `88a449c`: `verificador` y `verificador-b` dan FALLA en 5 criterios:
+  - todos por el contrato modificado: los 4 de presupuesto y el `congelado.sh` del cierre global;
+  - el resto pasa, con 105 tests de Django y 90 de hooks;
+  - los presupuestos medidos a mano contra `b437ec1` entran todos: T1 133/160, T2 96/200, T3 122/220, T4 50/100.
+- T1 quedó `en curso` en el Registro porque su criterio de presupuesto no pasa. T2 a T4 quedaron `hecha`.
+- Incidente: el principal hizo `cd` a un worktree desde su shell persistente, y la decisión del 2026-10-02 lo prohíbe. Se corrigió en el momento, con `git status` en la raíz y en los worktrees: sin daño.
+- El merge a `main` queda pendiente de la revisión manual del usuario.
 
 ### 2026-10-03 — Correcciones de la auditoría de visitas y bloqueo de la reversión desde el historial; fusión en main
 Hecho:
