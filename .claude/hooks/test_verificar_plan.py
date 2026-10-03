@@ -852,5 +852,20 @@ def test_rama_con_slug_invalido_no_ejecuta_plan_ajeno(tmp_path):
         assert proceso.returncode == 0, rama
 
 
+def test_plantilla_integracion_de_ola_fuera_de_las_tareas():
+    # La integración de cada ola es un encabezado propio: si fuera un párrafo, sus criterios se
+    # sumarían a la última `### T<n>` y el hook los ejecutaría como si fueran de esa tarea.
+    texto_plantilla = (DIR_HOOKS.parent.parent / "docs" / "plantilla-plan.md").read_text(
+        encoding="utf-8"
+    )
+    plan = verificar_plan.parsear_plan(texto_plantilla)
+    encabezado = texto_plantilla.index("### Trabajo del principal (integración de la ola 1)")
+    assert texto_plantilla.index("T1: integra <slug>-T1") > encabezado
+    for n, lista in plan.criterios.items():
+        assert not any("integra <slug>" in c.comando for c in lista), n
+    assert 3 in plan.criterios
+    assert len(plan.cierre_global) == 6
+
+
 if __name__ == "__main__":
     unittest.main()
