@@ -245,7 +245,7 @@
 
 ## Registro de verificación
 
-commit_base: (se anota tras el commit `docs(plan): autenticacion`)
+commit_base: 6d22ff1
 
 ### Estado de subtareas
 
