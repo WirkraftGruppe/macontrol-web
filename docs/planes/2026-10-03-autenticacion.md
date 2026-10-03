@@ -251,7 +251,7 @@ commit_base: 6d22ff1
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 | T2 | pendiente |
 | T4 | pendiente |
 | T3 | pendiente |
@@ -260,7 +260,8 @@ commit_base: 6d22ff1
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-03 | T1 | 2325ed9 | PASA (verificador y verificador-b, 16/16) | auditor: sin bloqueantes; I1, I2, M1, M2 en el filtro de logging |
+| 2026-10-03 | T1 (corrección) | d516a7e | PASA (verificador y verificador-b, 16/16) | auditor: I1, I2, M1, M2 cerrados; integrada en 59ac5ca |
 | | T2, T4 | | | |
 | | T3 | | | |
 | | TODO | | | |
