@@ -1,5 +1,5 @@
 # Python / Django
-venv/
+venv
 __pycache__/
 *.pyc
 *.sqlite3

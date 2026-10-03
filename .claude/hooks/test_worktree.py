@@ -1,0 +1,162 @@
+"""Tests de `worktree-crear.sh` y `worktree-integrar.sh` (T2 de docs/planes/2026-10-02-paralelismo.md).
+
+Se ejecutan con pytest:
+    py -3 -m pytest .claude/hooks/test_worktree.py -q
+
+Cada test trabaja sobre un repo git temporal con un `manage.py` de juguete y un `venv` que es una
+junction al `venv` REAL del proyecto. Seguridad: el teardown quita primero todas las junctions con
+`os.rmdir` (que solo borra el enlace) y recién después borra el árbol temporal, de modo que nunca
+se borra contenido del `venv` real.
+"""
+import os
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+DIR_HOOKS = Path(__file__).resolve().parent
+CREAR = DIR_HOOKS / "worktree-crear.sh"
+INTEGRAR = DIR_HOOKS / "worktree-integrar.sh"
+VENV_REAL = DIR_HOOKS.parent.parent / "venv"
+
+MANAGE_JUGUETE = (
+    "import sys\n"
+    "open('humo.txt', 'w').write(sys.executable + ' ' + ' '.join(sys.argv[1:]))\n"
+)
+
+
+def texto(bytes_):
+    """Decodifica una salida como UTF-8, sustituyendo lo que no se pueda decodificar."""
+    return bytes_.decode("utf-8", errors="replace")
+
+
+def git(repo, *argumentos):
+    """Ejecuta git en el repo temporal y falla el test si git falla."""
+    proceso = subprocess.run(["git", "-C", str(repo), *argumentos], capture_output=True, timeout=60)
+    if proceso.returncode != 0:
+        raise AssertionError(f"git {argumentos} falló: {texto(proceso.stderr)}")
+    return texto(proceso.stdout)
+
+
+def hacer_junction(enlace, destino):
+    """Crea una junction `enlace` -> `destino` con mklink /J."""
+    proceso = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(enlace), str(destino)], capture_output=True, timeout=60
+    )
+    assert proceso.returncode == 0, texto(proceso.stdout) + texto(proceso.stderr)
+
+
+def quitar_junctions(raiz):
+    """Quita las junctions `venv` de la raíz y de cada worktree sin tocar el destino."""
+    candidatos = [raiz / "venv"]
+    carpeta = raiz / "worktrees"
+    if carpeta.is_dir():
+        candidatos += [wt / "venv" for wt in carpeta.iterdir()]
+    for candidato in candidatos:
+        if os.path.lexists(candidato):
+            try:
+                os.rmdir(candidato)  # en una junction borra solo el enlace; un directorio real con contenido falla
+            except OSError:
+                pass
+
+
+@pytest.fixture
+def repo(tmp_path):
+    """Repo temporal en `main` con manage.py de juguete y venv como junction al venv real."""
+    if not (VENV_REAL / "Scripts" / "python.exe").exists():
+        pytest.skip("no existe el venv real del proyecto")
+    raiz = tmp_path / "raiz"
+    raiz.mkdir()
+    git(raiz, "init", "-q", "-b", "main")
+    git(raiz, "config", "core.autocrlf", "false")
+    git(raiz, "config", "user.name", "Test")
+    git(raiz, "config", "user.email", "test@example.invalid")
+    git(raiz, "config", "commit.gpgsign", "false")
+    (raiz / ".gitignore").write_text("worktrees/\nvenv\n*.sqlite3\nhumo.txt\n")
+    (raiz / "manage.py").write_text(MANAGE_JUGUETE)
+    git(raiz, "add", "-A")
+    git(raiz, "commit", "-q", "-m", "base")
+    hacer_junction(raiz / "venv", VENV_REAL)
+    try:
+        yield raiz
+    finally:
+        quitar_junctions(raiz)
+        shutil.rmtree(tmp_path, ignore_errors=True)
+        assert (VENV_REAL / "Scripts" / "python.exe").exists()
+
+
+def correr(script, raiz, *args):
+    """Ejecuta un script del hook con bash, con cwd en la raíz temporal."""
+    return subprocess.run(
+        ["bash", script.as_posix(), *args], cwd=str(raiz), capture_output=True, timeout=300
+    )
+
+
+def crear(raiz, slug="demo", tarea="T1"):
+    proceso = correr(CREAR, raiz, slug, tarea)
+    assert proceso.returncode == 0, texto(proceso.stdout) + texto(proceso.stderr)
+    return raiz / "worktrees" / f"{slug}-{tarea}"
+
+
+def commitear_archivo(wt, nombre, contenido="x\n"):
+    (wt / nombre).write_text(contenido)
+    git(wt, "add", "-A")
+    git(wt, "commit", "-q", "-m", f"agrega {nombre}")
+
+
+def test_crear_hace_junction_de_venv(repo):
+    wt = crear(repo)
+    assert (wt / "venv" / "Scripts" / "python.exe").exists()
+    assert git(repo, "branch", "--list", "demo-T1").strip().endswith("demo-T1")
+
+
+def test_crear_corre_check_de_humo(repo):
+    wt = crear(repo)
+    marcador = (wt / "humo.txt").read_text()
+    assert marcador.endswith("check")
+    assert "python" in marcador.lower()
+
+
+def test_integrar_mergea_rama_limpia_y_borra_worktree(repo):
+    wt = crear(repo, "demo", "T5a")
+    commitear_archivo(wt, "app.txt")
+    proceso = correr(INTEGRAR, repo, "demo", "T5a", "main", "app.txt")
+    assert proceso.returncode == 0, texto(proceso.stdout) + texto(proceso.stderr)
+    assert (repo / "app.txt").exists()
+    assert git(repo, "log", "-1", "--format=%s").strip() == "T5a: integra demo-T5a"
+    assert not wt.exists()
+    assert git(repo, "branch", "--list", "demo-T5a").strip() == ""
+    assert git(repo, "worktree", "list", "--porcelain").count("worktree ") == 1
+
+
+def test_integrar_rechaza_archivos_fuera_de_alcance(repo):
+    wt = crear(repo)
+    commitear_archivo(wt, "permitido.txt")
+    commitear_archivo(wt, "intruso.txt")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "permitido.txt")
+    assert proceso.returncode == 1
+    assert "intruso.txt" in texto(proceso.stderr)
+    assert git(repo, "rev-parse", "main").strip() == antes
+    assert wt.exists()
+
+
+def test_integrar_no_borra_el_venv_de_la_raiz(repo):
+    wt = crear(repo)
+    commitear_archivo(wt, "app.txt")
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "app.txt")
+    assert proceso.returncode == 0, texto(proceso.stdout) + texto(proceso.stderr)
+    assert (repo / "venv" / "Scripts" / "python.exe").exists()
+    assert (VENV_REAL / "Scripts" / "python.exe").exists()
+
+
+def test_integrar_rechaza_worktree_con_cambios_sin_commitear(repo):
+    wt = crear(repo)
+    commitear_archivo(wt, "app.txt")
+    (wt / "sucio.txt").write_text("sin commitear\n")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "app.txt", "sucio.txt")
+    assert proceso.returncode != 0
+    assert git(repo, "rev-parse", "main").strip() == antes
+    assert wt.exists()
