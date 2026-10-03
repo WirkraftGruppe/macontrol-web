@@ -160,3 +160,21 @@ def test_integrar_rechaza_worktree_con_cambios_sin_commitear(repo):
     assert proceso.returncode != 0
     assert git(repo, "rev-parse", "main").strip() == antes
     assert wt.exists()
+
+
+def test_integrar_rechaza_renombre_desde_fuera_de_alcance(repo):
+    (repo / "fuera").mkdir()
+    (repo / "fuera" / "x.txt").write_text("contenido protegido\n" * 5)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "archivo fuera de alcance")
+    wt = crear(repo)
+    (wt / "dentro").mkdir()
+    git(wt, "mv", "fuera/x.txt", "dentro/x.txt")
+    git(wt, "commit", "-q", "-m", "renombra fuera -> dentro")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "dentro/")
+    assert proceso.returncode != 0
+    assert "fuera/x.txt" in texto(proceso.stderr)
+    assert git(repo, "rev-parse", "main").strip() == antes
+    assert (repo / "fuera" / "x.txt").exists()
+    assert wt.exists()

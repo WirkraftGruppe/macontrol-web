@@ -72,7 +72,7 @@ bash "$dir_hooks/cambios.sh" "$raiz" "$destino" --stat
 
 # 3. Alcance: todo archivo cambiado debe caer bajo algún prefijo permitido.
 fuera=""
-while IFS= read -r archivo; do
+while IFS= read -r -d '' archivo; do
   [ -z "$archivo" ] && continue
   dentro=0
   for prefijo in "$@"; do
@@ -81,7 +81,7 @@ while IFS= read -r archivo; do
     esac
   done
   [ "$dentro" -eq 0 ] && fuera="$fuera$archivo"$'\n'
-done < <(git -C "$raiz" diff --name-only "$destino...$nombre")
+done < <(git -C "$raiz" -c core.quotepath=off diff --no-renames --name-only -z "$destino...$nombre")
 if [ -n "$fuera" ]; then
   echo "archivos fuera de alcance, no se integra:" >&2
   printf '%s' "$fuera" >&2
