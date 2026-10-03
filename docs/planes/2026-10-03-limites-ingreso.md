@@ -15,7 +15,7 @@
 - Normalización del usuario: `unicodedata.normalize("NFKC", s).strip().casefold()`, la misma en los cupos, en el formulario de login y en `crear_usuario`. Los usernames existentes no se migran (no hay producción). Uno guardado sin normalizar, como "Ana", deja de poder ingresar hasta que se lo renombre a mano. Queda como decisión del plan, sin test, porque un test de "no hay migración" pasaría sin hacer nada.
 - commit_base: hoy los planes lo calculan con `"$(bash .claude/hooks/congelado.sh …)"`, que con un contrato modificado sale con 1 y vacío (P-pendientes-heredados-9). Nuevo: los criterios escriben `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> <rutas>`, con comillas porque sin ellas bash lo toma como redirección. `verificar_plan.py` reemplaza el marcador con la línea `commit_base:` del Registro antes de ejecutar. `presupuesto.sh`, si recibe el marcador literal, lo resuelve con `verificar_plan.py --commit-base`, que usa el mismo parser. El hash tiene que ser un commit con asunto `docs(plan): <slug>` (exacto o con ` — modificado: …`); si no, falla.
 - Pendientes: cada plan los declara debajo del corte en `## Pendientes que deja este plan`. `pendientes.py` los consolida y `contexto.sh` los inyecta. La bitácora deja de llevar la lista.
-- Este plan, para sus propios presupuestos, usa todavía la forma con `congelado.sh`, porque el marcador recién existe con T3 integrada y los worktrees de T1 a T4 no lo tienen. Los greps de T5 buscan `'<commit_base` sin el `>` final, para que el hook no los reemplace.
+- Este plan usaba para sus presupuestos la forma con `congelado.sh`; desde el contrato modificado (token en los baldes de usuario) usa `'<commit_base>'`, porque `congelado.sh` sale con 1 ante un contrato modificado. T2 se ramifica después de integrar T3, para que el marcador se resuelva en su worktree. Los greps de T5 buscan `'<commit_base` sin el `>` final, para que el hook no los reemplace.
 - Propiedad: `config/settings/*.py` es del principal (T1 es su subtarea de integración, sola en `config/`). `config/admin.py`, `.claude/hooks/**`, `.claude/agents/**`, `CLAUDE.md` y `docs/plantilla-plan.md` no figuran en la tabla de propiedad: acá se asignan a un único dueño por subtarea.
 
 ## Olas
@@ -46,7 +46,7 @@
   - `[grep-1]` `grep -n "^NUM_PROXIES" config/settings/base.py`
   - `[grep-1]` `grep -n "NUM_PROXIES" .env.example`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-limites-ingreso.md limites-ingreso)" 120 config/settings config/tests/test_ajustes_ingreso.py .env.example`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 120 config/settings config/tests/test_ajustes_ingreso.py .env.example`
 
 ### Trabajo del principal (integración de la ola 1)
 
@@ -80,7 +80,7 @@
   - `[test]` `py -3 -m pytest .claude/hooks/test_verificar_plan.py::test_marcador_se_reemplaza_antes_de_ejecutar -q`
   - `[test]` `py -3 -m pytest .claude/hooks/test_verificar_plan.py::test_commit_base_que_no_es_docs_plan_se_rechaza -q`
   - `[cmd]` `py -3 -m pytest .claude/hooks -q`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-limites-ingreso.md limites-ingreso)" 300 .claude/hooks/presupuesto.sh .claude/hooks/verificar_plan.py .claude/hooks/test_presupuesto.py .claude/hooks/test_verificar_plan.py`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 300 .claude/hooks/presupuesto.sh .claude/hooks/verificar_plan.py .claude/hooks/test_presupuesto.py .claude/hooks/test_verificar_plan.py`
 
 ### T4 — Pendientes por plan: pendientes.py y contexto.sh
 
@@ -122,12 +122,12 @@
   - `[test]` `py -3 -m pytest .claude/hooks/test_contexto.py::test_contexto_inyecta_pendientes -q`
   - `[cmd]` `py -3 .claude/hooks/pendientes.py`
   - `[cmd]` `py -3 -m pytest .claude/hooks -q`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-limites-ingreso.md limites-ingreso)" 400 .claude/hooks/pendientes.py .claude/hooks/test_pendientes.py .claude/hooks/contexto.sh .claude/hooks/test_contexto.py .claude/hooks/fixtures`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 400 .claude/hooks/pendientes.py .claude/hooks/test_pendientes.py .claude/hooks/contexto.sh .claude/hooks/test_contexto.py .claude/hooks/fixtures`
 
 ### T2 — Límites de ingreso del panel, el admin y el token
 
 - **Ola**: 2
-- **Depende de**: T1
+- **Depende de**: T1, T3 (T3 solo para que `'<commit_base>'` se resuelva en su worktree)
 - **Puede tocar**: `apps/accounts/` (salvo `migrations/`), `apps/panel/views.py`, `apps/panel/forms.py`, `apps/panel/tests/test_acceso.py`, `apps/api/views.py`, `apps/api/tests/test_limites.py`, `apps/api/tests/test_auth.py`, `config/admin.py`, `apps/web/tests/test_csp.py`
 - **No puede tocar**: `docs/planes/`, `config/settings/`, `apps/api/urls.py`, `apps/panel/urls.py`, `templates/`, `.claude/`, migraciones
 - **Skill a leer antes**: `.agents/skills/api-security-best-practices/SKILL.md` § rate limiting
@@ -143,7 +143,8 @@
     - el mixin registra un fallo en los tres baldes ante un formulario inválido (incluido `sin_acceso`) y en un ingreso exitoso limpia solo el balde (usuario, IP).
   - Usar el mixin en `IngresarView` y en `SitioAdministracion.login` (mismos baldes). Quitar `LimiteIngresoPorIP` y `LimiteIngresoPorUsuario`.
   - `FormularioIngreso` normaliza el username antes de autenticar.
-  - Token: throttle con scope `token` cuyo `get_ident` es `ip_del_cliente`.
+  - Token: throttle con scope `token` cuyo `get_ident` es `ip_del_cliente`. Además, el token consulta y registra los mismos baldes (usuario, IP) y por usuario que el panel, con `normalizar_usuario`: responde 429 sin evaluar la clave si alguno está lleno y registra un fallo cuando la autenticación falla (contrato modificado por hallazgo del auditor en T1).
+  - `ThrottleRenovacion` también usa `ip_del_cliente`. Con IPv6, las claves de los baldes agrupan la dirección por /64.
   - `crear_usuario`:
     - normaliza el nombre;
     - `full_clean()`;
@@ -163,6 +164,8 @@
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.accounts.tests.test_red.IpDelClienteTests.test_con_un_proxy_toma_la_ultima_ip --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.api.tests.test_limites.LimitesTokenTests.test_cupo_del_token_es_independiente_del_panel --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.api.tests.test_limites.LimitesTokenTests.test_token_ignora_x_forwarded_for_sin_proxies --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.api.tests.test_limites.LimitesTokenTests.test_token_registra_fallos_en_los_baldes_de_usuario --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.accounts.tests.test_limites.LimitesPanelTests.test_ipv6_del_mismo_64_comparte_balde --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.accounts.tests.test_crear_usuario.CrearUsuarioTests.test_normaliza_el_nombre --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.accounts.tests.test_crear_usuario.CrearUsuarioTests.test_rechaza_variante_unicode_de_usuario_existente --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_csp.CspTests.test_nonce_cambia_en_cada_respuesta --keepdb`
@@ -173,7 +176,7 @@
   - `[grep-1]` `grep -n "normalizar_usuario" apps/accounts/management/commands/crear_usuario.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-limites-ingreso.md limites-ingreso)" 650 apps/accounts apps/panel apps/api config/admin.py apps/web/tests/test_csp.py`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 650 apps/accounts apps/panel apps/api config/admin.py apps/web/tests/test_csp.py`
 
 ### Trabajo del principal (integración de la ola 2)
 
@@ -220,7 +223,7 @@
   - `[grep-1]` `grep -n "Pendientes: <n> abiertos" .claude/agents/verificador.md`
   - `[grep-1]` `grep -n "Pendientes: <n> abiertos" .claude/agents/verificador-b.md`
   - `[cmd]` `py -3 -m pytest .claude/hooks -q`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-limites-ingreso.md limites-ingreso)" 250 docs/plantilla-plan.md CLAUDE.md .claude/agents`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 docs/plantilla-plan.md CLAUDE.md .claude/agents`
 
 ### Trabajo del principal (integración de la ola 3 y cierre)
 
