@@ -1,13 +1,13 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-02-paralelismo.md
+Plan activo: (ninguno; `paralelismo` cerrado con TODO PASA 69/69 y fusionado en `main`)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `paralelismo` | `plan/paralelismo` | cerrado (olas 1-3 en PASA, corrección del auditor integrada) | verificación TODO y decisión del usuario sobre el merge a `main` | principal en la raíz |
+| (ninguno) | `main` | — | plan de Visita | — |
 
 Después: plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
 
@@ -51,6 +51,7 @@ Hecho:
 - Cada subtarea dio PASA con verificador y verificador-b.
 - auditor-seguridad: T1 sin hallazgos. En T2, 1 bloqueante (un renombre esquivaba el control de alcance), corregido en 1bf9878 con un test que se vio fallar antes del cambio. Los hallazgos menores quedan en Problemas abiertos.
 - Incidente: en T3, `git worktree remove` dio "Permission denied" porque el shell del principal tenía el cwd dentro del worktree. Quedó anotado en el Registro y como decisión.
+- Verificación final: TODO PASA 69/69 (verificador y verificador-b) en de25aee. El usuario aprobó el merge: `main` avanzó por fast-forward hasta 8ad718d y se borró la rama `plan/paralelismo`.
 
 ### 2026-10-02 — Acciones de Sitio por rol administrador (H1-a, H3-a)
 Hecho:
