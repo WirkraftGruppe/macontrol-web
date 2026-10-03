@@ -1,15 +1,15 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `visitas`, `visitas-auditoria` e `historial-revert` cerrados con TODO PASA y fusionados en `main`)
+Plan activo: docs/planes/2026-10-03-autenticacion.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| (ninguno) | `main` | — | decidir los menores abiertos de fotos (abajo) o seguir con el plan de API/autenticación | — |
+| `autenticacion` | `plan/autenticacion` (worktree `worktrees/autenticacion`) | 3 (integrada, TODO PASA) | el usuario decide el merge a `main` (choca en `docs/bitacora.md` y `docs/decisiones.md` con `menores-abiertos`: rebase al fusionar) | 2026-10-03 |
 
-Después: plan de API/autenticación (antes, decidir si se corrigen los menores de fotos y N5).
+Después: plan `limites-ingreso` (N1-N4 y H2 de abajo), luego el plan de API.
 
 Problemas abiertos:
 - [menor, abierto, decisión del usuario] Auditoría de `paralelismo` sobre `worktree-integrar.sh`:
@@ -33,7 +33,19 @@ Problemas abiertos:
   - H4: ante resto 10 se acepta 9 aunque AFIP nunca emite ese caso con el mismo prefijo, y los CUIT ya cargados no se revalidan.
 - [menor] `apps/sitios/models.py:60` lleva `# noqa: E501` porque el criterio del plan exigía la línea de `excluded_fields` en una sola línea; `ruff format` la partiría.
 - [importante, abierto, diferido al plan de despliegue por decisión del usuario: hoy es solo desarrollo] La barrera de `config/settings/dev.py` solo mira `ALLOWED_HOSTS`. Con `DJANGO_ENV=development` y `ALLOWED_HOSTS` vacío en un hosting, el sitio arranca con `DEBUG=True` y la página técnica del 400 expone tracebacks y settings; con `runserver`, también `DATABASE_URL`, porque no coincide con el patrón de ocultamiento (comprobado por el auditor). Propuesta del auditor: abortar si hay variables propias del hosting (`RAILWAY_ENVIRONMENT`, `RENDER`, `DYNO`, `FLY_APP_NAME`, `K_SERVICE`…), que hay que ajustar al hosting real. [menor] Las IP privadas en `ALLOWED_HOSTS` no limitan quién se conecta (el Host lo elige el cliente). (El `.strip()` de `ALLOWED_HOSTS` ya está corregido: plan `hosts-espacios`.)
-- El plan de autenticación tiene que invertir `test_panel_responde_200` y `test_api_v1_responde_200` (hoy fijan el acceso anónimo) y seguir la lista de condiciones del auditor: mixin por `es_administrador`, DRF con `IsAuthenticated` y JWT, `AdminSite` restringido, `simple_history` en `User` con `excluded_fields=["password", "last_login"]` (si no, copia el hash, y con el middleware de historial ya activo cada login genera un registro), LOGGING sin datos personales y CSP.
+- [importante, abierto, plan `limites-ingreso`] Límites de ingreso (re-auditoría de `autenticacion` T3):
+  - N1: el cupo por usuario de `/panel/ingresar/` cuenta todos los POST: 10/min desde una IP bloquean el ingreso de un administrador desde cualquier IP (DoS de cuenta). Propuesta: contar solo fallos, cupo estricto por (usuario, IP) y uno global por usuario más alto y largo.
+  - N2: la clave del cupo por usuario usa el username crudo (`strip().lower()`); variantes NFKC ("ａｄｍ", "𝐚𝐝𝐦") tienen balde propio y autentican igual. Normalizar con `unicodedata.normalize("NFKC", …).strip().casefold()`.
+  - N3: `/admin/login/` no tiene ningún límite (viene de T1): aplicar los mismos límites en `SitioAdministracion.login`, con un módulo común (p. ej. `apps/accounts/limites.py`).
+  - N4 [menor]: el cupo por IP del panel comparte scope `autenticacion` con `/api/v1/auth/token/`.
+  - Oráculo acotado: dentro del cupo, la clave correcta de un empleado en el panel responde "no tiene acceso".
+- [importante, abierto, condición obligatoria del despliegue] H2: sin `NUM_PROXIES`, DRF toma la IP de `X-Forwarded-For` (la controla el cliente) y los límites de token y panel se esquivan; además la caché por defecto es LocMem (un cupo por worker). Antes de producción: `REST_FRAMEWORK["NUM_PROXIES"]` desde el entorno según el hosting y `CACHES` compartida.
+- [menor, abierto] Restos de `autenticacion`:
+  - `crear_usuario` construye `User(...)` sin `normalize_username` ni `full_clean`: "ａna" se crea y nunca puede ingresar; acepta emails inválidos; carrera `exists()`/`save()` termina en `IntegrityError`.
+  - `User.save` borra `skip_history_when_saving` aunque lo haya puesto quien llama.
+  - `test_csp` no comprueba que el nonce cambie entre respuestas; el `<style>` inline de `admin/change_list.html` queda bloqueado por la CSP (solo estética en pantallas angostas; no relajar la política).
+  - Filtro de logging: oculta claves inocuas con las subcadenas (`access_count`, `secretaria`); no cubre `lat`/`lng`, `cookie`, `session`, `teléfono` con tilde, `cuil`, `dni`; no limpia mensajes ya formateados (f-strings) ni `exc_info`; el SQL de `django.db.backends` en DEBUG saldría con valores. Regla de revisión propuesta: nada de f-strings ni `%` previo en `logger.*`.
+  - Los tests de T2 y T3 se escribieron junto con el código: no hay corrida roja registrada.
 - WeasyPrint está instalado pero no se probó en tiempo de ejecución (en Windows suele necesitar GTK/Pango).
 - Observación del verificador: `apps/web/tests/test_base.py:13` no distingue el atributo `data-tema="oscuro"` del selector CSS.
 - Falta el ejemplo del certificado que la empresa entrega hoy (diseño y texto legal del PDF). Ver `docs/01-modelo-y-arquitectura.md` § 7.
@@ -42,6 +54,19 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-03 — Plan `autenticacion`: panel con rol administrador, API con JWT, admin solo superusuarios, CSP y LOGGING
+Hecho:
+- Plan `docs/planes/2026-10-03-autenticacion.md` (rama `plan/autenticacion`, worktree `worktrees/autenticacion`), 4 subtareas en 3 olas, todas integradas; verificación TODO en 6787a16: `verificador` 68/68 PASA, `verificador-b` sin FALLA. `auditor-seguridad` en cada subtarea.
+- T1 (config): DRF solo JWT + `IsAuthenticated` + JSON; SimpleJWT 15 min / 7 días con rotación, blacklist y `CHECK_REVOKE_TOKEN`; django-csp 4 (`self` + nonce); `min_length` 12; `AdminSite` solo superusuarios (`config/admin.py`, `config/apps.py`); filtro `config/registro.py` recursivo por subcadena (incluye `telefono` y `contacto`), aplicado también a los loggers `django` y `django.server`; test de `check --deploy` que exige exactamente {W005, W021}.
+- T2 (accounts): historial de `User` sin `password` ni `last_login` (y sin registro por login), `AdministradorRequeridoMixin`, `EsAdministrador`/`EsEmpleado`, comando `crear_usuario`.
+- T4 (diseño/web): nonce en el `<style>` de `base.html`.
+- T3 (panel/api): `/panel/ingresar/` y `/panel/salir/` (empleados rechazados en el formulario, límite por IP y por usuario), `/api/v1/auth/token/` y `/refresh/` con cupos propios, refresh rechazado tras cambio de contraseña, raíz de la API con rol; `test_rutas` invertido.
+Incidentes:
+- Otra sesión (`menores-abiertos`) cambió la raíz a su rama un segundo después de crear `plan/autenticacion`: los commits del plan cayeron en `plan/menores-abiertos`. Se pasaron por cherry-pick a `plan/autenticacion` (nuevo `commit_base` 6d22ff1) y `plan/menores-abiertos` volvió a cae1152 (con autorización del usuario). Desde ahí la sesión trabajó solo en `worktrees/autenticacion`.
+- Integrar T2 falló al borrar el worktree ("Permission denied") porque el shell del principal estaba dentro: el merge sí quedó; se borró la carpeta vacía y la rama a mano (el caso de la decisión del 2026-10-02).
+- La sesión se cortó con T2 a medias; se retomó el implementador sobre su worktree.
+Pendiente: merge a `main` (decisión del usuario), plan `limites-ingreso`.
 
 ### 2026-10-03 — Correcciones de la auditoría de visitas y bloqueo de la reversión desde el historial; fusión en main
 Hecho:
