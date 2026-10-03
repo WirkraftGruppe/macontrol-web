@@ -1,7 +1,10 @@
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
+from django.core.files.uploadedfile import UploadedFile
 from simple_history.admin import SimpleHistoryAdmin
 
+from . import imagenes
 from .models import Foto, ProductoAplicado, Visita
 
 CAMPOS_EVIDENCIA = (
@@ -17,6 +20,8 @@ CAMPOS_EVIDENCIA = (
     "realizada_en",
     "esquema_planilla",
 )
+
+CAMPOS_PLANIFICACION = ("programada_para", "asignada_por")
 
 
 def _visita_cerrada(visita):
@@ -41,8 +46,25 @@ class InlineDeEvidencia:
         )
 
 
+class FotoInlineForm(forms.ModelForm):
+    """Valida la foto nueva con el mismo procesamiento que usa Foto.save."""
+
+    class Meta:
+        model = Foto
+        fields = "__all__"
+
+    def clean_imagen(self):
+        archivo = self.cleaned_data.get("imagen")
+        if isinstance(archivo, UploadedFile):
+            # La ValidationError queda como error del campo; el resultado se descarta.
+            imagenes.procesar_imagen(archivo)
+            archivo.seek(0)
+        return archivo
+
+
 class FotoInline(InlineDeEvidencia, admin.TabularInline):
     model = Foto
+    form = FotoInlineForm
     extra = 0
     fields = ("imagen", "tomada_en", "orden")
 
@@ -77,7 +99,7 @@ class VisitaAdmin(SimpleHistoryAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if _visita_cerrada(obj):
-            return CAMPOS_EVIDENCIA
+            return CAMPOS_EVIDENCIA + CAMPOS_PLANIFICACION
         return super().get_readonly_fields(request, obj)
 
     def has_delete_permission(self, request, obj=None):
@@ -92,6 +114,7 @@ class VisitaAdmin(SimpleHistoryAdmin):
 
 @admin.register(Foto)
 class FotoAdmin(admin.ModelAdmin):
+    form = FotoInlineForm
     list_display = ("id", "visita", "tomada_en", "orden")
     raw_id_fields = ("visita",)
     readonly_fields = ("visita",)
