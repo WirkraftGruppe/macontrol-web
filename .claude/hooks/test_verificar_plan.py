@@ -780,5 +780,77 @@ class TestCongelado(unittest.TestCase):
             self.assertEqual(proceso.returncode, 0, texto(proceso.stderr))
 
 
+# ---------------------------------------------------------------------------
+# Plan derivado de la rama (estilo pytest)
+# ---------------------------------------------------------------------------
+
+def repo_con_plan_de_rama(raiz, slug, rama):
+    """Repo temporal con `docs/planes/2026-01-01-<slug>.md` congelado y la rama pedida.
+
+    El criterio de T1 del plan deja `marcador-ejecutado`; la bitácora dice `Plan activo: (ninguno)`.
+    """
+    (raiz / "docs" / "planes").mkdir(parents=True)
+    (raiz / "docs" / "bitacora.md").write_text("# Bitácora\n\nPlan activo: (ninguno)\n", encoding="utf-8")
+    plan = PLAN_CONGELADO.replace("`[cmd]` `true`", "`[cmd]` `touch marcador-ejecutado`").replace(
+        "| T1 | pendiente |", "| T1 | hecha |"
+    )
+    (raiz / "docs" / "planes" / f"2026-01-01-{slug}.md").write_text(plan, encoding="utf-8")
+    git(raiz, "init", "-q", "-b", "main")
+    for clave, valor in (("core.autocrlf", "false"), ("user.name", "Test"),
+                         ("user.email", "t@example.invalid"), ("commit.gpgsign", "false")):
+        git(raiz, "config", clave, valor)
+    git(raiz, "add", "-A")
+    git(raiz, "commit", "-q", "-m", f"docs(plan): {slug}")
+    git(raiz, "switch", "-q", "-c", rama)
+    return raiz
+
+
+def test_plan_se_deriva_de_rama_plan_slug(tmp_path):
+    raiz = repo_con_plan_de_rama(tmp_path, "demo", "plan/demo")
+    correr_hook(raiz)
+    assert (raiz / "marcador-ejecutado").exists()
+
+
+def test_plan_se_deriva_de_rama_de_subtarea(tmp_path):
+    for rama in ("demo-T3", "demo-T5a"):
+        raiz = repo_con_plan_de_rama(tmp_path / rama, "demo", rama)
+        correr_hook(raiz)
+        assert (raiz / "marcador-ejecutado").exists(), rama
+
+
+def test_rama_sin_plan_cae_en_bitacora(tmp_path):
+    # Rama sin plan correspondiente: se usa `Plan activo:` de la bitácora.
+    raiz = repo_con_plan_de_rama(tmp_path, "demo", "otra-rama")
+    assert verificar_plan.plan_de_rama(raiz) is None
+    correr_hook(raiz)
+    assert not (raiz / "marcador-ejecutado").exists()
+    (raiz / "docs" / "bitacora.md").write_text(
+        "# Bitácora\n\nPlan activo: docs/planes/2026-01-01-demo.md\n", encoding="utf-8"
+    )
+    correr_hook(raiz)
+    assert (raiz / "marcador-ejecutado").exists()
+
+
+def test_rama_con_slug_invalido_no_ejecuta_plan_ajeno(tmp_path):
+    raiz = repo_con_plan_de_rama(tmp_path, "demo", "plan/demo")
+    # `demo` no debe tomar `2026-01-01-demo-dos.md`; slugs inválidos o prefijos no ejecutan nada.
+    (raiz / "docs" / "planes" / "2026-01-01-demo-dos.md").write_text(
+        PLAN_CONGELADO.replace("`[cmd]` `true`", "`[cmd]` `touch marcador-ajeno`").replace(
+            "| T1 | pendiente |", "| T1 | hecha |"
+        ),
+        encoding="utf-8"
+    )
+    # Control positivo: con la rama válida el hook sí ejecuta el criterio (el resto no es vacuo).
+    correr_hook(raiz)
+    assert (raiz / "marcador-ejecutado").exists()
+    (raiz / "marcador-ejecutado").unlink()
+    for rama in ("plan/Demo", "plan/demo_x", "plan/-demo", "plan/de", "x/demo-T1"):
+        git(raiz, "switch", "-q", "-C", rama)
+        proceso = correr_hook(raiz)
+        assert not (raiz / "marcador-ejecutado").exists(), rama
+        assert not (raiz / "marcador-ajeno").exists(), rama
+        assert proceso.returncode == 0, rama
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,10 @@ docs/planes/2026-09-23-endurecer-hooks.md y T2 de docs/planes/2026-09-23-endurec
 1. Lee el JSON del hook por stdin. Si `stop_hook_active` es true, sale con 0 (anti-bucle).
    Un stdin vacío o malformado también sale con 0: el hook nunca rompe la sesión.
 2. La raíz sale de `CLAUDE_PROJECT_DIR` o, si no está definida, del directorio actual.
-3. Lee `Plan activo:` de `<raíz>/docs/bitacora.md`. `(ninguno)` o archivo inexistente → 0.
+3. Deriva el plan de la rama de git: `plan/<slug>` o `<slug>-T<n>` (p. ej. `demo-T5a`) apuntan
+   al único `docs/planes/AAAA-MM-DD-<slug>.md`. Sin rama, con slug inválido, sin plan o con
+   varios, se cae en `Plan activo:` de `<raíz>/docs/bitacora.md`. `(ninguno)` o archivo
+   inexistente → 0.
    Solo se acepta una ruta relativa, sin `..`, a un `.md` que no sea symlink y cuyo padre
    resuelto sea exactamente `<raíz>/docs/planes`. Cualquier otro valor → aviso por stderr y 0.
 4. Corre `congelado.sh <plan> <slug>` (el de la carpeta de este hook). Si no sale con 0, o si
@@ -73,6 +76,9 @@ TAMANO_BLOQUE = 1 << 16
 RE_HASH_COMMIT = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")
 RE_PLAN_ACTIVO = re.compile(r"^Plan activo:\s*(.*?)\s*$")
 RE_FECHA_SLUG = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+RE_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
+RE_RAMA_PLAN = re.compile(r"^plan/(?P<slug>.+)$")
+RE_RAMA_SUBTAREA = re.compile(r"^(?P<slug>.+)-T[0-9]+[a-z]?$")
 RE_TAREA = re.compile(r"^### T(\d+)\b")
 RE_ESTADO = re.compile(r"^\| T(\d+) \| (pendiente|en curso|hecha) \|")
 RE_CRITERIO = re.compile(
@@ -172,6 +178,44 @@ def validar_plan(raiz: Path, valor: str) -> tuple[Path | None, str | None]:
     if resuelto.parent != (raiz / "docs" / "planes").resolve():
         return None, "no está en docs/planes/ de la raíz"
     return resuelto, None
+
+
+def rama_actual(raiz: Path) -> str:
+    """Rama actual (`git branch --show-current`), o "" si no hay git, repo o es HEAD separado."""
+    salida = salida_git(raiz, "branch", "--show-current", timeout=10)
+    return (salida or "").strip()
+
+
+def plan_de_rama(raiz: Path) -> Path | None:
+    """Plan derivado de la rama `plan/<slug>` o `<slug>-T<n>`, o None si no corresponde.
+
+    El plan es el único `docs/planes/AAAA-MM-DD-<slug>.md` y pasa por `validar_plan`. Un slug
+    inválido o varias coincidencias avisan por stderr; en todos los casos None significa
+    "usar `Plan activo:` de la bitácora".
+    """
+    rama = rama_actual(raiz)
+    coincidencia = RE_RAMA_PLAN.match(rama) or RE_RAMA_SUBTAREA.match(rama)
+    if not coincidencia:
+        return None
+    slug = coincidencia.group("slug")
+    if not RE_SLUG.fullmatch(slug):
+        sys.stderr.write(f"verificar_plan: la rama {rama!r} tiene un slug inválido; se usa la bitácora.\n")
+        return None
+    carpeta = raiz / "docs" / "planes"
+    if not carpeta.is_dir():
+        return None
+    candidatos = [
+        archivo.name
+        for archivo in carpeta.glob("*.md")
+        if RE_FECHA_SLUG.match(archivo.name) and RE_FECHA_SLUG.sub("", archivo.stem) == slug
+    ]
+    if len(candidatos) > 1:
+        sys.stderr.write(f"verificar_plan: la rama {rama!r} coincide con varios planes; se usa la bitácora.\n")
+        return None
+    if not candidatos:
+        return None
+    ruta, _ = validar_plan(raiz, f"docs/planes/{candidatos[0]}")
+    return ruta
 
 
 def plan_activo(raiz: Path) -> Path | None:
@@ -774,7 +818,7 @@ def main(texto_stdin: str, entorno: dict[str, str]) -> int:
     session_id = str(datos.get("session_id") or "sin-sesion")
 
     raiz = resolver_raiz(entorno)
-    plan = plan_activo(raiz)
+    plan = plan_de_rama(raiz) or plan_activo(raiz)
     if plan is None:
         return 0
 
