@@ -1,15 +1,15 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `paralelismo` cerrado con TODO PASA 69/69 y fusionado en `main`)
+Plan activo: docs/planes/2026-10-03-visitas.md (TODO PASA 60/60 en `plan/visitas`, sin fusionar en `main`)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| (ninguno) | `main` | — | plan de Visita | — |
+| `visitas` | `plan/visitas` | cerrado (olas 1 y 2 integradas) | decidir merge a `main` y qué hallazgos del auditor se corrigen (ver abajo) | 2026-10-03 |
 
-Después: plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
+Después: plan de corrección de los hallazgos importantes del auditor de `visitas` (o directo a la API, si se difieren), y después el plan de API/autenticación.
 
 Problemas abiertos:
 - [menor, abierto, decisión del usuario] Auditoría de `paralelismo` sobre `worktree-integrar.sh`:
@@ -18,18 +18,22 @@ Problemas abiertos:
   - `rama_base` de `worktree-crear.sh` no se valida (un valor que empiece con `-` se toma como opción), e integrar no comprueba que la ruta sea un worktree registrado;
   - si la prueba de humo falla, la junction queda viva en `worktrees/`: limpiar con `cmd /c rmdir <venv>` y después `git worktree remove`; nunca `Remove-Item -Recurse` de PowerShell 5.1, que sigue la junction y vacía el venv real.
   - Observaciones de T1: `RE_FECHA_SLUG` usa `\d` (acepta dígitos Unicode, `contexto.sh` usa `[0-9]`); `plan_de_rama` vuelve a la bitácora sin avisar cuando `validar_plan` rechaza el candidato; una rama con el slug de un plan viejo hace verificar ese plan congelado (el mismo riesgo que ya existía con `Plan activo:`).
-- [menor, abierto, decisión del usuario] Auditoría de `acciones-sitio` (PLAUSIBLE, no probado en ejecución): si un proyecto se borra y después su sitio se suprime, quedan dos problemas:
-  - `HistoricalProyecto` conserva `sitio_id`, el título y el detalle del proyecto, que podrían mencionar el domicilio o al titular.
-  - `/admin/proyectos/proyecto/<id>/history/` daría 500, porque `Proyecto.__str__` lee `self.sitio`.
-
-  Propuesta: borrar `Proyecto.history.filter(sitio_id=pk)` dentro de `suprimir_sitio`, hacer que `__str__` tolere un sitio inexistente y agregar un test. Se puede hacer en el plan de Visita, que vuelve a tocar Proyecto.
+- [importante, abierto, decisión del usuario] Auditoría de `visitas` (0 bloqueantes hoy; el 1 pasa a bloqueante cuando la API reciba fotos):
+  1. Bomba de descompresión: `apps/visitas/imagenes.py` decodifica la imagen entera antes de reducir (un JPEG de 13000×13000 de 2,6 MB lleva el pico a 1,4 GB). Propuesta: tope de píxeles, `draft()` antes de `exif_transpose`, `DecompressionBombWarning` como error y test.
+  2. El admin permite cambiar coordenadas, `datos`, `empleado`, `origen` y `proyecto` de una visita realizada; coordenadas y `datos` no tienen historial, así que no queda rastro. Propuesta: `get_readonly_fields` con todos los campos de evidencia cuando `estado != pendiente`.
+  3. Fotos y productos de una visita realizada se cambian, borran o mueven desde el admin sin historial. Propuesta: permisos de cambio/alta/baja en `False` si la visita no está pendiente; `HistoricalRecords` en `ProductoAplicado`.
+  4. Doble registro: `registrar_visita_realizada` comprueba `pendiente` sobre el objeto en memoria y sin bloqueo; un reintento o una instancia vieja vuelve a registrar y pisa la evidencia. Propuesta: `select_for_update` de visita y proyecto dentro del `atomic` y test de doble registro (resuelve también que la visita quede mutada en memoria si falla `full_clean`).
+  5. Una visita offline que llega tarde hace retroceder `encargado_actual` y `proxima_visita`. Propuesta: actualizar el proyecto solo si `realizada_en` es la más reciente; rechazar `realizada_en` futura.
+  6. Borrar una foto o una visita deja el JPEG en disco, y `HistoricalVisita` conserva texto libre tras una supresión. Propuesta: `has_delete_permission=False` en el admin de visitas y fotos, `post_delete` que borre el archivo; decisión legal sobre retención de visitas al suprimir un sitio (hoy `PROTECT` lo impide).
+  - Menores: el comentario JPEG/GIF (marcador COM) sobrevive al reencodeo (`imagen.info = {}`); archivo no imagen da 500 por `Foto.objects.create` (relanzar como `ValidationError`); HEIC no se abre (la app debe mandar JPEG); el original con GPS pasa por el temporal del sistema si pesa más de 2,5 MB; el servicio no compara `empleado` con el asignado (definir en el plan de API); `HistoricalVisita` guarda `motivo_manual`, `observaciones` e `incidencia_detalle` (política de retención); MEDIA no se sirve y, cuando se sirva, tiene que ser con vista autenticada por permiso sobre la visita.
+  - Observaciones de verificación: `ProyectoTests.test_str_tolera_sitio_inexistente` usa `count() + 99999` como pk inexistente; T3 y T4 escribieron los tests junto con el código (no se los vio fallar uno por uno); `Visita.Meta.ordering = ["-creado"]` se agregó sin estar en el plan; `datos` todavía no se valida contra el esquema (va con el serializer).
+- [menor, abierto] Los bloques `### Ola` de `docs/plantilla-plan.md` no los ejecuta ni `verificar_plan.py` ni `verificador`: en `visitas` los criterios de integración se pusieron en el cierre global. Corregir la plantilla o el hook.
 - [menor, abierto] Re-auditoría de `auditoria-dominio`:
   - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
   - Las columnas borradas por `sitios/0002` siguen en disco hasta un `VACUUM FULL` y siguen en los backups (decisión de retención).
   - H2: `bulk_create`/`update()` saltean la validación de encargados. Hoy no se usan.
   - H4: ante resto 10 se acepta 9 aunque AFIP nunca emite ese caso con el mismo prefijo, y los CUIT ya cargados no se revalidan.
 - [menor] `apps/sitios/models.py:60` lleva `# noqa: E501` porque el criterio del plan exigía la línea de `excluded_fields` en una sola línea; `ruff format` la partiría.
-- Para el plan de Visita (auditor): guardar una copia del esquema de planilla en cada Visita. `CampoPlanilla` no tiene historial, y cambiar una `clave` cambia cómo se leen las planillas viejas.
 - [importante, abierto, diferido al plan de despliegue por decisión del usuario: hoy es solo desarrollo] La barrera de `config/settings/dev.py` solo mira `ALLOWED_HOSTS`. Con `DJANGO_ENV=development` y `ALLOWED_HOSTS` vacío en un hosting, el sitio arranca con `DEBUG=True` y la página técnica del 400 expone tracebacks y settings; con `runserver`, también `DATABASE_URL`, porque no coincide con el patrón de ocultamiento (comprobado por el auditor). Propuesta del auditor: abortar si hay variables propias del hosting (`RAILWAY_ENVIRONMENT`, `RENDER`, `DYNO`, `FLY_APP_NAME`, `K_SERVICE`…), que hay que ajustar al hosting real. [menor] Las IP privadas en `ALLOWED_HOSTS` no limitan quién se conecta (el Host lo elige el cliente). (El `.strip()` de `ALLOWED_HOSTS` ya está corregido: plan `hosts-espacios`.)
 - El plan de autenticación tiene que invertir `test_panel_responde_200` y `test_api_v1_responde_200` (hoy fijan el acceso anónimo) y seguir la lista de condiciones del auditor: mixin por `es_administrador`, DRF con `IsAuthenticated` y JWT, `AdminSite` restringido, `simple_history` en `User` con `excluded_fields=["password", "last_login"]` (si no, copia el hash, y con el middleware de historial ya activo cada login genera un registro), LOGGING sin datos personales y CSP.
 - WeasyPrint está instalado pero no se probó en tiempo de ejecución (en Windows suele necesitar GTK/Pango).
@@ -40,6 +44,15 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-03 — Registro de visitas (Visita, Foto, ProductoAplicado) y correcciones de Proyecto
+Hecho (plan `docs/planes/2026-10-03-visitas.md`, rama `plan/visitas`, primer plan con olas y worktrees):
+- Ola 1 en paralelo: T1 `Proyecto.__str__` tolera un sitio inexistente; T2 `suprimir_sitio` borra `Proyecto.history` del sitio; T3 modelos `Visita` (historial sin coordenadas ni `datos`, `esquema_planilla`, `clean()` de estado), `Foto` (uuid4, 1600 px, JPEG sin EXIF en `apps/visitas/imagenes.py`) y `ProductoAplicado`, con `visitas/0001_initial`.
+- Ola 2 en paralelo: T4 `apps/visitas/services.py::registrar_visita_realizada` (valida origen, coordenadas, foto y motivo; copia el esquema; actualiza encargado y próxima visita en un `atomic`); T5 admin técnico con inlines y `estado`/`realizada_en`/`esquema_planilla` de solo lectura.
+- Cada subtarea: PASA de `verificador` y `verificador-b`; TODO PASA 60/60 en `05b8cef` (77 tests). `juez-plan` (corrido como agente Plan, no está registrado como tipo) marcó 2 bloqueantes antes de congelar: presupuesto de T3 compartido con T5 y bloques `### Ola` que nadie ejecuta; se corrigieron moviendo el procesamiento de fotos a T3, el admin a T5 y los criterios de integración al cierre global.
+- `auditor-seguridad`: 0 bloqueantes, 6 importantes, 8 menores (en Problemas abiertos).
+- Incidente: un `cd` del principal al worktree de T3 desde el shell persistente (contra la decisión del 2026-10-02); se volvió a la raíz y `git status` de todos los árboles estaba limpio.
+Pendiente: decidir el merge de `plan/visitas` a `main` y si los hallazgos importantes del auditor se corrigen antes, en un plan propio.
 
 ### 2026-10-02 — Paralelismo con multiagentes (worktrees, plan por rama, rutas por app)
 Hecho:
