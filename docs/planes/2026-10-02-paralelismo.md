@@ -231,3 +231,103 @@ commit_base: 2823e82
 | 2026-10-02 | T2 | b988235 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada, inline sobre plan/paralelismo (bootstrap) · commit T2: b988235 · fuera del contrato: `MSYS2_ARG_CONV_EXCL="*" cmd /c` en vez de `cmd //c` (Git Bash convertía `/J` en ruta) |
 | 2026-10-02 | T3, T4 | 001e553 | PASA (verificador 30/30: T3 19, T4 11; verificador-b 32/32) | ruta: delegada en worktrees · T3: c2c7a90, merge 4b9ab09 · T4: 559dc87, merge 001e553 · incidente T3: `worktree-integrar.sh` exit 1 en `git worktree remove` por "Permission denied" (el shell del principal tenía el cwd dentro del worktree); merge, makemigrations y tests ya habían pasado y la junction estaba quitada; el principal borró el directorio vacío y la rama `paralelismo-T3` a mano. Regla aplicada desde entonces: el principal no hace `cd` a worktrees, usa `git -C` |
 | 2026-10-02 | T1 | f0dd286 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada en worktree · T1: 094fb8c, merge f0dd286 · skip preexistente: test de symlink en test_contexto.py |
+
+### Prueba de fuego (T5): salida literal
+
+Commits de las ramas: T5a 18ebe6d, T5b 7ee924a. Merges: `T5a: integra paralelismo-T5a`, `T5b: integra paralelismo-T5b`.
+
+```
+$ bash .claude/hooks/worktree-crear.sh paralelismo T5a
+Preparing worktree (new branch 'paralelismo-T5a')
+HEAD is now at 257a7fc registro: T1 de paralelismo hecha (PASA 10/10)
+System check identified no issues (0 silenced).
+worktree listo: C:/Users/Emanuel/Desktop/WEB/MaControl/worktrees/paralelismo-T5a (rama paralelismo-T5a)
+exit: 0
+```
+
+```
+$ bash .claude/hooks/worktree-crear.sh paralelismo T5b
+Preparing worktree (new branch 'paralelismo-T5b')
+HEAD is now at 257a7fc registro: T1 de paralelismo hecha (PASA 10/10)
+System check identified no issues (0 silenced).
+worktree listo: C:/Users/Emanuel/Desktop/WEB/MaControl/worktrees/paralelismo-T5b (rama paralelismo-T5b)
+exit: 0
+```
+
+```
+$ bash .claude/hooks/worktree-integrar.sh paralelismo T5a plan/paralelismo apps/clientes
+=== worktree: C:/Users/Emanuel/Desktop/WEB/MaControl (rama: plan/paralelismo) ===
+-- diff --stat contra plan/paralelismo (plan/paralelismo...HEAD) --
+-- sin commitear (git status --porcelain) --
+  (nada sin commitear)
+-- diff --stat de lo sin commitear (contra HEAD) --
+
+=== worktree: C:/Users/Emanuel/Desktop/WEB/MaControl/worktrees/paralelismo-T5a (rama: paralelismo-T5a) ===
+-- diff --stat contra plan/paralelismo (plan/paralelismo...HEAD) --
+ apps/clientes/tests/test_rutas.py | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+-- sin commitear (git status --porcelain) --
+  (nada sin commitear)
+-- diff --stat de lo sin commitear (contra HEAD) --
+
+=== worktree: C:/Users/Emanuel/Desktop/WEB/MaControl/worktrees/paralelismo-T5b (rama: paralelismo-T5b) ===
+-- diff --stat contra plan/paralelismo (plan/paralelismo...HEAD) --
+ apps/productos/tests/test_rutas.py | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+-- sin commitear (git status --porcelain) --
+  (nada sin commitear)
+-- diff --stat de lo sin commitear (contra HEAD) --
+
+Merge made by the 'ort' strategy.
+ apps/clientes/tests/test_rutas.py | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 apps/clientes/tests/test_rutas.py
+No changes detected
+Using existing test database for alias 'default'...
+..........................................................
+----------------------------------------------------------------------
+Ran 58 tests in 6.793s
+
+OK
+Preserving test database for alias 'default'...
+Found 58 test(s).
+System check identified no issues (0 silenced).
+Deleted branch paralelismo-T5a (was 18ebe6d).
+integrada paralelismo-T5a en plan/paralelismo
+exit: 0
+```
+
+```
+$ bash .claude/hooks/worktree-integrar.sh paralelismo T5b plan/paralelismo apps/productos
+=== worktree: C:/Users/Emanuel/Desktop/WEB/MaControl (rama: plan/paralelismo) ===
+-- diff --stat contra plan/paralelismo (plan/paralelismo...HEAD) --
+-- sin commitear (git status --porcelain) --
+  (nada sin commitear)
+-- diff --stat de lo sin commitear (contra HEAD) --
+
+=== worktree: C:/Users/Emanuel/Desktop/WEB/MaControl/worktrees/paralelismo-T5b (rama: paralelismo-T5b) ===
+-- diff --stat contra plan/paralelismo (plan/paralelismo...HEAD) --
+ apps/productos/tests/test_rutas.py | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+-- sin commitear (git status --porcelain) --
+  (nada sin commitear)
+-- diff --stat de lo sin commitear (contra HEAD) --
+
+Merge made by the 'ort' strategy.
+ apps/productos/tests/test_rutas.py | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 apps/productos/tests/test_rutas.py
+No changes detected
+Using existing test database for alias 'default'...
+...........................................................
+----------------------------------------------------------------------
+Ran 59 tests in 6.697s
+
+OK
+Preserving test database for alias 'default'...
+Found 59 test(s).
+System check identified no issues (0 silenced).
+Deleted branch paralelismo-T5b (was 7ee924a).
+integrada paralelismo-T5b en plan/paralelismo
+exit: 0
+```
