@@ -193,16 +193,16 @@ T3 cambia `worktree-integrar.sh`: se integra con el script de `plan/menores-abie
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): menores-abiertos>
+commit_base: b437ec1
 
 ### Estado de subtareas
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | en curso |
+| T2 | en curso |
+| T3 | en curso |
+| T4 | en curso |
 
 ### Corridas
 
