@@ -1,0 +1,38 @@
+from unittest import mock
+
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase
+
+from apps.accounts.models import User
+
+GETPASS = "apps.accounts.management.commands.crear_usuario.getpass"
+
+
+class CrearUsuarioTests(TestCase):
+    def test_crea_empleado_sin_is_staff(self):
+        with mock.patch(GETPASS, return_value="clave-segura-123"):
+            call_command("crear_usuario", "ana", rol="empleado", nombre="Ana")
+        usuario = User.objects.get(username="ana")
+        self.assertEqual(usuario.rol, User.Rol.EMPLEADO)
+        self.assertEqual(usuario.first_name, "Ana")
+        self.assertFalse(usuario.is_staff)
+        self.assertFalse(usuario.is_superuser)
+        self.assertTrue(usuario.check_password("clave-segura-123"))
+
+    def test_rechaza_contrasena_de_11_caracteres(self):
+        with mock.patch(GETPASS, return_value="clave-corta"):
+            with self.assertRaises(CommandError):
+                call_command("crear_usuario", "ana", rol="empleado")
+        self.assertFalse(User.objects.filter(username="ana").exists())
+
+    def test_rechaza_usuario_existente(self):
+        User.objects.create_user("ana", password="clave-segura-123")
+        with mock.patch(GETPASS, return_value="clave-segura-123"):
+            with self.assertRaises(CommandError):
+                call_command("crear_usuario", "ana", rol="empleado")
+
+    def test_rechaza_contrasenas_distintas(self):
+        with mock.patch(GETPASS, side_effect=["clave-segura-123", "otra-clave-123"]):
+            with self.assertRaises(CommandError):
+                call_command("crear_usuario", "ana", rol="empleado")
