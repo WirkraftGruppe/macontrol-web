@@ -2,6 +2,7 @@ import shutil
 import tempfile
 from io import BytesIO
 
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from PIL import Image
@@ -55,3 +56,34 @@ class FotoTests(TestCase):
         with Image.open(foto.imagen.path) as guardada:
             self.assertEqual(guardada.format, "JPEG")
         self.assertNotIn("Perez", foto.imagen.name)
+
+    def test_rechaza_imagen_con_demasiados_pixeles(self):
+        datos = _bytes(Image.new("L", (8000, 6000)), "PNG")
+        with self.assertRaises(ValidationError):
+            Foto.objects.create(
+                visita=self.visita,
+                imagen=SimpleUploadedFile(
+                    "grande.png", datos, content_type="image/png"
+                ),
+            )
+        self.assertEqual(Foto.objects.count(), 0)
+
+    def test_quita_comentario_del_jpeg(self):
+        datos = _bytes(Image.new("RGB", (100, 80), "green"), "JPEG", comment=b"SECRETO")
+        self.assertIn(b"SECRETO", datos)
+        foto = Foto.objects.create(
+            visita=self.visita,
+            imagen=SimpleUploadedFile("foto.jpg", datos, content_type="image/jpeg"),
+        )
+        with open(foto.imagen.path, "rb") as guardada:
+            self.assertNotIn(b"SECRETO", guardada.read())
+
+    def test_archivo_que_no_es_imagen_lanza_validation_error(self):
+        with self.assertRaises(ValidationError):
+            Foto.objects.create(
+                visita=self.visita,
+                imagen=SimpleUploadedFile(
+                    "falso.jpg", b"esto no es una imagen", content_type="image/jpeg"
+                ),
+            )
+        self.assertEqual(Foto.objects.count(), 0)
