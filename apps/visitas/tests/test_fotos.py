@@ -1,6 +1,7 @@
 import shutil
 import struct
 import tempfile
+import zlib
 from io import BytesIO
 from unittest import mock
 
@@ -107,3 +108,52 @@ class FotoTests(TestCase):
                 ),
             )
         self.assertEqual(Foto.objects.count(), 0)
+
+    def _png_con_idat_corrupto(self, recalcular_crc):
+        """PNG real con los bytes de datos del IDAT sobrescritos."""
+        imagen = Image.effect_noise((200, 200), 80).convert("RGB")
+        datos = bytearray(_bytes(imagen, "PNG"))
+        inicio = datos.index(b"IDAT")
+        largo = struct.unpack(">I", datos[inicio - 4 : inicio])[0]
+        desde, hasta = inicio + 4, inicio + 4 + largo
+        datos[desde:hasta] = bytes([0xFF]) * largo
+        if recalcular_crc:
+            crc = zlib.crc32(bytes(datos[inicio:hasta]))
+            datos[hasta : hasta + 4] = struct.pack(">I", crc)
+        return bytes(datos)
+
+    def test_png_corrupto_se_rechaza(self):
+        for recalcular_crc in (True, False):
+            with self.subTest(crc_recalculado=recalcular_crc):
+                datos = self._png_con_idat_corrupto(recalcular_crc)
+                with self.assertRaises(ValidationError):
+                    Foto.objects.create(
+                        visita=self.visita,
+                        imagen=SimpleUploadedFile(
+                            "roto.png", datos, content_type="image/png"
+                        ),
+                    )
+                self.assertEqual(Foto.objects.count(), 0)
+
+    def test_webp_con_dimensiones_enormes_se_rechaza(self):
+        # 39,2 MP: bajo el tope de JPEG pero sobre el de WebP (16 MP).
+        datos = _bytes(Image.new("L", (8000, 4900)), "WEBP", lossless=True)
+        with self.assertRaises(ValidationError):
+            Foto.objects.create(
+                visita=self.visita,
+                imagen=SimpleUploadedFile(
+                    "enorme.webp", datos, content_type="image/webp"
+                ),
+            )
+        self.assertEqual(Foto.objects.count(), 0)
+
+    def test_formato_no_permitido_se_rechaza(self):
+        for formato in ("ICNS", "GIF", "BMP"):
+            with self.subTest(formato=formato):
+                datos = _bytes(Image.new("RGB", (128, 128), "red"), formato)
+                with self.assertRaises(ValidationError):
+                    Foto.objects.create(
+                        visita=self.visita,
+                        imagen=SimpleUploadedFile("foto." + formato.lower(), datos),
+                    )
+                self.assertEqual(Foto.objects.count(), 0)
