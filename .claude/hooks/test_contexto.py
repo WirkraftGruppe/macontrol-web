@@ -221,5 +221,22 @@ def test_contexto_sin_plan_de_rama_usa_bitacora(tmp_path):
     assert "PLAN-DE-RAMA" not in salida
 
 
+def test_contexto_inyecta_pendientes(tmp_path):
+    planes = tmp_path / "docs" / "planes"
+    planes.mkdir(parents=True)
+    (planes / "2026-01-01-demo.md").write_text(
+        "# Plan\n\n## Registro de verificación\n\n## Pendientes que deja este plan\n\n"
+        "### Problemas\n\n- P-demo-1 [importante] PENDIENTE-DE-JUGUETE\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "docs" / "bitacora.md").write_text("# Bitácora\n", encoding="utf-8")
+    proceso = correr_hook(tmp_path)
+    salida = texto(proceso)
+    assert proceso.returncode == 0
+    assert "=== Pendientes abiertos (pendientes.py) ===" in salida
+    assert "PENDIENTE-DE-JUGUETE" in salida
+    assert salida.index("# Bitácora") < salida.index("=== Pendientes abiertos")
+
+
 if __name__ == "__main__":
     unittest.main()
