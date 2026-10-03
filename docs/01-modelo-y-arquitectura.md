@@ -134,6 +134,11 @@ macontrol/
 │   └── 02-diseno.md                  # tokens del sistema visual (dirección A)
 ├── config/                  # settings (base/dev/prod), urls, asgi/wsgi
 ├── apps/
+│   │                        # cada app de dominio es dueña de lo suyo:
+│   │                        #   models · services · admin · migrations
+│   │                        #   serializers · api_views · api_urls.py (app_name = "<app>")
+│   │                        #   panel_views · panel_urls.py · panel_forms
+│   │                        #   templates/<app>/{panel,pdf}/… · tests/
 │   ├── accounts/            # User, roles, permisos
 │   ├── clientes/
 │   ├── sitios/              # Sitio, QR, geocodificación
@@ -142,10 +147,10 @@ macontrol/
 │   ├── visitas/             # Visita, Foto, ProductoAplicado, reglas de actualización
 │   ├── productos/
 │   ├── informes/            # generación de PDF (informes, certificados, historial, QR)
-│   ├── panel/               # vistas HTMX del panel de gestión
-│   ├── api/                 # DRF: serializers, viewsets, auth JWT, versionado
+│   ├── panel/               # layout, login, tablero, mapa; urls.py = router de una línea por app
+│   ├── api/                 # transversal: JWT, permisos base, paginación; urls.py = router por app
 │   └── web/                 # sitio público: páginas, contenido, SEO
-├── templates/               # base.html, panel/, web/
+├── templates/               # solo base.html y panel/base.html
 ├── static/                  # tailwind, htmx, leaflet, logo
 ├── media/                   # fotos de visitas, logos, QR generados (fuera de git)
 ├── pyproject.toml           # ruff; dependencias en requirements.txt
