@@ -123,7 +123,7 @@ Una sola ola:
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): historial-revert>
+commit_base: c2dc617
 
 ### Estado de subtareas
 
