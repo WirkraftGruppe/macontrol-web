@@ -254,7 +254,7 @@ commit_base: 6d22ff1
 | T1 | hecha |
 | T2 | hecha |
 | T4 | hecha |
-| T3 | pendiente |
+| T3 | hecha |
 
 ### Corridas
 
@@ -264,5 +264,6 @@ commit_base: 6d22ff1
 | 2026-10-03 | T1 (corrección) | d516a7e | PASA (verificador y verificador-b, 16/16) | auditor: I1, I2, M1, M2 cerrados; integrada en 59ac5ca |
 | 2026-10-03 | T2 | d238292 | PASA (verificador y verificador-b, 14/14) | auditor: sin bloqueantes ni importantes; 3 menores (skip_history borrado si lo puso quien llama, crear_usuario sin normalize_username/full_clean, carrera exists/save); integrada en 15264d2 |
 | 2026-10-03 | T4 | cb01217 | PASA (verificador y verificador-b, 7/7) | auditor: sin bloqueantes; menores: falta test de unicidad del nonce; `<style>` inline del changelist del admin queda bloqueado por la CSP; integrada en cd5e5ce |
-| | T3 | | | |
+| 2026-10-03 | T3 | cd209f0 | PASA (verificador y verificador-b, 21/21) | auditor: H1 login del panel sin límite (importante), H2 XFF/NUM_PROXIES (importante, diferido a despliegue), H3 refresh tras cambio de contraseña, H4 balde compartido |
+| 2026-10-03 | T3 (corrección) | a56f9d7 | PASA (verificador y verificador-b, 21/21) | auditor: H1, H3, H4 cerrados; nuevos N1 DoS de cuenta, N2 NFKC, N3 /admin/login/ sin límite, N4 balde por IP compartido → plan siguiente `limites-ingreso` (decisión del usuario); integrada en 5a71d9e |
 | | TODO | | | |
