@@ -75,3 +75,16 @@ class AuthApiTests(TestCase):
     def test_sesion_django_no_autentica_la_api(self):
         self.client.force_login(self.usuario)
         self.assertEqual(self.client.get("/api/v1/").status_code, 401)
+
+    def test_refresh_tras_cambio_de_contrasena_falla(self):
+        refresh = self._tokens()["refresh"]
+        self.usuario.set_password("otra-clave-segura-456")
+        self.usuario.save()
+        self.assertEqual(self._renovar(refresh).status_code, 401)
+
+    def test_renovar_tiene_cupo_propio(self):
+        refresh = self._tokens()["refresh"]
+        for _ in range(10):
+            self._pedir_token("mala")
+        self.assertEqual(self._pedir_token("mala").status_code, 429)
+        self.assertEqual(self._renovar(refresh).status_code, 200)
