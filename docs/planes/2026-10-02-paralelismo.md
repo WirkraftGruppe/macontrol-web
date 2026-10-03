@@ -219,7 +219,7 @@ commit_base: 2823e82
 | Tarea | Estado |
 |---|---|
 | T1 | pendiente |
-| T2 | pendiente |
+| T2 | hecha |
 | T3 | pendiente |
 | T4 | pendiente |
 | T5 | pendiente |
@@ -228,3 +228,4 @@ commit_base: 2823e82
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-02 | T2 | b988235 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada, inline sobre plan/paralelismo (bootstrap) · commit T2: b988235 · fuera del contrato: `MSYS2_ARG_CONV_EXCL="*" cmd /c` en vez de `cmd //c` (Git Bash convertía `/J` en ruta) |
