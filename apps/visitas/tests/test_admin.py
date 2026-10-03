@@ -1,5 +1,6 @@
 import shutil
 import tempfile
+from decimal import Decimal
 from io import BytesIO
 
 from django.contrib import admin
@@ -129,3 +130,31 @@ class VisitaAdminTests(TestCase):
                 request, foto_pendiente if modelo is Foto else None
             )
             self.assertIn("visita", solo_lectura)
+
+    def test_revertir_desde_historial_esta_prohibido(self):
+        visita = crear_visita(latitud=Decimal("-35.1"), longitud=Decimal("-58.1"))
+        visita.estado = Visita.Estado.REALIZADA
+        visita.realizada_en = timezone.now()
+        visita.save()
+        realizada_en = visita.realizada_en
+        version_pendiente = visita.history.get(estado=Visita.Estado.PENDIENTE)
+        self.client.force_login(self.administrador)
+        url = reverse(
+            "admin:visitas_visita_simple_history",
+            args=[visita.pk, version_pendiente.pk],
+        )
+        respuesta = self.client.get(url)
+        self.assertEqual(respuesta.status_code, 200)
+        formulario = respuesta.context["adminform"].form
+        datos = {
+            nombre: ("" if valor is None else valor)
+            for nombre, valor in formulario.initial.items()
+            if nombre in formulario.fields
+        }
+        datos["latitud"] = -36.5
+        respuesta = self.client.post(url, datos)
+        self.assertEqual(respuesta.status_code, 403)
+        visita.refresh_from_db()
+        self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
+        self.assertEqual(visita.realizada_en, realizada_en)
+        self.assertEqual(visita.latitud, Decimal("-35.1"))

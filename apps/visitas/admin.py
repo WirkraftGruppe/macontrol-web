@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from simple_history.admin import SimpleHistoryAdmin
 
 from .models import Foto, ProductoAplicado, Visita
@@ -81,6 +82,12 @@ class VisitaAdmin(SimpleHistoryAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def history_form_view(self, request, object_id, version_id, extra_context=None):
+        """Revertir desde el historial reescribiría evidencia: solo se permite ver."""
+        if request.method == "POST":
+            raise PermissionDenied
+        return super().history_form_view(request, object_id, version_id, extra_context)
 
 
 @admin.register(Foto)
