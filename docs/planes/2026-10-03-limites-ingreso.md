@@ -264,7 +264,7 @@ commit_base: 071ecb5
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
@@ -274,6 +274,7 @@ commit_base: 071ecb5
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-03 | T1 | db4f2d5 | verificador: PASA 7/7 · verificador-b: PASA 7/7 | auditor-seguridad: sin bloqueantes; 3 importantes (default NUM_PROXIES=0 en prod, token fuera de los baldes de usuario, 10 IP o un /64 bloquean al administrador) y 3 menores (parser de NUM_PROXIES, dos fuentes de NUM_PROXIES, LocMem). Integrada en a9acc82. |
 
 ## Pendientes que deja este plan
 
