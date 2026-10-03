@@ -178,3 +178,66 @@ def test_integrar_rechaza_renombre_desde_fuera_de_alcance(repo):
     assert git(repo, "rev-parse", "main").strip() == antes
     assert (repo / "fuera" / "x.txt").exists()
     assert wt.exists()
+
+
+def test_integrar_rechaza_prefijo_vacio(repo):
+    wt = crear(repo)
+    commitear_archivo(wt, "app.txt")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "", "app.txt")
+    assert proceso.returncode != 0
+    assert git(repo, "rev-parse", "main").strip() == antes
+
+
+def test_integrar_compara_por_segmento(repo):
+    wt = crear(repo)
+    (wt / "app").mkdir()
+    (wt / "app_v2").mkdir()
+    commitear_archivo(wt, "app/x.txt")
+    commitear_archivo(wt, "app_v2/y.txt")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "app")
+    assert proceso.returncode == 1
+    assert "app_v2/y.txt" in texto(proceso.stderr)
+    assert git(repo, "rev-parse", "main").strip() == antes
+
+
+def test_integrar_deshace_merge_si_fallan_tests(repo):
+    # manage.py de juguete que falla cuando recibe `test`.
+    (repo / "manage.py").write_text(
+        MANAGE_JUGUETE + "if 'test' in sys.argv[1:]:\n    sys.exit(1)\n"
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "manage.py que falla en test")
+    wt = crear(repo)
+    commitear_archivo(wt, "app.txt")
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "app.txt")
+    assert proceso.returncode == 1
+    assert git(repo, "rev-parse", "main").strip() == antes
+    assert "se deshizo el merge" in texto(proceso.stderr)
+    assert not (repo / "app.txt").exists()
+    assert wt.exists()
+    assert git(repo, "branch", "--list", "demo-T1").strip().endswith("demo-T1")
+
+
+def test_integrar_rechaza_ruta_que_no_es_worktree(repo):
+    # La rama existe con un commit propio, pero worktrees/demo-T1 es un directorio común.
+    git(repo, "checkout", "-q", "-b", "demo-T1")
+    (repo / "app.txt").write_text("x\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "agrega app.txt")
+    git(repo, "checkout", "-q", "main")
+    (repo / "worktrees" / "demo-T1").mkdir(parents=True)
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, repo, "demo", "T1", "main", "app.txt")
+    assert proceso.returncode == 1
+    assert git(repo, "rev-parse", "main").strip() == antes
+
+
+@pytest.mark.parametrize("rama_base", ["-b", "--orphan", "no-existe"])
+def test_crear_rechaza_rama_base_invalida(repo, rama_base):
+    proceso = correr(CREAR, repo, "demo", "T1", rama_base)
+    assert proceso.returncode == 2, texto(proceso.stdout) + texto(proceso.stderr)
+    assert not (repo / "worktrees" / "demo-T1").exists()
+    assert git(repo, "branch", "--list", "demo-T1").strip() == ""

@@ -13,9 +13,17 @@
 # mensaje "T<n>: integra <slug>-T<n>"; makemigrations --check y tests en el destino; quita la
 # junction venv con cmd (nunca borra el contenido del venv real), el worktree y la rama.
 #
+# Validaciones: una <ruta> vacía (o solo "/") es uso inválido; la "/" final de cada prefijo se
+# quita y el alcance compara por segmento (`app` admite `app` y `app/…`, no `app_v2/…`);
+# `worktrees/<slug>-T<n>` debe figurar en la lista de worktrees de git (ruta normalizada).
+# Si makemigrations --check o los tests fallan tras el merge, se deshace con
+# un reset duro a ORIG_HEAD en el destino (estaba limpio por el paso 1) y el worktree y la rama
+# de la subtarea quedan intactos.
+#
 # exit 0 → integrada y limpia
 # exit 2 → uso inválido
-# exit 1 → rechazada o fallida (si falló antes del merge no se modificó nada)
+# exit 1 → rechazada o fallida (si falló antes del merge no se modificó nada; si falló después,
+#          el merge se deshizo)
 set -u
 
 if [ "$#" -lt 4 ]; then
@@ -27,6 +35,17 @@ slug="$1"
 tarea="$2"
 destino="$3"
 shift 3
+
+# Prefijos: ninguno vacío y sin "/" final.
+prefijos=()
+for p in "$@"; do
+  p="${p%/}"
+  if [ -z "$p" ]; then
+    echo "ruta vacía no permitida" >&2
+    exit 2
+  fi
+  prefijos+=("$p")
+done
 
 if ! printf '%s' "$slug" | grep -Eq '^[a-z0-9][a-z0-9-]*$'; then
   echo "slug inválido: '$slug'" >&2
@@ -51,8 +70,24 @@ if [ ! -d "$ruta_sub" ]; then
   exit 1
 fi
 
+# La ruta de la subtarea debe estar registrada como worktree (rutas normalizadas).
+normalizar() { cygpath -m "$1" 2>/dev/null | tr 'A-Z' 'a-z'; }
+esperada="$(normalizar "$ruta_sub")"
+lista_wt="$(git -C "$raiz" worktree list --porcelain)"
+registrado=0
+while IFS= read -r linea; do
+  case "$linea" in
+    "worktree "*) [ "$(normalizar "${linea#worktree }")" = "$esperada" ] && registrado=1 ;;
+  esac
+done <<< "$lista_wt"
+if [ "$registrado" -eq 0 ]; then
+  echo "$ruta_sub no figura en git worktree list" >&2
+  exit 1
+fi
+
 # Worktree donde está la rama destino.
-ruta_dest="$(git -C "$raiz" worktree list --porcelain | awk -v rama="refs/heads/$destino" '
+ruta_dest="$(printf '%s
+' "$lista_wt" | awk -v rama="refs/heads/$destino" '
   /^worktree /{ruta=substr($0,10)} $0=="branch " rama {print ruta; exit}')"
 if [ -z "$ruta_dest" ]; then
   echo "la rama destino '$destino' no tiene worktree" >&2
@@ -75,9 +110,9 @@ fuera=""
 while IFS= read -r -d '' archivo; do
   [ -z "$archivo" ] && continue
   dentro=0
-  for prefijo in "$@"; do
+  for prefijo in "${prefijos[@]}"; do
     case "$archivo" in
-      "$prefijo"*) dentro=1 ;;
+      "$prefijo"|"$prefijo"/*) dentro=1 ;;
     esac
   done
   [ "$dentro" -eq 0 ] && fuera="$fuera$archivo"$'\n'
@@ -94,14 +129,18 @@ if ! git -C "$ruta_dest" merge --no-ff -m "$tarea: integra $nombre" "$nombre"; t
   exit 1
 fi
 
-# 5. Migraciones y tests en el destino.
+# 5. Migraciones y tests en el destino; si fallan, se deshace el merge.
+deshacer_merge() {
+  git -C "$ruta_dest" reset --hard ORIG_HEAD >/dev/null
+  echo "$1; se deshizo el merge de $nombre en $destino" >&2
+}
 export PYTHONIOENCODING=utf-8 DJANGO_ENV=development
 if ! (cd "$ruta_dest" && ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run); then
-  echo "makemigrations --check falló tras el merge (worktree intacto)" >&2
+  deshacer_merge "makemigrations --check falló tras el merge"
   exit 1
 fi
 if ! (cd "$ruta_dest" && ./venv/Scripts/python.exe manage.py test --keepdb); then
-  echo "los tests fallaron tras el merge (worktree intacto)" >&2
+  deshacer_merge "los tests fallaron tras el merge"
   exit 1
 fi
 
