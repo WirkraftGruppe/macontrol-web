@@ -74,6 +74,12 @@ de ese encabezado (estado de subtareas, corridas, `commit_base`) no alteran el c
    <hash>`) y es lo único que le da validez a tu veredicto: si después alguien toca el
    código, el veredicto queda invalidado aunque el criterio no haya cambiado, y hay que
    repetir la verificación contra el HEAD nuevo.
+4. Los criterios de presupuesto traen el marcador literal `'<commit_base>'` (entre comillas
+   simples): lo ejecutas tal cual, sin reemplazarlo, porque `presupuesto.sh` lo resuelve con
+   `verificar_plan.py --commit-base` leyendo la línea `commit_base:` del Registro. Si no
+   resuelve, el criterio es `FALLA` con el mensaje que imprime el script.
+5. Ejecutas `py -3 .claude/hooks/pendientes.py --json` (solo lectura) y anotas la cantidad de
+   elementos de `abiertos` para el veredicto. No cambia el PASA/FALLA.
 
 ### Paso 1 — Ejecución literal de cada criterio
 
@@ -132,6 +138,7 @@ Devuelves exactamente esto, en español, sin prosa antes ni después:
 HEAD verificado: <hash>
 Contrato: INTACTO | MODIFICADO (commits: …) | NO CONGELADO
 Inocuidad: OK | INVÁLIDA (ver abajo)
+Pendientes: <n> abiertos
 
 ## T1 — <título de la subtarea>
 - [cmd] <comando literal> → PASA (exit 0)
