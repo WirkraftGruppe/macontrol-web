@@ -38,3 +38,12 @@ class CspTests(TestCase):
         respuesta = self.client.get("/admin/login/")
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn("Content-Security-Policy", respuesta)
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_nonce_cambia_en_cada_respuesta(self):
+        """Dos respuestas distintas llevan nonces distintos."""
+        nonces = set()
+        for _ in range(2):
+            csp = self.client.get("/base/")["Content-Security-Policy"]
+            nonces.add(re.search(r"'nonce-([^']+)'", csp).group(1))
+        self.assertEqual(len(nonces), 2)

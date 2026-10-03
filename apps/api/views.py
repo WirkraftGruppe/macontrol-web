@@ -1,7 +1,7 @@
 """Vistas transversales de la API: raíz y tokens JWT."""
 
 from django.contrib.auth import get_user_model
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, Throttled
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -10,14 +10,24 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.utils import get_md5_hash_password
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-
-class ThrottleAutenticacion(AnonRateThrottle):
-    """Limita los intentos anónimos de obtener o renovar tokens."""
-
-    scope = "autenticacion"
+from apps.accounts.limites import baldes_llenos, limpiar_usuario_ip, registrar_fallo
+from apps.accounts.red import ip_del_cliente
 
 
-class ThrottleRenovacion(AnonRateThrottle):
+class IpDelClienteMixin:
+    """Identifica al cliente con `ip_del_cliente` y no con `X-Forwarded-For` crudo."""
+
+    def get_ident(self, request):
+        return ip_del_cliente(request)
+
+
+class ThrottleToken(IpDelClienteMixin, AnonRateThrottle):
+    """Limita los pedidos anónimos de obtener tokens, por IP."""
+
+    scope = "token"
+
+
+class ThrottleRenovacion(IpDelClienteMixin, AnonRateThrottle):
     """Cupo propio para renovar tokens, aparte del de obtenerlos."""
 
     scope = "renovacion"
@@ -56,7 +66,25 @@ class RaizView(APIView):
 
 
 class ObtenerToken(TokenObtainPairView):
-    throttle_classes = [ThrottleAutenticacion]
+    """Obtiene el token; comparte con el panel los baldes de fallos por usuario."""
+
+    throttle_classes = [ThrottleToken]
+
+    def post(self, request, *args, **kwargs):
+        usuario = (
+            request.data.get("username", "") if hasattr(request.data, "get") else ""
+        )
+        if not isinstance(usuario, str):
+            usuario = ""
+        if baldes_llenos(request, usuario, solo_usuario=True):
+            raise Throttled()
+        try:
+            respuesta = super().post(request, *args, **kwargs)
+        except AuthenticationFailed:
+            registrar_fallo(request, usuario, solo_usuario=True)
+            raise
+        limpiar_usuario_ip(request, usuario)
+        return respuesta
 
 
 class RenovarToken(TokenRefreshView):
