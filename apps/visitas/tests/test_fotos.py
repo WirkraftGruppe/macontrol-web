@@ -1,6 +1,8 @@
 import shutil
+import struct
 import tempfile
 from io import BytesIO
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -44,6 +46,24 @@ class FotoTests(TestCase):
         with Image.open(foto.imagen.path) as guardada:
             self.assertEqual(max(guardada.size), 1600)
             self.assertEqual(len(guardada.getexif()), 0)
+
+    def test_exif_corrupto_no_impide_guardar(self):
+        datos = _bytes(Image.new("RGB", (2000, 1000), "red"), "JPEG")
+        for error in (struct.error("exif roto"), SyntaxError("exif roto")):
+            with self.subTest(error=type(error).__name__):
+                with mock.patch(
+                    "apps.visitas.imagenes.ImageOps.exif_transpose",
+                    side_effect=error,
+                ):
+                    foto = Foto.objects.create(
+                        visita=self.visita,
+                        imagen=SimpleUploadedFile(
+                            "foto.jpg", datos, content_type="image/jpeg"
+                        ),
+                    )
+                with Image.open(foto.imagen.path) as guardada:
+                    self.assertEqual(max(guardada.size), 1600)
+                    self.assertEqual(len(guardada.getexif()), 0)
 
     def test_png_se_guarda_como_jpeg(self):
         datos = _bytes(Image.new("RGBA", (100, 80), "blue"), "PNG")
