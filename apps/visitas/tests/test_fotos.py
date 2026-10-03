@@ -157,3 +157,56 @@ class FotoTests(TestCase):
                         imagen=SimpleUploadedFile("foto." + formato.lower(), datos),
                     )
                 self.assertEqual(Foto.objects.count(), 0)
+
+    def _crear(self, nombre, datos, tipo):
+        return Foto.objects.create(
+            visita=self.visita,
+            imagen=SimpleUploadedFile(nombre, datos, content_type=tipo),
+        )
+
+    def test_mpo_se_acepta(self):
+        # Pillow abre un JPEG con varios cuadros como MPO (format == "MPO").
+        base = Image.new("RGB", (200, 100), "red")
+        datos = _bytes(
+            base, "MPO", save_all=True, append_images=[Image.new("RGB", (200, 100))]
+        )
+        with Image.open(BytesIO(datos)) as abierta:
+            self.assertEqual(abierta.format, "MPO")
+        foto = self._crear("foto.jpg", datos, "image/jpeg")
+        with Image.open(foto.imagen.path) as guardada:
+            self.assertEqual(guardada.format, "JPEG")
+            self.assertEqual(getattr(guardada, "n_frames", 1), 1)
+
+    def test_png_con_ztxt_enorme_se_rechaza(self):
+        # El zTXt va después del IDAT: Pillow lo descomprime en load() y lanza
+        # ValueError("Decompressed data too large") si pasa de MAX_TEXT_CHUNK.
+        datos = _bytes(Image.new("RGB", (20, 20), "red"), "PNG")
+        cuerpo = b"clave\x00\x00" + zlib.compress(b"\x00" * (2 * 1024 * 1024))
+        chunk = b"zTXt" + cuerpo
+        chunk = (
+            struct.pack(">I", len(cuerpo))
+            + chunk
+            + struct.pack(">I", zlib.crc32(chunk))
+        )
+        fin = datos.rindex(b"IEND") - 4
+        datos = datos[:fin] + chunk + datos[fin:]
+        with self.assertRaises(ValidationError):
+            self._crear("ztxt.png", datos, "image/png")
+        self.assertEqual(Foto.objects.count(), 0)
+
+    def test_webp_de_10_mp_se_rechaza(self):
+        datos = _bytes(Image.new("L", (4000, 2500)), "WEBP", lossless=True)
+        with self.assertRaises(ValidationError):
+            self._crear("grande.webp", datos, "image/webp")
+        self.assertEqual(Foto.objects.count(), 0)
+
+    def test_jpeg_progresivo_grande_se_rechaza(self):
+        # 20 MP: libjpeg guarda los coeficientes completos y draft no los reduce.
+        imagen = Image.new("L", (5000, 4000))
+        with self.assertRaises(ValidationError):
+            self._crear(
+                "prog.jpg", _bytes(imagen, "JPEG", progressive=True), "image/jpeg"
+            )
+        self.assertEqual(Foto.objects.count(), 0)
+        self._crear("base.jpg", _bytes(imagen, "JPEG"), "image/jpeg")
+        self.assertEqual(Foto.objects.count(), 1)
