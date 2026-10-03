@@ -74,6 +74,12 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 -->
 
 <!-- Las subtareas se llaman siempre T<n>: el hook de cierre solo reconoce `### T<n>` y las filas `| T<n> |`. -->
+<!-- Integración por ola: cada ola termina con un encabezado `### Trabajo del principal (integración de la
+ola N)`, nunca con un párrafo en negrita: el hook corta la tarea en cualquier encabezado, y sin él sus
+criterios se sumarían a la última `### T<n>`. `verificar_plan.py` y `verificador` solo ejecutan `### T<n>`
+y `## Criterios de cierre global`. Los criterios de integración los corre el principal antes de abrir la
+ola siguiente y pega la salida en `### Corridas`; lo que deba quedar comprobado al cierre se repite en el
+cierre global. -->
 ### T1 — <título imperativo, p. ej. "Crear el modelo Sitio con qr_codigo único">
 
 - **Ola**: <n>
@@ -104,22 +110,40 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - **Criterios**:
   - `[test]` …
 
-## Trabajo del principal (integración)
+### Trabajo del principal (integración de la ola 1)
 
-<Por ola: crear los worktrees con `worktree-crear.sh`, integrar con `worktree-integrar.sh` en
-`plan/<slug>`, cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar, ajustar imports, resolver
-conflictos. Lleva sus propios criterios igual que una subtarea. Si no hay nada, se escribe "nada"
-y la verificación final corre directo.>
+<Ola 1: integrar T1 y T2 en `plan/<slug>`. Si no hay nada que integrar, se escribe "nada".>
 
-### Ola 1
-
+- **Pasos**:
+  1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
+  2. `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
+  3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
+  4. Crear los worktrees de la ola siguiente con `bash .claude/hooks/worktree-crear.sh <slug> T3 plan/<slug>`.
 - **Criterios**:
-  - `[cmd]` `<…>`
+  - `[cmd]` `git log --oneline plan/<slug> | grep -q "T1: integra <slug>-T1"`
 
-### Ola 2
+### T3 — <título>
 
+- **Ola**: 2
+- **Depende de**: T1, T2
+- **Puede tocar**: …
+- **No puede tocar**: `docs/planes/`, …
+- **Skill a leer antes**: …
+- **Qué hacer**: <…>
 - **Criterios**:
-  - `[cmd]` `<…>`
+  - `[test]` …
+
+### Trabajo del principal (integración de la ola 2)
+
+<Ola 2: integrar T3 en `plan/<slug>`.>
+
+- **Pasos**:
+  1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
+  2. `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
+  3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
+  4. Con todo integrado, el cierre global y la verificación `TODO`.
+- **Criterios**:
+  - `[cmd]` `git log --oneline plan/<slug> | grep -q "T3: integra <slug>-T3"`
 
 ## Criterios de cierre global
 
@@ -147,6 +171,7 @@ commit_base: <hash del commit docs(plan): <slug>>
 |---|---|
 | T1 | pendiente |
 | T2 | pendiente |
+| T3 | pendiente |
 
 ### Corridas
 
@@ -156,4 +181,5 @@ corrida. Un veredicto vale solo para el HEAD verificado. -->
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | | T1 | | | |
+| | T3 | | | |
 | | TODO | | | |
