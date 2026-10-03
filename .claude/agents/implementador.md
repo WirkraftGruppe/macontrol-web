@@ -93,6 +93,10 @@ Devuelves esto y nada más, en español:
 
 ## Fuera o a medias
 - <qué no se hizo y por qué> | ninguno
+
+## Pendientes propuestos
+- <problema o decisión que viste y que el contrato no cubre: severidad
+  (bloqueante|importante|menor|observación) y texto> | ninguno
 ```
 
 Reglas del informe:
@@ -101,3 +105,5 @@ Reglas del informe:
   afirmación sin el comando, su salida y su código de salida al lado.
 - Un criterio que no pasa se reporta con su salida, no se omite ni se suaviza.
 - No resumes la salida: la copias.
+- `Pendientes propuestos` es solo una propuesta: no escribes en `docs/planes/`. El principal
+  decide si la pasa a la sección `## Pendientes que deja este plan` del plan.

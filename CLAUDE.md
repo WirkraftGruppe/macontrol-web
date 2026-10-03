@@ -12,8 +12,8 @@ Eres Claude Code, el asistente automatizado principal de desarrollo de MAControl
 La raíz es un repositorio git propio. Cuando exista `mobile/`, será otro repositorio y la raíz lo ignorará.
 
 ## Al entrar
-- El hook `SessionStart` (`.claude/hooks/contexto.sh`) inyecta el comienzo de `docs/bitacora.md` ("Estado actual" y la última entrada), el encabezado y la tabla de estado del plan de la rama (o el activo de la bitácora), y las últimas decisiones de `docs/decisiones.md`.
-- No preguntes lo que ya está ahí (plan activo, rama, pendiente inmediato, problemas abiertos): léelo y seguí desde ese punto.
+- El hook `SessionStart` (`.claude/hooks/contexto.sh`) inyecta el comienzo de `docs/bitacora.md` ("Estado actual" y la última entrada), el encabezado y la tabla de estado del plan de la rama (o el activo de la bitácora), y las últimas decisiones de `docs/decisiones.md`. También inyecta `=== Pendientes abiertos (pendientes.py) ===`: los problemas abiertos de todos los planes (`py -3 .claude/hooks/pendientes.py [--raiz R] [--json]`); la bitácora ya no lleva esa lista.
+- No preguntes lo que ya está ahí (plan activo, rama, pendiente inmediato, pendientes abiertos): léelo y seguí desde ese punto.
 - **Resumen de entrada**: la primera respuesta de la sesión abre con un resumen de 3 a 5 líneas de lo que Claude cree que es el estado: plan activo, último trabajo registrado, pendiente inmediato y rama. Antes de escribirlo se corre `git branch --show-current` y `git log -1 --oneline` y se marca toda diferencia con la bitácora (otra rama, commits posteriores a la última entrada): es la señal de trabajo hecho a mano, fuera de Claude. Si el primer pedido implica escribir, se muestra el resumen y se espera la confirmación del usuario antes de la primera escritura; leer no espera.
 - Si el pedido del usuario contradice una decisión registrada en `docs/decisiones.md`, avisalo citando la decisión **antes de avanzar**. Cambiar una decisión es del usuario, y queda como una línea nueva que dice a cuál reemplaza.
 
@@ -67,13 +67,13 @@ Aplica a todo trabajo que toque más de un archivo o que se vaya a dividir en su
 - **Los criterios se fijan antes de delegar y se congelan.** El plan se commitea solo, antes de lanzar el primer subagente (`docs(plan): <slug>`), y ese hash se anota como `commit_base:` en `## Registro de verificación`, **debajo del corte**, nunca en el encabezado. Todo lo anterior a `## Registro de verificación` queda congelado y lo comprueba `bash .claude/hooks/congelado.sh <plan> <slug>`; lo de abajo (commit_base, tabla `### Estado de subtareas`, corridas) lo actualiza el principal durante la ejecución. Cambiar un criterio después es decisión del usuario, nunca del agente que lo incumple: se hace en un commit nuevo `docs(plan): <slug> — modificado: <motivo>`, que `congelado.sh` reporta como **CONTRATO MODIFICADO**.
 - **Commits**: cada subtarea se commitea como `T<n>: …` **antes** de invocar al verificador, y las correcciones van en commits nuevos con el mismo prefijo; las actualizaciones del Registro van en commits `registro: …`.
 - Regla de oro: **si quien puede fallar el criterio puede reescribirlo, no era un criterio.** Ningún subagente implementador recibe permiso de escribir en `docs/planes/`.
-- **Presupuesto de líneas**: cada subtarea lleva `- **Presupuesto**: <N> líneas agregadas` (por defecto 400) y un criterio `[cmd]` con `.claude/hooks/presupuesto.sh . <commit_base> <N> <rutas>`. Se fija antes de empezar y **nunca se sube** durante la subtarea: si el trabajo no entra, se parte en subtareas más chicas. **El presupuesto no es golf**: está prohibido recortar comentarios, docs, tests o líneas en blanco para entrar.
+- **Presupuesto de líneas**: cada subtarea lleva `- **Presupuesto**: <N> líneas agregadas` (por defecto 400) y un criterio `[cmd]` con `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> <rutas>`. El marcador `'<commit_base>'` va literal y entre comillas simples: `presupuesto.sh` lo resuelve con `verificar_plan.py --commit-base`, leyendo la línea `commit_base:` del Registro (debe ser un commit `docs(plan): <slug>`), y el hook de cierre lo reemplaza antes de ejecutar; si no resuelve, el criterio es FALLA (`commit_base sin resolver en <plan>: <motivo>`). Se fija antes de empezar y **nunca se sube** durante la subtarea: si el trabajo no entra, se parte en subtareas más chicas. **El presupuesto no es golf**: está prohibido recortar comentarios, docs, tests o líneas en blanco para entrar.
 
 ### 5. Delegación a subagentes con contrato
 
 - El principal divide el plan en subtareas independientes (por app o por archivo, sin dos subagentes escribiendo el mismo archivo) y las lanza en paralelo cuando no dependen entre sí.
 - Cada delegación incluye, textualmente: objetivo de la subtarea, archivos que puede tocar, archivos que **no** puede tocar (siempre incluye `docs/planes/`), skill que debe leer antes de codificar, y el bloque `Criterios` copiado literal del plan.
-- El implementador devuelve un informe con esta estructura y nada más: archivos tocados; comandos que ejecutó con su **salida literal y código de salida**; tests nuevos por nombre; lo que quedó fuera o a medias. Prohibido devolver "listo", "implementado" o "tests pasando" sin la salida que lo respalda.
+- El implementador devuelve un informe con esta estructura y nada más: archivos tocados; comandos que ejecutó con su **salida literal y código de salida**; tests nuevos por nombre; lo que quedó fuera o a medias; pendientes propuestos. Prohibido devolver "listo", "implementado" o "tests pasando" sin la salida que lo respalda.
 - El principal **no da por cumplida una subtarea leyendo el informe**. Los informes son optimistas por naturaleza; la única verificación válida es la del punto 6.
 
 **Regla de worktree por defecto**: toda subtarea delegada que escriba código va en su propio worktree. Inline solo va lo pasivo o lo que escribe un único archivo de documentación. Los worktrees viven en `worktrees/` (ignorado) y no tienen `venv/`: el script crea una junction.
@@ -113,8 +113,10 @@ Se copian tal cual al último bloque del plan.
 
 ## Cierre de sesión
 Antes de terminar una sesión de trabajo:
-- Actualizar "Estado actual" de `docs/bitacora.md` (tabla `| plan | rama | ola actual | pendiente inmediato | sesión |`, con la línea `Plan activo:` como compatibilidad, y problemas abiertos) y agregar una entrada nueva arriba de todo en "Entradas", con fecha y título.
-- Registrar las decisiones nuevas en `docs/decisiones.md`, una línea cada una con el formato `- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)`.
+- Actualizar "Estado actual" de `docs/bitacora.md` (tabla `| plan | rama | ola actual | pendiente inmediato | sesión |`, con la línea `Plan activo:` como compatibilidad, sin lista de problemas) y agregar una entrada nueva arriba de todo en "Entradas", con fecha y título.
+- Escribir los problemas y decisiones nuevos en la sección `## Pendientes que deja este plan` del plan (debajo del corte), no en la bitácora: problemas como `- P-<slug>-<n> [bloqueante|importante|menor|observación] texto`; decisiones, una línea cada una con el formato `- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)`.
+- Al fusionar en `main` se copian solo las decisiones a `docs/decisiones.md` (apéndice) y la bitácora recibe la entrada de sesión.
+- Un problema se cierra con `- cierra: P-<slug>-<n> — cómo` en `### Cierra` del plan que lo resuelve, nunca editando el plan de origen.
 - Marcar una tarea como `hecha` en la tabla `### Estado de subtareas` **solo después de ver pasar sus criterios**. El hook de cierre (`.claude/hooks/verificar_plan.py`, evento `Stop`) ejecuta los criterios de todas las tareas `hecha` del plan de la rama (con `Plan activo:` como respaldo) y, cuando están todas, los de cierre global.
 - Si el hook de cierre avisa una falla, se corrige la causa, **nunca el criterio**. Si el criterio está mal, es un cambio de contrato y lo decide el usuario (§ 4).
 
