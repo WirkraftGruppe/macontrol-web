@@ -1,0 +1,44 @@
+from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
+from django.test import RequestFactory, TestCase
+from django.views import View
+
+from apps.accounts.mixins import AdministradorRequeridoMixin
+from apps.accounts.models import User
+
+
+class VistaDePrueba(AdministradorRequeridoMixin, View):
+    def get(self, request):
+        return HttpResponse("ok")
+
+
+class AdministradorRequeridoMixinTests(TestCase):
+    def _responder(self, usuario):
+        peticion = RequestFactory().get("/panel/algo/")
+        peticion.user = usuario
+        return VistaDePrueba.as_view()(peticion)
+
+    def test_anonimo_redirige_al_login(self):
+        respuesta = self._responder(AnonymousUser())
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(respuesta.url, "/panel/ingresar/?next=/panel/algo/")
+
+    def test_empleado_recibe_403(self):
+        empleado = User.objects.create_user("emp", password="clave-segura-123")
+        with self.assertRaises(PermissionDenied):
+            self._responder(empleado)
+
+    def test_administrador_activo_accede(self):
+        admin = User.objects.create_user(
+            "adm", password="clave-segura-123", rol=User.Rol.ADMINISTRADOR
+        )
+        self.assertEqual(self._responder(admin).status_code, 200)
+
+    def test_administrador_inactivo_recibe_403(self):
+        admin = User.objects.create_user(
+            "adm", password="clave-segura-123", rol=User.Rol.ADMINISTRADOR
+        )
+        admin.is_active = False
+        with self.assertRaises(PermissionDenied):
+            self._responder(admin)
