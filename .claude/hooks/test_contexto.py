@@ -190,5 +190,36 @@ class TestPlanActivoConfinado(unittest.TestCase):
         self.assertNotIn(AVISO_IGNORADO, self.correr_con_plan("(ninguno)"))
 
 
+def repo_con_plan_de_rama(raiz, rama):
+    """Repo temporal con un plan fechado `demo` y la rama pedida; la bitácora apunta a otro plan."""
+    shutil.copytree(FIXTURE / "docs", raiz / "docs")
+    planes = raiz / "docs" / "planes"
+    (planes / "2026-01-01-demo.md").write_text(
+        "PLAN-DE-RAMA\n\n### Estado de subtareas\n| T1 | pendiente |\n", encoding="utf-8"
+    )
+    (planes / "2026-01-01-demo-dos.md").write_text("PLAN-PARIENTE\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(raiz), "init", "-q", "-b", "main"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(raiz), "switch", "-q", "-c", rama], check=True, capture_output=True)
+    return raiz
+
+
+def test_contexto_elige_plan_por_rama(tmp_path):
+    for rama in ("plan/demo", "demo-T2"):
+        raiz = repo_con_plan_de_rama(tmp_path / rama.replace("/", "_"), rama)
+        salida = texto(correr_hook(raiz))
+        assert f"=== Plan activo (por rama {rama}): docs/planes/2026-01-01-demo.md" in salida
+        assert "PLAN-DE-RAMA" in salida
+        assert "PLAN-PARIENTE" not in salida
+        assert "ENCABEZADO-DEL-PLAN" not in salida
+
+
+def test_contexto_sin_plan_de_rama_usa_bitacora(tmp_path):
+    raiz = repo_con_plan_de_rama(tmp_path, "plan/otro")
+    salida = texto(correr_hook(raiz))
+    assert "=== Plan activo (por bitácora): docs/planes/plan.md" in salida
+    assert "ENCABEZADO-DEL-PLAN" in salida
+    assert "PLAN-DE-RAMA" not in salida
+
+
 if __name__ == "__main__":
     unittest.main()

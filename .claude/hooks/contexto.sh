@@ -21,7 +21,36 @@ if [ -f "$bitacora" ]; then
 fi
 
 # 2. Plan activo: encabezado hasta el primer "### T" y la tabla "### Estado de subtareas".
-if [ -f "$bitacora" ]; then
+# El plan se deriva primero de la rama (plan/<slug> o <slug>-T<n>): el único
+# docs/planes/AAAA-MM-DD-<slug>.md. Sin rama, slug inválido, cero o varias coincidencias,
+# se cae en "Plan activo:" de la bitácora.
+plan_rama=""
+rama="$(git -C "$raiz" branch --show-current 2>/dev/null | tr -d '\r')"
+slug=""
+case "$rama" in
+  plan/*) slug="${rama#plan/}" ;;
+  *-T*)
+    sufijo="${rama##*-T}"
+    if printf '%s' "$sufijo" | grep -Eq '^[0-9]+[a-z]?$'; then slug="${rama%-T"$sufijo"}"; fi
+    ;;
+esac
+if [ -n "$slug" ] && printf '%s' "$slug" | grep -Eq '^[a-z0-9][a-z0-9-]*$'; then
+  coincidencias=0
+  for archivo in "$raiz"/docs/planes/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-"$slug".md; do
+    if [ -f "$archivo" ]; then
+      coincidencias=$((coincidencias + 1))
+      plan_rama="docs/planes/$(basename "$archivo")"
+    fi
+  done
+  if [ "$coincidencias" -ne 1 ]; then
+    plan_rama=""
+  fi
+  if [ -L "$raiz/docs" ] || [ -L "$raiz/docs/planes" ] || [ -L "$raiz/$plan_rama" ]; then
+    plan_rama=""
+  fi
+fi
+
+if [ -f "$bitacora" ] || [ -n "$plan_rama" ]; then
   plan="$(grep -m1 '^Plan activo:' "$bitacora" 2>/dev/null | tr -d '\r' \
     | sed -e 's/^Plan activo:[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^`//' -e 's/`$//')"
   # Solo se acepta un archivo .md directamente dentro de docs/planes/, sin "..", sin ruta
@@ -42,15 +71,21 @@ if [ -f "$bitacora" ]; then
       fi
       ;;
   esac
-  if [ -n "$plan" ] && [ "$plan" != "(ninguno)" ] && [ "$plan_valido" -ne 1 ]; then
+  origen="por bitácora"
+  if [ -n "$plan_rama" ]; then
+    plan="$plan_rama"
+    plan_valido=1
+    origen="por rama $rama"
+  fi
+  if [ -z "$plan_rama" ] && [ -n "$plan" ] && [ "$plan" != "(ninguno)" ] && [ "$plan_valido" -ne 1 ]; then
     echo "(Plan activo ignorado: fuera de docs/planes/)"
     echo
   fi
   if [ "$plan_valido" -eq 1 ] && [ -f "$raiz/$plan" ]; then
-    echo "=== Plan activo: $plan (encabezado, sin subtareas) ==="
+    echo "=== Plan activo ($origen): $plan (encabezado, sin subtareas) ==="
     tr -d '\r' < "$raiz/$plan" 2>/dev/null | awk '/^### T/ { exit } { print }'
     echo
-    echo "=== Plan activo: $plan (estado de subtareas) ==="
+    echo "=== Plan activo ($origen): $plan (estado de subtareas) ==="
     tr -d '\r' < "$raiz/$plan" 2>/dev/null | awk '
       /^### Estado de subtareas/ { dentro = 1; print; next }
       dentro && /^#/ { exit }
