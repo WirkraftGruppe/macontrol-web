@@ -6,13 +6,15 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError
 
+from apps.proyectos.models import Proyecto
+
 from .models import Sitio
 
 TOPE_REGENERAR_QR = 20
 
 
 def suprimir_sitio(sitio):
-    """Suprime el sitio y todo su historial (supresión de datos personales, Ley 25.326).
+    """Suprime el sitio y su historial, y el de sus proyectos (Ley 25.326).
 
     Si el sitio tiene proyectos, ``ProtectedError`` se propaga y no se borra nada.
     """
@@ -20,6 +22,7 @@ def suprimir_sitio(sitio):
         pk = sitio.pk
         sitio.delete()
         Sitio.history.filter(id=pk).delete()
+        Proyecto.history.filter(sitio_id=pk).delete()
 
 
 def suprimir_sitios(sitios):

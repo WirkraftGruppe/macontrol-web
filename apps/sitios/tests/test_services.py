@@ -28,6 +28,26 @@ class SuprimirSitioTests(_BaseSitio):
         self.assertFalse(Sitio.objects.filter(pk=pk).exists())
         self.assertEqual(Sitio.history.filter(id=pk).count(), 0)
 
+    def test_borra_historial_de_proyectos(self):
+        tipo = TipoServicio.objects.create(nombre="Desratización", slug="desratizacion")
+        encargado = User.objects.create_user(
+            username="emp", password="x", rol=User.Rol.EMPLEADO, is_active=True
+        )
+        proyecto = Proyecto.objects.create(
+            sitio=self.sitio,
+            tipo_servicio=tipo,
+            titulo="Control",
+            encargado_inicial=encargado,
+            encargado_actual=encargado,
+        )
+        proyecto.titulo = "Control mensual"
+        proyecto.save()
+        pk = self.sitio.pk
+        self.assertEqual(Proyecto.history.filter(sitio_id=pk).count(), 2)
+        proyecto.delete()
+        services.suprimir_sitio(self.sitio)
+        self.assertEqual(Proyecto.history.filter(sitio_id=pk).count(), 0)
+
     def test_suprimir_con_proyectos_no_borra_nada(self):
         tipo = TipoServicio.objects.create(nombre="Desratización", slug="desratizacion")
         encargado = User.objects.create_user(
