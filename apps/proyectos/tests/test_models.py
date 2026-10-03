@@ -37,6 +37,10 @@ class ProyectoTests(TestCase):
         datos.update(extra)
         return Proyecto.objects.create(**datos)
 
+    def test_str_tolera_sitio_inexistente(self):
+        proyecto = Proyecto(titulo="X", sitio_id=Sitio.objects.count() + 99999)
+        self.assertIn("X", str(proyecto))
+
     def test_estado_visita_vencida_cuando_proxima_visita_paso(self):
         ayer = timezone.localdate() - timedelta(days=1)
         self.assertEqual(self._proyecto(proxima_visita=ayer).estado_visita, "vencida")

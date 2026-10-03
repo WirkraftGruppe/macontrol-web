@@ -105,7 +105,10 @@ class Proyecto(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.titulo} - {self.sitio.nombre}"
+        try:
+            return f"{self.titulo} - {self.sitio.nombre}"
+        except Sitio.DoesNotExist:
+            return f"{self.titulo} - (sitio suprimido)"
 
     @property
     def estado_visita(self):
