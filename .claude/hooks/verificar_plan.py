@@ -39,6 +39,11 @@ docs/planes/2026-09-23-endurecer-hooks.md y T2 de docs/planes/2026-09-23-endurec
     `aviso` → 1 (no bloquea), `bloqueo` → 2 (bloquea y se lo muestra al modelo).
 11. En modo bloqueo lleva un contador por `session_id` en el directorio temporal: al cuarto
     intento sale con 1 y "revisar a mano".
+12. Antes de ejecutar, reemplaza el marcador `<commit_base>` (con o sin comillas simples) de los
+    comandos por el hash completo de la línea `commit_base:` del Registro (ver
+    `commit_base_del_registro`). Si no resuelve, los criterios con marcador son FALLA sin
+    ejecutarse. La CLI `verificar_plan.py --commit-base [plan]` imprime ese hash (exit 0) o el
+    motivo por stderr (exit 2); no lee stdin.
 
 Seguridad: los criterios corren con `bash -c`, es decir, con toda la potencia de un shell:
 pueden hacer red, escribir archivos o salir del árbol del proyecto. El control no está en
@@ -79,6 +84,9 @@ RE_FECHA_SLUG = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 RE_SLUG = re.compile(r"[a-z0-9][a-z0-9-]*")
 RE_RAMA_PLAN = re.compile(r"^plan/(?P<slug>.+)$")
 RE_RAMA_SUBTAREA = re.compile(r"^(?P<slug>.+)-T[0-9]+[a-z]?$")
+RE_COMMIT_BASE = re.compile(r"^commit_base:\s*(\S+)\s*$")
+RE_HASH_ABREVIADO = re.compile(r"[0-9a-f]{4,64}")
+RE_MARCADOR_BASE = re.compile(r"'<commit_base>'|<commit_base>")
 RE_TAREA = re.compile(r"^### T(\d+)\b")
 RE_ESTADO = re.compile(r"^\| T(\d+) \| (pendiente|en curso|hecha) \|")
 RE_CRITERIO = re.compile(
@@ -340,6 +348,59 @@ def combinar_planes(texto_congelado: str, texto_disco: str) -> Plan:
 def sin_formato_t(plan: Plan) -> bool:
     """True si el plan tiene bloques de criterios pero ninguna subtarea `### T<n>`."""
     return plan.bloques_de_criterios > 0 and not plan.criterios
+
+
+# ---------------------------------------------------------------------------
+# commit_base del Registro
+# ---------------------------------------------------------------------------
+
+def commit_base_del_registro(texto_disco: str, raiz: Path, slug: str) -> tuple[str | None, str | None]:
+    """Resuelve la primera línea `commit_base: <hash>` de debajo del corte del plan en disco.
+
+    Devuelve (hash completo, None) o (None, motivo). El hash se resuelve con
+    `git rev-parse --verify <hash>^{commit}` y el asunto del commit tiene que ser
+    `docs(plan): <slug>` o empezar con `docs(plan): <slug> — `.
+    """
+    valor = None
+    bajo_corte = False
+    for linea in texto_disco.replace("\r", "").splitlines():
+        if linea.startswith(CORTE):
+            bajo_corte = True
+        elif bajo_corte and (coincidencia := RE_COMMIT_BASE.match(linea)):
+            valor = coincidencia.group(1)
+            break
+    if valor is None:
+        return None, f"no hay una línea 'commit_base: <hash>' debajo de '{CORTE}'"
+    if not RE_HASH_ABREVIADO.fullmatch(valor):
+        return None, f"'{valor}' no es un hash de commit"
+    completo = (salida_git(raiz, "rev-parse", "--verify", "--quiet", f"{valor}^{{commit}}", timeout=30) or "").strip()
+    if hash_valido(completo) is None:
+        return None, f"'{valor}' no es un commit del repositorio"
+    asunto = (salida_git(raiz, "log", "-1", "--format=%s", completo, timeout=30) or "").strip()
+    esperado = f"docs(plan): {slug}"
+    if asunto != esperado and not asunto.startswith(esperado + " — "):
+        return None, f"el asunto de {completo[:10]} es {asunto!r}, no '{esperado}'"
+    return completo, None
+
+
+def reemplazar_commit_base(criterios: list[Criterio], commit_base: str | None, motivo: str | None,
+                           plan: Path) -> tuple[list[Criterio], list[Resultado]]:
+    """Reemplaza `<commit_base>` en los comandos. Devuelve (criterios a ejecutar, FALLAS previas).
+
+    Sin hash resuelto, los criterios con el marcador no se ejecutan: quedan como FALLA con el
+    motivo; los demás pasan sin cambios.
+    """
+    a_ejecutar: list[Criterio] = []
+    fallas: list[Resultado] = []
+    for criterio in criterios:
+        if not RE_MARCADOR_BASE.search(criterio.comando):
+            a_ejecutar.append(criterio)
+        elif commit_base is None:
+            fallas.append(Resultado(criterio, False, None, f"commit_base sin resolver en {plan.name}: {motivo}"))
+        else:
+            comando = RE_MARCADOR_BASE.sub(commit_base, criterio.comando)
+            a_ejecutar.append(Criterio(criterio.origen, criterio.tipo, comando))
+    return a_ejecutar, fallas
 
 
 # ---------------------------------------------------------------------------
@@ -681,7 +742,11 @@ def firma_de_repo(repo: Path, excluir: list[str], timeout: float) -> list[str] |
 
 
 def firma(
-    raiz: Path, plan: Path, presupuesto: Presupuesto | None = None, contenido_plan: bytes | None = None
+    raiz: Path,
+    plan: Path,
+    presupuesto: Presupuesto | None = None,
+    contenido_plan: bytes | None = None,
+    commit_base: str | None = None,
 ) -> str | None:
     """Firma por contenido del estado de trabajo, para la caché.
 
@@ -690,7 +755,9 @@ def firma(
     marcar una subtarea `hecha` invalida la caché). Un cambio nuevo sobre un archivo que ya
     estaba modificado cambia la firma aunque `git status` no cambie. El archivo de caché queda
     fuera: escribirlo no debe invalidar la firma. `contenido_plan` son los bytes del plan que
-    ya se leyeron para los estados (así la firma corresponde exactamente a lo parseado). Sin la firma de la raíz → None (sin caché);
+    ya se leyeron para los estados (así la firma corresponde exactamente a lo parseado).
+    `commit_base` es el hash resuelto del Registro (o None): entra en la firma para que un
+    commit_base distinto invalide la caché. Sin la firma de la raíz → None (sin caché);
     backend o mobile que no existen o fallan aportan un componente vacío.
     """
     if presupuesto is None:
@@ -704,7 +771,7 @@ def firma(
     except OSError:
         return None
     hash_plan = hashlib.sha256(contenido_plan).hexdigest()
-    partes = [str(plan), hash_plan, *raiz_partes]
+    partes = [str(plan), hash_plan, f"commit_base={commit_base or ''}", *raiz_partes]
     for sub in ("backend", "mobile"):
         partes.append(sub)
         if (raiz / sub).is_dir():
@@ -869,7 +936,10 @@ def main(texto_stdin: str, entorno: dict[str, str]) -> int:
         )
         return salir_con_falla(motivo, raiz, session_id)
 
-    firma_actual = firma(raiz, plan, presupuesto, contenido_disco)
+    commit_base, motivo_base = commit_base_del_registro(
+        contenido_disco.decode("utf-8", errors="replace"), raiz, slug_de(plan)
+    )
+    firma_actual = firma(raiz, plan, presupuesto, contenido_disco, commit_base)
     cache = raiz / ".claude" / NOMBRE_CACHE
     if firma_actual is not None:
         previo = leer_cache(cache)
@@ -884,7 +954,8 @@ def main(texto_stdin: str, entorno: dict[str, str]) -> int:
     if not seleccion:
         return 0
 
-    resultados = ejecutar_seleccion(seleccion, raiz, bash, leer_timeout(entorno), presupuesto)
+    seleccion, sin_resolver = reemplazar_commit_base(seleccion, commit_base, motivo_base, plan)
+    resultados = sin_resolver + ejecutar_seleccion(seleccion, raiz, bash, leer_timeout(entorno), presupuesto)
     fallas = [r for r in resultados if not r.pasa]
     texto_informe = informe(fallas, plan) if fallas else ""
     if firma_actual is not None:
@@ -895,12 +966,39 @@ def main(texto_stdin: str, entorno: dict[str, str]) -> int:
     return salir_con_falla(texto_informe, raiz, session_id)
 
 
+def ejecutar_commit_base(argumentos: list[str], entorno: dict[str, str]) -> int:
+    """CLI `--commit-base [plan]`: imprime el hash resuelto (0) o el motivo por stderr (2).
+
+    El plan se deriva como en el hook (`plan_de_rama`, luego `plan_activo`) salvo que se pase
+    una ruta relativa a la raíz. No lee stdin.
+    """
+    raiz = resolver_raiz(entorno)
+    if argumentos:
+        plan, motivo = validar_plan(raiz, argumentos[0])
+        if plan is None:
+            sys.stderr.write(f"commit_base sin resolver en {argumentos[0]}: plan inválido ({motivo})\n")
+            return 2
+    else:
+        plan = plan_de_rama(raiz) or plan_activo(raiz)
+        if plan is None:
+            sys.stderr.write("commit_base sin resolver: no hay plan activo ni plan de la rama\n")
+            return 2
+    completo, motivo = commit_base_del_registro(leer_texto(plan), raiz, slug_de(plan))
+    if completo is None:
+        sys.stderr.write(f"commit_base sin resolver en {plan.name}: {motivo}\n")
+        return 2
+    sys.stdout.write(completo + "\n")
+    return 0
+
+
 def ejecutar() -> int:
     """Envuelve `main` para que el hook nunca termine con traceback."""
     try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass  # stderr sin reconfigure (p. ej. reemplazado): se usa tal cual
+    if sys.argv[1:2] == ["--commit-base"]:
+        return ejecutar_commit_base(sys.argv[2:3], dict(os.environ))
     try:
         texto = sys.stdin.buffer.read().decode("utf-8", errors="replace") if sys.stdin else ""
     except (OSError, ValueError):

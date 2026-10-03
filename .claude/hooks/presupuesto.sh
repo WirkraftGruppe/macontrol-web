@@ -3,7 +3,10 @@
 #
 # Uso: presupuesto.sh <repo> <base> <max> [rutas...]
 #   <repo>  directorio del repositorio git a inspeccionar (. | backend | mobile)
-#   <base>  commit contra el que se mide el diff (normalmente commit_base del plan)
+#   <base>  commit contra el que se mide el diff (normalmente commit_base del plan). Si es
+#           literalmente `<commit_base>` (entre comillas simples, para que bash no lo tome como
+#           redirección), se resuelve con `verificar_plan.py --commit-base`: el hash de la línea
+#           `commit_base:` del Registro del plan de la rama (o el activo de la bitácora)
 #   <max>   máximo de líneas agregadas permitido (entero >= 0)
 #   [rutas] opcional: limita el conteo a esas rutas, relativas a <repo>
 #
@@ -17,7 +20,8 @@
 #
 # exit 0 → total <= max
 # exit 1 → total > max (se imprime el detalle igual, para que se vea qué archivo lo explica)
-# exit 2 → uso inválido, <repo> no es un repositorio git o <base> no existe
+# exit 2 → uso inválido, <repo> no es un repositorio git, <base> no existe o `<commit_base>` no
+#          se pudo resolver
 set -u
 
 if [ "$#" -lt 3 ] || [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
@@ -42,6 +46,27 @@ esac
 if ! git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "'$repo' no es un repositorio git" >&2
   exit 2
+fi
+
+# Marcador `<commit_base>`: lo resuelve verificar_plan.py (mismo parser que el hook de cierre).
+# Python: `py -3`, si no `python3`, si no `python`. La raíz es <repo> y no el entorno heredado.
+if [ "$base" = "<commit_base>" ]; then
+  verificador="$(dirname "$0")/verificar_plan.py"
+  raiz="$(cd "$repo" 2>/dev/null && pwd)"
+  if command -v py >/dev/null 2>&1 && py -3 -c "" >/dev/null 2>&1; then
+    interprete=(py -3)
+  elif command -v python3 >/dev/null 2>&1; then
+    interprete=(python3)
+  elif command -v python >/dev/null 2>&1; then
+    interprete=(python)
+  else
+    echo "no se pudo resolver '<commit_base>': no hay Python (py -3, python3 ni python)" >&2
+    exit 2
+  fi
+  if ! base="$(CLAUDE_PROJECT_DIR="$raiz" "${interprete[@]}" "$verificador" --commit-base </dev/null | tr -d '\r')" || [ -z "$base" ]; then
+    echo "no se pudo resolver '<commit_base>' en '$repo' (ver el motivo arriba)" >&2
+    exit 2
+  fi
 fi
 
 if ! git -C "$repo" rev-parse --verify --quiet "${base}^{commit}" >/dev/null; then
