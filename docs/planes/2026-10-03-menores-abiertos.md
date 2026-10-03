@@ -52,6 +52,15 @@
     - `test_webp_con_dimensiones_enormes_se_rechaza`: un WebP de 8000×4900, que suma menos de 40 MP pero más que el tope de WebP.
     - `test_formato_no_permitido_se_rechaza`: un ICNS generado con Pillow, más GIF y BMP en `subTest`.
   - `test_exif_corrupto_no_impide_guardar` sigue en verde, porque el mock de `exif_transpose` acepta el kwarg `in_place`.
+  - **Agregado por la auditoría de seguridad** (modificación del contrato decidida por el usuario):
+    - MPO: Pillow abre las fotos MPO por el plugin JPEG, pero `original.format == "MPO"`, y eso daba un `KeyError` y un 500. Agregar `"MPO"` con el tope de JPEG y buscar el tope con `.get()`: un formato sin tope se rechaza con `ValidationError`, no explota. Test `test_mpo_se_acepta`: un MPO de dos cuadros generado con Pillow (`save_all=True`) se guarda como JPEG de un solo cuadro.
+    - `ValueError`: un `zTXt` o `iTXt` que descomprime más de `MAX_TEXT_CHUNK` lanza `ValueError` en `open` o en `load`. Agregar `ValueError` al `except` externo, con un comentario. Test `test_png_con_ztxt_enorme_se_rechaza`: un PNG chico con un `zTXt` de más de 1 MB descomprimido, ubicado después del IDAT, lanza `ValidationError`.
+    - Memoria:
+      - WebP baja a 8 MP.
+      - Un JPEG o MPO progresivo (`original.info.get("progressive")`) o CMYK usa `MAX_PIXELES_JPEG_COSTOSO = 16_000_000`, porque libjpeg guarda los coeficientes a resolución completa y `draft` no lo reduce.
+      - Test `test_webp_de_10_mp_se_rechaza`: un WebP de 4000×2500 lanza `ValidationError`.
+      - Test `test_jpeg_progresivo_grande_se_rechaza`: un JPEG progresivo de 5000×4000 (20 MP) lanza `ValidationError`, y el mismo tamaño en baseline se acepta.
+    - El presupuesto sigue en 160.
 - **Criterios**:
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_png_corrupto_se_rechaza --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_webp_con_dimensiones_enormes_se_rechaza --keepdb`
@@ -59,6 +68,11 @@
   - `[grep-1]` `grep -n 'formats=("JPEG", "PNG", "WEBP")' apps/visitas/imagenes.py`
   - `[grep-1]` `grep -n "in_place=True" apps/visitas/imagenes.py`
   - `[grep-1]` `grep -n "MAX_PIXELES_POR_FORMATO" apps/visitas/imagenes.py`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_mpo_se_acepta --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_png_con_ztxt_enorme_se_rechaza --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_webp_de_10_mp_se_rechaza --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_fotos.FotoTests.test_jpeg_progresivo_grande_se_rechaza --keepdb`
+  - `[grep-1]` `grep -n "MAX_PIXELES_JPEG_COSTOSO" apps/visitas/imagenes.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas --keepdb`
   - `[cmd]` `./venv/Scripts/python.exe -m ruff check apps/visitas`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . "$(bash .claude/hooks/congelado.sh docs/planes/2026-10-03-menores-abiertos.md menores-abiertos)" 160 apps/visitas/imagenes.py apps/visitas/tests/test_fotos.py`
