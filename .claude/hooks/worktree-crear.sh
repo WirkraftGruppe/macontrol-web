@@ -11,7 +11,8 @@
 # humo `manage.py check`. La raíz es `git rev-parse --show-toplevel` del directorio actual.
 #
 # exit 0 → worktree listo y prueba de humo pasada
-# exit 2 → uso inválido, argumentos mal formados o no se está dentro de un repo git
+# exit 2 → uso inválido, argumentos mal formados (incluye rama_base que empiece con "-" o que no
+#          resuelva a un commit) o no se está dentro de un repo git
 # exit 1 → falló git, la junction o la prueba de humo (el worktree queda para inspección)
 set -u
 
@@ -40,6 +41,17 @@ raiz="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 
 if [ -z "$rama_base" ]; then
   rama_base="$(git -C "$raiz" rev-parse --abbrev-ref HEAD)"
+fi
+
+case "$rama_base" in
+  -*)
+    echo "rama_base inválida: '$rama_base' (no puede empezar con -)" >&2
+    exit 2
+    ;;
+esac
+if ! git -C "$raiz" rev-parse --verify --quiet "${rama_base}^{commit}" >/dev/null; then
+  echo "rama_base inválida: '$rama_base' no resuelve a un commit" >&2
+  exit 2
 fi
 
 nombre="$slug-$tarea"
