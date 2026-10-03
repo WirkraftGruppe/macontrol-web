@@ -222,7 +222,7 @@ commit_base: 2823e82
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
+| T5 | hecha |
 
 ### Corridas
 
@@ -231,6 +231,7 @@ commit_base: 2823e82
 | 2026-10-02 | T2 | b988235 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada, inline sobre plan/paralelismo (bootstrap) · commit T2: b988235 · fuera del contrato: `MSYS2_ARG_CONV_EXCL="*" cmd /c` en vez de `cmd //c` (Git Bash convertía `/J` en ruta) |
 | 2026-10-02 | T3, T4 | 001e553 | PASA (verificador 30/30: T3 19, T4 11; verificador-b 32/32) | ruta: delegada en worktrees · T3: c2c7a90, merge 4b9ab09 · T4: 559dc87, merge 001e553 · incidente T3: `worktree-integrar.sh` exit 1 en `git worktree remove` por "Permission denied" (el shell del principal tenía el cwd dentro del worktree); merge, makemigrations y tests ya habían pasado y la junction estaba quitada; el principal borró el directorio vacío y la rama `paralelismo-T3` a mano. Regla aplicada desde entonces: el principal no hace `cd` a worktrees, usa `git -C` |
 | 2026-10-02 | T1 | f0dd286 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada en worktree · T1: 094fb8c, merge f0dd286 · skip preexistente: test de symlink en test_contexto.py |
+| 2026-10-02 | T5 | cafbaae | PASA (verificador 8/8; verificador-b 8/8) | ruta: el principal crea e integra; dos implementadores (haiku) en paralelo · T5a 18ebe6d, merge ee462fb · T5b 7ee924a, merge f001a0e · salida literal abajo |
 
 ### Prueba de fuego (T5): salida literal
 

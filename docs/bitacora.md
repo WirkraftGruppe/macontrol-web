@@ -2,8 +2,15 @@
 
 ## Estado actual
 Plan activo: docs/planes/2026-10-02-paralelismo.md
-Rama: plan/paralelismo
-Pendiente inmediato: ola 1 (T2, scripts de worktree) del plan `paralelismo`; después, plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
+
+Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
+
+| plan | rama | ola actual | pendiente inmediato | sesión |
+|---|---|---|---|---|
+| `paralelismo` | `plan/paralelismo` | cerrado (olas 1-3 en PASA) | verificación TODO y decisión del usuario sobre el merge a `main` | principal en la raíz |
+
+Después: plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
+
 Problemas abiertos:
 - [menor, abierto, decisión del usuario] Auditoría de `acciones-sitio` (PLAUSIBLE, no probado en ejecución): si un proyecto se borra y después su sitio se suprime, quedan dos problemas:
   - `HistoricalProyecto` conserva `sitio_id`, el título y el detalle del proyecto, que podrían mencionar el domicilio o al titular.
