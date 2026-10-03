@@ -212,14 +212,17 @@ commit_base: 9ef9c1e
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-03 | T1 | a32428c | PASA 8/8 (verificador y verificador-b) | integrada en 3fa9da4 |
+| 2026-10-03 | T2 | 39caa50 | PASA 10/10 (verificador y verificador-b) | integrada en 9c5dd0a |
+| 2026-10-03 | T3 | 473d834 | PASA 9/9 (verificador y verificador-b) | integrada en e3f112d |
+| 2026-10-03 | T4 | 9de7a82 | PASA 9/9 (verificador y verificador-b) | una ronda de corrección del principal (FotoInline sin borrado, visita de solo lectura); integrada en 7dad5a5 |
 | | TODO | | | |
