@@ -10,6 +10,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
 
+from apps.accounts.models import User
 from apps.servicios.models import CampoPlanilla
 from apps.visitas.models import Foto, Visita
 from apps.visitas.services import registrar_visita_realizada
@@ -33,7 +34,7 @@ class RegistrarVisitaTests(TestCase):
         shutil.rmtree(MEDIA_TEMPORAL, ignore_errors=True)
 
     def setUp(self):
-        self.ahora = timezone.make_aware(datetime(2026, 10, 3, 12, 0))
+        self.ahora = timezone.make_aware(datetime(2026, 9, 1, 12, 0))
 
     def con_foto(self, visita):
         Foto.objects.create(visita=visita, imagen=jpeg_chico())
@@ -136,3 +137,67 @@ class RegistrarVisitaTests(TestCase):
             registrar_visita_realizada(visita, visita.empleado, self.ahora)
         visita.refresh_from_db()
         self.assertEqual(visita.estado, Visita.Estado.CANCELADA)
+
+    def otro_empleado(self):
+        return User.objects.create_user(
+            username="emp-otro", password="x", rol=User.Rol.EMPLEADO
+        )
+
+    def test_doble_registro_con_lecturas_distintas_falla(self):
+        creada = crear_visita(origen=Visita.Origen.MANUAL, motivo_manual="Carga")
+        primera = Visita.objects.get(pk=creada.pk)
+        segunda = Visita.objects.get(pk=creada.pk)
+        otro = self.otro_empleado()
+        registrar_visita_realizada(primera, primera.empleado, self.ahora)
+        with self.assertRaises(ValidationError):
+            registrar_visita_realizada(
+                segunda, otro, self.ahora + timedelta(hours=1)
+            )
+        creada.refresh_from_db()
+        self.assertEqual(creada.empleado, primera.empleado)
+        self.assertEqual(creada.realizada_en, self.ahora)
+
+    def test_visita_atrasada_no_retrocede_el_proyecto(self):
+        reciente = crear_visita(origen=Visita.Origen.MANUAL, motivo_manual="Carga")
+        proyecto = reciente.proyecto
+        proyecto.frecuencia_dias = 30
+        proyecto.save()
+        otro = self.otro_empleado()
+        atrasada = Visita.objects.create(
+            proyecto=proyecto,
+            empleado=reciente.empleado,
+            origen=Visita.Origen.MANUAL,
+            motivo_manual="Carga tardía",
+        )
+        registrar_visita_realizada(reciente, reciente.empleado, self.ahora)
+        registrar_visita_realizada(atrasada, otro, self.ahora - timedelta(days=10))
+        proyecto.refresh_from_db()
+        self.assertEqual(proyecto.encargado_actual, reciente.empleado)
+        self.assertEqual(
+            proyecto.proxima_visita,
+            timezone.localdate(self.ahora) + timedelta(days=30),
+        )
+        atrasada.refresh_from_db()
+        self.assertEqual(atrasada.estado, Visita.Estado.REALIZADA)
+
+    def test_rechaza_realizada_en_futura(self):
+        visita = crear_visita(origen=Visita.Origen.MANUAL, motivo_manual="Carga")
+        with self.assertRaises(ValidationError):
+            registrar_visita_realizada(
+                visita, visita.empleado, timezone.now() + timedelta(hours=1)
+            )
+        visita.refresh_from_db()
+        self.assertEqual(visita.estado, Visita.Estado.PENDIENTE)
+        self.assertIsNone(visita.realizada_en)
+
+    def test_falla_de_validacion_no_muta_la_instancia(self):
+        visita = crear_visita(origen=Visita.Origen.MANUAL, motivo_manual="Carga")
+        admin = User.objects.create_user(
+            username="admin-svc", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        empleado_original = visita.empleado
+        with self.assertRaises(ValidationError):
+            registrar_visita_realizada(visita, admin, self.ahora)
+        self.assertEqual(visita.estado, Visita.Estado.PENDIENTE)
+        self.assertEqual(visita.empleado, empleado_original)
+        self.assertIsNone(visita.realizada_en)
