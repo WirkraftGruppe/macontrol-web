@@ -284,4 +284,37 @@ commit_base: 071ecb5
 
 ## Pendientes que deja este plan
 
-<!-- Lo completa el principal al cerrar (paso 2 de la integración de la ola 3). -->
+### Problemas
+
+- P-limites-ingreso-1 [importante] Auditoría de T2: `ThrottleToken` y `ThrottleRenovacion` (`apps/api/views.py`) identifican por la IP cruda de `ip_del_cliente`, sin el agrupado /64 de los baldes; con IPv6 se esquiva el 10/min del token rotando dentro del /64, y el token no usa el balde de fallos por IP (`solo_usuario=True`), así que es la puerta más débil para probar contra muchos usuarios a la vez. Corrección propuesta: `get_ident` devuelve `_grupo_de_ip(ip_del_cliente(request))` (función pública) y evaluar aplicar el balde por IP también al token. Cada usuario distinto crea claves de caché: con LocMem se pueden desalojar los baldes de la víctima.
+- P-limites-ingreso-2 [importante] Auditoría de T2: las IPv4 mapeadas en IPv6 (`::ffff:a.b.c.d`) caen todas en el balde `::/64` (`apps/accounts/limites.py`, `_grupo_de_ip`): en un despliegue dual-stack, 20 fallos desde cualquier IPv4 bloquean el panel y el admin a todos, y 5 fallos bloquean a un usuario en todo internet. Corrección: desmapear con `direccion.ipv4_mapped` antes de agrupar, con test.
+- P-limites-ingreso-3 [importante] Auditoría de T1: `NUM_PROXIES` tiene default 0 también en producción; detrás del proxy del hosting todas las peticiones comparten `REMOTE_ADDR` y 20 fallos anónimos dejan sin ingreso a todos (y el token comparte un 10/min). Hacer la variable obligatoria en `config/settings/prod.py` en el plan de despliegue (junto con P-pendientes-heredados-21).
+- P-limites-ingreso-4 [menor] Auditoría de T2: en el JSON del token, un `username` entero (`12345678`) autentica igual (el `CharField` lo convierte) pero sus fallos van al balde de `""` (`apps/api/views.py`, `if not isinstance(usuario, str)`): duplica el cupo contra cuentas con usuario numérico. Usar la misma conversión que el serializer.
+- P-limites-ingreso-5 [menor] Auditoría de T2: los baldes no son atómicos (leer, evaluar PBKDF2, `get`→`append`→`set`); con hilos o caché compartida una ráfaga concurrente supera el cupo. Pasa a importante cuando se resuelva `CACHES` compartida: reservar con `cache.add`/`incr` o un lock.
+- P-limites-ingreso-6 [menor] Auditoría de T2: las claves de caché usan SHA-256 sin sal del usuario y de la IP; con una caché compartida legible se revierten por fuerza bruta. Usar `salted_hmac`.
+- P-limites-ingreso-7 [menor] Auditoría de T2: el token no normaliza el usuario al autenticar (el panel sí): "Ana" con la clave correcta da 401 y cuenta como fallo de "ana". Normalizar en un `TokenObtainPairSerializer` propio (plan de API).
+- P-limites-ingreso-8 [menor] Auditoría de T1: `leer_num_proxies` acepta `"1_0"` (10), dígitos no ASCII y números enormes; un valor mayor que los proxies reales permite falsear la IP con `X-Forwarded-For`. Aceptar solo `[0-9]` ASCII en un rango chico.
+- P-limites-ingreso-9 [menor] Auditoría de T1: `NUM_PROXIES` vive en dos lugares (`settings.NUM_PROXIES`, que usa `ip_del_cliente`, y `REST_FRAMEWORK["NUM_PROXIES"]`); `override_settings(NUM_PROXIES=…)` en un test no cambia el de DRF. Hoy ningún throttle usa el `get_ident` de DRF, pero conviene una sola fuente.
+- P-limites-ingreso-10 [menor] Auditoría de T1: 5 fallos desde cada una de 10 IP llenan el balde global de 50 y bloquean a un administrador 60 minutos, renovable (aceptado por diseño; decidir si un par usuario-IP con ingreso exitoso reciente queda exceptuado).
+- P-limites-ingreso-11 [menor] `SitioAdministracion.login` (`config/admin.py`) copia `AdminSite.login` de Django 5.2 para usar el mixin de límites: revisarla al actualizar Django.
+- P-limites-ingreso-12 [menor] `.claude/hooks/test_pendientes.py:99` emite `SyntaxWarning: invalid escape sequence '\W'` (`"C:\Windows"` sin `r`).
+- P-limites-ingreso-13 [menor] `ruff format --check apps config` falla por `apps/visitas/tests/test_services.py:153` (preexistente; el de `apps/sitios/models.py:60` es P-pendientes-heredados-14).
+- P-limites-ingreso-14 [observación] Los usernames existentes no se migran: un usuario guardado sin normalizar (mayúsculas, Unicode compatible) no puede ingresar hasta que se lo renombre a mano. Hoy no hay producción.
+- P-limites-ingreso-15 [menor] Proceso: el contrato de este plan se modificó (387c9a7) para meter el token en los baldes; `congelado.sh` sale con 1, el hook de cierre no ejecuta sus criterios y el plan no puede llegar a TODO PASA (P-pendientes-heredados-9 sigue abierto). Los presupuestos sí se ejecutan gracias a `'<commit_base>'`.
+
+### Decisiones
+
+- 2026-10-03 — Los ingresos del panel, de `/admin/login/` y de `/api/v1/auth/token/` cuentan solo fallos en tres baldes de caché (IP 20 en 15 min, usuario e IP 5 en 15 min, usuario 50 en 60 min, IPv6 por /64), con 429 sin evaluar la clave si alguno está lleno; el token suma su throttle DRF `token` de 10/min por IP; la IP sale de `ip_del_cliente` con `NUM_PROXIES` (default 0) — N1-N4 de la re-auditoría de `autenticacion` y hallazgo del auditor sobre T1 — reemplaza a: los throttles `autenticacion` 10/min del plan `autenticacion`
+- 2026-10-03 — El nombre de usuario se normaliza con NFKC + strip + casefold en el login, el token (baldes) y `crear_usuario`; los usernames existentes no se migran — N2 y restos de `autenticacion`; no hay producción — reemplaza a: (nada)
+- 2026-10-03 — Los criterios de presupuesto escriben `'<commit_base>'` literal y entre comillas; `presupuesto.sh` y el hook lo resuelven desde la línea `commit_base:` del Registro, que debe ser un commit `docs(plan): <slug>` — los presupuestos con `"$(congelado.sh …)"` fallaban ante un contrato modificado — reemplaza a: la forma `"$(bash .claude/hooks/congelado.sh …)"`
+- 2026-10-03 — Los problemas abiertos viven en la sección `## Pendientes que deja este plan` de cada plan (los de antes, en `pendientes-heredados`), se cierran con `cierra:` en el plan que los resuelve y se listan con `pendientes.py`; la bitácora ya no lleva la lista y a `decisiones.md` se copian solo las decisiones al fusionar en `main` — la lista de la bitácora crecía sin dueño — reemplaza a: la lista "Problemas abiertos" de `docs/bitacora.md`
+- 2026-10-03 — El token entra a los baldes de usuario dentro de `limites-ingreso` con el contrato modificado (387c9a7), aunque el plan no pueda llegar a TODO PASA — decisión del usuario ante el hallazgo del auditor sobre T1 — reemplaza a: (nada)
+
+### Cierra
+
+- cierra: P-pendientes-heredados-16 — T2: los baldes cuentan solo fallos, con cupo estricto por (usuario, IP) y uno global por usuario más alto y largo.
+- cierra: P-pendientes-heredados-17 — T2: `normalizar_usuario` (NFKC + strip + casefold) en la clave de los baldes y en el formulario.
+- cierra: P-pendientes-heredados-18 — T2: `SitioAdministracion.login` usa el mismo mixin y los mismos baldes que el panel.
+- cierra: P-pendientes-heredados-19 — T2: el token tiene su scope `token`; el panel ya no usa throttles DRF.
+- cierra: P-pendientes-heredados-22 — T2: `crear_usuario` normaliza, hace `full_clean` y convierte la carrera en `CommandError`.
+- cierra: P-pendientes-heredados-24 — T2: `CspTests.test_nonce_cambia_en_cada_respuesta`.
