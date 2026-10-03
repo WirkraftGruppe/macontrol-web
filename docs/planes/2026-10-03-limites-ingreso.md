@@ -258,7 +258,7 @@ Cada id lleva el texto íntegro del punto de la bitácora; el de un subpunto se 
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): limites-ingreso>
+commit_base: 071ecb5
 
 ### Estado de subtareas
 
