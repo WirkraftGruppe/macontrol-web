@@ -9,3 +9,4 @@ Pillow
 WeasyPrint
 segno
 ruff
+django-csp>=4.0,<5

@@ -1,6 +1,7 @@
 """Pruebas de los módulos de settings, cada una en un proceso aparte."""
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -86,3 +87,17 @@ class SettingsTests(SimpleTestCase):
         texto = Path(settings.BASE_DIR, ".env.example").read_text(encoding="utf-8")
         lineas = [linea.strip() for linea in texto.splitlines()]
         self.assertIn("DJANGO_ENV=", lineas)
+
+
+class CheckDeployTests(SimpleTestCase):
+    def test_check_deploy_solo_avisa_hsts_diferido(self):
+        r = _correr(
+            ["check", "--deploy"],
+            DJANGO_ENV="production",
+            SECRET_KEY="clave-Larga_de-PRUEBA-0123456789-abcdefghijklmnopqrstuvwxyz-!@#$%^&*",
+            DATABASE_URL="sqlite:///prod-test.sqlite3",
+            ALLOWED_HOSTS="macontrol.com.ar",
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        ids = set(re.findall(r"security\.W\d+", r.stdout + r.stderr))
+        self.assertEqual(ids, {"security.W005", "security.W021"})

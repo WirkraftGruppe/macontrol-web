@@ -20,11 +20,14 @@ class RutasTests(TestCase):
     def test_q_no_uuid_da_404(self):
         self.assertEqual(self.client.get("/q/no-es-uuid/").status_code, 404)
 
-    def test_panel_responde_200(self):
-        self.assertEqual(self.client.get("/panel/").status_code, 200)
+    def test_panel_anonimo_redirige_al_login(self):
+        respuesta = self.client.get("/panel/")
+        self.assertRedirects(
+            respuesta, "/panel/ingresar/?next=/panel/", fetch_redirect_response=False
+        )
 
-    def test_api_v1_responde_200(self):
-        self.assertEqual(self.client.get("/api/v1/").status_code, 200)
+    def test_api_v1_anonimo_recibe_401(self):
+        self.assertEqual(self.client.get("/api/v1/").status_code, 401)
 
     def test_rutas_con_espacio_de_nombres(self):
         codigo = uuid.uuid4()

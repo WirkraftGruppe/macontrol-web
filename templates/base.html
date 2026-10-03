@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}MAControl{% endblock %}</title>
-  <style>
+  <style nonce="{{ request.csp_nonce }}">
     /* Fuentes servidas desde el propio sitio (subconjunto latin) */
     @font-face {
       font-family: "Barlow";
