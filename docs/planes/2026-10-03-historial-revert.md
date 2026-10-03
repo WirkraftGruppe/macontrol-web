@@ -129,13 +129,15 @@ commit_base: c2dc617
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-03 | T1 | cd8d00c | PASA 5/5 (verificador y verificador-b) | integrada en d7166e1 |
+| 2026-10-03 | T2 | 9a0256a | PASA 4/4 (verificador y verificador-b) | integrada |
+| 2026-10-03 | T3 | 6d4ea23 | PASA 5/5 (verificador y verificador-b) | integrada |
 | | TODO | | | |
