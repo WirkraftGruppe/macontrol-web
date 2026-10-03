@@ -4,7 +4,9 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from simple_history.models import HistoricalRecords
 
 from apps.accounts.models import User
@@ -116,10 +118,29 @@ class Foto(models.Model):
         return f"Foto {self.pk} de visita {self.visita_id}"
 
     def save(self, *args, **kwargs):
+        anterior = None
+        if self.pk:
+            anterior = (
+                Foto.objects.filter(pk=self.pk).values_list("imagen", flat=True).first()
+            )
         if self.imagen and not self.imagen._committed:
             contenido = imagenes.procesar_imagen(self.imagen)
             self.imagen.save("foto.jpg", contenido, save=False)
         super().save(*args, **kwargs)
+        if anterior and anterior != self.imagen.name:
+            _borrar_archivo_al_confirmar(self.imagen.storage, anterior)
+
+
+def _borrar_archivo_al_confirmar(almacenamiento, nombre):
+    """Borra el archivo del almacenamiento cuando la transacción se confirma."""
+    transaction.on_commit(lambda: almacenamiento.delete(nombre))
+
+
+@receiver(post_delete, sender=Foto)
+def borrar_archivo_de_foto(sender, instance, **kwargs):
+    """Al borrar una foto (también en cascada) no queda el archivo en disco."""
+    if instance.imagen:
+        _borrar_archivo_al_confirmar(instance.imagen.storage, instance.imagen.name)
 
 
 class ProductoAplicado(models.Model):
@@ -140,6 +161,8 @@ class ProductoAplicado(models.Model):
     cantidad = models.DecimalField(
         "cantidad", max_digits=10, decimal_places=3, null=True, blank=True
     )
+
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "producto aplicado"
