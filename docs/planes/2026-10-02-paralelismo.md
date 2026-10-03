@@ -220,8 +220,8 @@ commit_base: 2823e82
 |---|---|
 | T1 | pendiente |
 | T2 | hecha |
-| T3 | pendiente |
-| T4 | pendiente |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 
 ### Corridas
@@ -229,3 +229,4 @@ commit_base: 2823e82
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-02 | T2 | b988235 | PASA (verificador 10/10; verificador-b 10/10) | ruta: delegada, inline sobre plan/paralelismo (bootstrap) · commit T2: b988235 · fuera del contrato: `MSYS2_ARG_CONV_EXCL="*" cmd /c` en vez de `cmd //c` (Git Bash convertía `/J` en ruta) |
+| 2026-10-02 | T3, T4 | 001e553 | PASA (verificador 30/30: T3 19, T4 11; verificador-b 32/32) | ruta: delegada en worktrees · T3: c2c7a90, merge 4b9ab09 · T4: 559dc87, merge 001e553 · incidente T3: `worktree-integrar.sh` exit 1 en `git worktree remove` por "Permission denied" (el shell del principal tenía el cwd dentro del worktree); merge, makemigrations y tests ya habían pasado y la junction estaba quitada; el principal borró el directorio vacío y la rama `paralelismo-T3` a mano. Regla aplicada desde entonces: el principal no hace `cd` a worktrees, usa `git -C` |
