@@ -25,6 +25,13 @@ def _imagen_real():
     return SimpleUploadedFile("f.jpg", salida.getvalue(), content_type="image/jpeg")
 
 
+def _png_demasiado_grande():
+    """PNG de 8000x6000 (modo L): lo acepta ImageField, pero procesar_imagen no."""
+    salida = BytesIO()
+    Image.new("L", (8000, 6000)).save(salida, format="PNG")
+    return SimpleUploadedFile("grande.png", salida.getvalue(), content_type="image/png")
+
+
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
 class VisitaAdminTests(TestCase):
     @classmethod
@@ -158,3 +165,68 @@ class VisitaAdminTests(TestCase):
         self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
         self.assertEqual(visita.realizada_en, realizada_en)
         self.assertEqual(visita.latitud, Decimal("-35.1"))
+
+    def _datos_iniciales(self, formulario):
+        return {
+            nombre: ("" if valor is None else valor)
+            for nombre, valor in formulario.initial.items()
+            if nombre in formulario.fields
+        }
+
+    def test_imagen_invalida_da_error_de_formulario_no_500(self):
+        """Una foto que procesar_imagen rechaza es error del formset, no un 500."""
+        realizada, _ = self._realizada_con_foto()
+        pendiente = self._pendiente_de(realizada)
+        self.client.force_login(self.administrador)
+        url = reverse("admin:visitas_visita_change", args=[pendiente.pk])
+        respuesta = self.client.get(url)
+        datos = self._datos_iniciales(respuesta.context["adminform"].form)
+        for formset in respuesta.context["inline_admin_formsets"]:
+            prefijo = formset.formset.prefix
+            datos[f"{prefijo}-TOTAL_FORMS"] = 1 if prefijo == "fotos" else 0
+            datos[f"{prefijo}-INITIAL_FORMS"] = 0
+            datos[f"{prefijo}-MIN_NUM_FORMS"] = 0
+            datos[f"{prefijo}-MAX_NUM_FORMS"] = 1000
+            if prefijo == "fotos":
+                datos[f"{prefijo}-0-imagen"] = _png_demasiado_grande()
+                datos[f"{prefijo}-0-orden"] = 0
+        antes = Foto.objects.count()
+        respuesta = self.client.post(url, datos)
+        self.assertEqual(respuesta.status_code, 200)
+        formset_fotos = next(
+            f.formset
+            for f in respuesta.context["inline_admin_formsets"]
+            if f.formset.model is Foto
+        )
+        self.assertTrue(any(formset_fotos.errors))
+        self.assertEqual(Foto.objects.count(), antes)
+
+    def test_foto_admin_imagen_invalida_da_error_de_formulario(self):
+        """FotoAdmin también devuelve error de campo para una imagen inválida."""
+        realizada, _ = self._realizada_con_foto()
+        pendiente = self._pendiente_de(realizada)
+        foto = Foto.objects.create(visita=pendiente, imagen=_imagen_real())
+        nombre = foto.imagen.name
+        self.client.force_login(self.administrador)
+        url = reverse("admin:visitas_foto_change", args=[foto.pk])
+        respuesta = self.client.post(
+            url, {"imagen": _png_demasiado_grande(), "tomada_en": "", "orden": 0}
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("imagen", respuesta.context["adminform"].form.errors)
+        foto.refresh_from_db()
+        self.assertEqual(foto.imagen.name, nombre)
+
+    def test_programada_para_solo_lectura_en_realizada(self):
+        """La planificación es de solo lectura en visitas cerradas."""
+        realizada, _ = self._realizada_con_foto()
+        pendiente = self._pendiente_de(realizada)
+        modeladmin = admin.site._registry[Visita]
+        request = self._request()
+        cerrada = modeladmin.get_readonly_fields(request, realizada)
+        abierta = modeladmin.get_readonly_fields(request, pendiente)
+        for campo in ("programada_para", "asignada_por"):
+            self.assertIn(campo, cerrada)
+            self.assertNotIn(campo, abierta)
+        for campo in ("observaciones", "incidencia", "incidencia_detalle"):
+            self.assertNotIn(campo, cerrada)
