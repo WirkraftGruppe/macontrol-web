@@ -867,5 +867,105 @@ def test_plantilla_integracion_de_ola_fuera_de_las_tareas():
     assert len(plan.cierre_global) == 6
 
 
+# ---------------------------------------------------------------------------
+# commit_base desde el Registro (T3 de docs/planes/2026-10-03-limites-ingreso.md)
+# ---------------------------------------------------------------------------
+
+def repo_con_registro(raiz, criterios, slug="demo"):
+    """Repo temporal con el plan `docs(plan): <slug>` congelado, en la rama `plan/<slug>`.
+
+    `criterios` son las líneas del bloque Criterios de T1. El Registro queda sin `commit_base:`;
+    devuelve el hash completo del commit congelado.
+    """
+    (raiz / "docs" / "planes").mkdir(parents=True)
+    (raiz / "docs" / "bitacora.md").write_text("# Bitácora\n\nPlan activo: (ninguno)\n", encoding="utf-8")
+    plan = (
+        "# Plan: demo\n\n### T1 — algo\n\n- **Criterios**:\n" + criterios + "\n"
+        "## Registro de verificación\n\n### Estado de subtareas\n\n| T1 | hecha |\n"
+    )
+    (raiz / "docs" / "planes" / f"2026-01-01-{slug}.md").write_text(plan, encoding="utf-8")
+    git(raiz, "init", "-q", "-b", "main")
+    for clave, valor in (("core.autocrlf", "false"), ("user.name", "Test"),
+                         ("user.email", "t@example.invalid"), ("commit.gpgsign", "false")):
+        git(raiz, "config", clave, valor)
+    git(raiz, "add", "-A")
+    git(raiz, "commit", "-q", "-m", f"docs(plan): {slug}")
+    git(raiz, "switch", "-q", "-c", f"plan/{slug}")
+    return git(raiz, "rev-parse", "HEAD").strip()
+
+
+def anotar_commit_base(raiz, valor, slug="demo"):
+    """Escribe `commit_base: <valor>` debajo del corte, en el plan en disco (no congelado)."""
+    plan = raiz / "docs" / "planes" / f"2026-01-01-{slug}.md"
+    corte = "## Registro de verificación\n\n"
+    plan.write_text(plan.read_text(encoding="utf-8").replace(corte, f"{corte}commit_base: {valor}\n\n"), encoding="utf-8")
+
+
+def registro_con(valor):
+    """Texto de un plan en disco cuyo Registro lleva `commit_base: <valor>`."""
+    return f"## Registro de verificación\n\ncommit_base: {valor}\n"
+
+
+def test_commit_base_faltante_falla_con_mensaje(tmp_path):
+    repo_con_registro(
+        tmp_path, "  - `[cmd]` `touch con-marcador '<commit_base>'`\n  - `[cmd]` `touch sin-marcador`\n"
+    )
+    proceso = correr_hook(tmp_path)
+    error = texto(proceso.stderr)
+    assert proceso.returncode == 1, error
+    assert "commit_base sin resolver en 2026-01-01-demo.md:" in error
+    assert not (tmp_path / "con-marcador").exists()  # el criterio con marcador no se ejecutó
+    assert (tmp_path / "sin-marcador").exists()  # los demás sí
+
+
+def test_marcador_se_reemplaza_antes_de_ejecutar(tmp_path):
+    base = repo_con_registro(
+        tmp_path,
+        "  - `[cmd]` `echo '<commit_base>' > con-comillas`\n  - `[cmd]` `echo <commit_base> > sin-comillas`\n",
+    )
+    anotar_commit_base(tmp_path, base[:10])  # abreviado: el criterio recibe el hash completo
+    proceso = correr_hook(tmp_path)
+    assert proceso.returncode == 0, texto(proceso.stderr)
+    for nombre in ("con-comillas", "sin-comillas"):
+        assert (tmp_path / nombre).read_text(encoding="utf-8").strip() == base
+
+
+def test_commit_base_que_no_es_docs_plan_se_rechaza(tmp_path):
+    base = repo_con_registro(tmp_path, "  - `[cmd]` `touch con-marcador '<commit_base>'`\n")
+    (tmp_path / "otro.txt").write_text("x\n", encoding="utf-8")
+    git(tmp_path, "add", "otro.txt")
+    git(tmp_path, "commit", "-q", "-m", "T1: otra cosa")
+    ajeno = git(tmp_path, "rev-parse", "HEAD").strip()
+    anotar_commit_base(tmp_path, ajeno)
+    disco = (tmp_path / "docs" / "planes" / "2026-01-01-demo.md").read_text(encoding="utf-8")
+    resuelto, motivo = verificar_plan.commit_base_del_registro(disco, tmp_path, "demo")
+    assert resuelto is None and "docs(plan): demo" in motivo
+    proceso = correr_hook(tmp_path)
+    assert proceso.returncode == 1 and "commit_base sin resolver" in texto(proceso.stderr)
+    assert not (tmp_path / "con-marcador").exists()
+    # Controles positivos: el commit congelado y el modificado (` — modificado: …`) se aceptan.
+    assert verificar_plan.commit_base_del_registro(registro_con(base), tmp_path, "demo") == (base, None)
+    git(tmp_path, "commit", "-q", "--allow-empty", "-m", "docs(plan): demo — modificado: motivo")
+    modificado = git(tmp_path, "rev-parse", "HEAD").strip()
+    assert verificar_plan.commit_base_del_registro(registro_con(modificado), tmp_path, "demo") == (modificado, None)
+    # Un asunto que solo empieza igual (`docs(plan): demo2`) no vale.
+    git(tmp_path, "commit", "-q", "--allow-empty", "-m", "docs(plan): demo2")
+    parecido = git(tmp_path, "rev-parse", "HEAD").strip()
+    assert verificar_plan.commit_base_del_registro(registro_con(parecido), tmp_path, "demo")[0] is None
+
+
+def test_cli_commit_base_imprime_hash_sin_leer_stdin(tmp_path):
+    base = repo_con_registro(tmp_path, "  - `[cmd]` `true`\n")
+    anotar_commit_base(tmp_path, base)
+    entorno = dict(os.environ, CLAUDE_PROJECT_DIR=str(tmp_path))
+    ok = subprocess.run([sys.executable, str(SCRIPT), "--commit-base"], env=entorno,
+                        stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    assert ok.returncode == 0 and texto(ok.stdout).strip() == base
+    anotar_commit_base(tmp_path, "0000000")
+    mal = subprocess.run([sys.executable, str(SCRIPT), "--commit-base"], env=entorno,
+                         stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    assert mal.returncode == 2 and mal.stdout == b"" and "commit_base sin resolver" in texto(mal.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

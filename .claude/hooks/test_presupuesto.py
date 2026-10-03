@@ -204,5 +204,50 @@ class TestCambiosConVariosWorktrees(unittest.TestCase):
         self.assertEqual(proceso.returncode, 2)
 
 
+# ---------------------------------------------------------------------------
+# Marcador `<commit_base>` (T3 de docs/planes/2026-10-03-limites-ingreso.md)
+# ---------------------------------------------------------------------------
+
+def repo_con_plan(repo, registro=""):
+    """Repo temporal con `docs(plan): demo` en la rama `plan/demo`; el Registro va en disco.
+
+    Devuelve el hash completo del commit congelado. `registro` se escribe debajo del corte,
+    con `{base}` reemplazado por ese hash.
+    """
+    preparar_repo(repo)
+    plan = repo / "docs" / "planes" / "2026-01-01-demo.md"
+    plan.parent.mkdir(parents=True)
+    contenido = "# Plan: demo\n\n### T1 — algo\n\n## Registro de verificación\n\n"
+    plan.write_text(contenido, encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "docs(plan): demo")
+    git(repo, "switch", "-q", "-c", "plan/demo")
+    base = git(repo, "rev-parse", "HEAD").strip()
+    plan.write_text(contenido + registro.replace("{base}", base), encoding="utf-8")
+    return base
+
+
+def test_marcador_commit_base_se_resuelve_del_registro(tmp_path):
+    repo = tmp_path / "repo"
+    repo_con_plan(repo, "commit_base: {base}\n")
+    (repo / "nuevo.txt").write_text("a\nb\nc\n", encoding="utf-8")
+    proceso = correr_presupuesto(repo, "<commit_base>", 5)
+    salida = texto(proceso.stdout)
+    assert proceso.returncode == 0, texto(proceso.stderr)
+    assert "total de líneas agregadas: 4 (máximo: 5)" in salida
+    assert "nuevo.txt" in salida  # 3 líneas del archivo nuevo + 1 de la línea commit_base del plan
+    # Con el mismo marcador, un máximo menor al total sigue dando 1: el marcador no desactiva la medida.
+    assert correr_presupuesto(repo, "<commit_base>", 3).returncode == 1
+
+
+def test_marcador_sin_registro_sale_con_dos(tmp_path):
+    repo = tmp_path / "repo"
+    repo_con_plan(repo)  # el Registro no tiene la línea `commit_base:`
+    proceso = correr_presupuesto(repo, "<commit_base>", 5)
+    assert proceso.returncode == 2
+    assert proceso.stdout == b""
+    assert "commit_base sin resolver" in texto(proceso.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
