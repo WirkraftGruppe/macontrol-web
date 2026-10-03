@@ -282,6 +282,7 @@ commit_base: 071ecb5
 | 2026-10-03 | T3 | 7c09024 | verificador: PASA 7/7 · verificador-b: PASA 7/7 | Integrada en ac5f7d0. |
 | 2026-10-03 | T2 | edd90ae | verificador: 24/24 criterios PASA, veredicto FALLA solo por contrato MODIFICADO (387c9a7, decisión del usuario) · verificador-b: 26/26 PASA, mismo motivo | auditor-seguridad: sin bloqueantes; 2 importantes (throttles DRF sin agrupar IPv6 por /64; IPv4 mapeadas caen en ::/64) y 4 menores, pasan a pendientes del plan. Integrada en ff0bf06; tasa autenticacion quitada después. |
 | 2026-10-03 | T5 | 0cf16e1 | verificador: 10/10 criterios PASA, veredicto FALLA solo por contrato MODIFICADO · verificador-b: igual | Integrada. |
+| 2026-10-03 | TODO | 6123127 | verificador: FALLA 2/78 · verificador-b: FALLA 2/78 (mismos dos) | Contrato MODIFICADO (387c9a7, decisión del usuario). FALLA 1: `congelado.sh` exit 1 por ese motivo. FALLA 2: el criterio de integración de la ola 2 que exige 33 heredados abiertos; pasó al correrlo el principal en la ola 2 (33, sin avisos) y deja de pasar cuando este plan agrega sus `cierra:` (queda en 27, lo que exige el cierre global, que pasa). Los otros 76 en PASA. Pendientes: 42 abiertos. |
 
 ## Pendientes que deja este plan
 
