@@ -206,7 +206,7 @@ Una sola ola:
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): visitas-auditoria>
+commit_base: 9ef9c1e
 
 ### Estado de subtareas
 
