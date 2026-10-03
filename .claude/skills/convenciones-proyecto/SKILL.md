@@ -36,12 +36,60 @@ apps/
   panel/           vistas del panel (Django + HTMX)
   api/             DRF: serializers, viewsets, auth, `v1/`
   web/             sitio público: páginas de servicio, configuración, clientes destacados
-templates/         base.html · panel/ · web/ · pdf/
+templates/         solo base.html y panel/base.html (el resto vive en cada app)
 static/            css compilado, htmx, leaflet, logo
 media/             fotos, logos, QR (ignorado por git)
 docs/              bitácora, decisiones, planes, especificaciones
 ```
 `DJANGO_ENV` (`development` | `production`) elige el módulo de settings en `config/settings/__init__.py`.
+
+### Estructura de cada app de dominio
+Cada app es dueña de todo lo suyo, con nombres de archivo fijos (así la propiedad se verifica con `grep`):
+```
+apps/<app>/
+  models.py · services.py · admin.py · migrations/
+  serializers.py · api_views.py · api_urls.py          # lo de la API
+  panel_views.py · panel_urls.py · panel_forms.py      # lo del panel
+  templates/<app>/panel/… · templates/<app>/pdf/…      # con APP_DIRS; nada en templates/<app>
+  tests/test_models.py · test_services.py · test_api.py · test_panel.py
+```
+- `api_urls.py` y `panel_urls.py` declaran `app_name = "<app>"`.
+- `apps/api/urls.py` y `apps/panel/urls.py` son routers de una línea por app: `path("sitios/", include("apps.sitios.api_urls"))`.
+- `apps/api` conserva solo lo transversal (JWT, permisos base, paginación, excepciones); `apps/panel`, el layout, el login, el tablero y el mapa agregado.
+- `apps/web` es el sitio público entero y se paraleliza por página (home, servicio, empresa), no por dominio. `apps/informes` es transversal pero expone sus propios `api_urls` y `panel_urls`.
+
+### Tabla de propiedad
+| Archivo o carpeta | Dueño | Cuándo se toca |
+|---|---|---|
+| `apps/<app>/**` | la subtarea de esa app | en su worktree |
+| `config/settings/*.py`, `config/urls.py`, `requirements.txt`, `pyproject.toml` | principal | subtarea de integración, nunca en paralelo |
+| `apps/api/urls.py`, `apps/panel/urls.py` | principal | al integrar cada ola |
+| `apps/api/**` (salvo `urls.py`), `apps/panel/**` (salvo `urls.py`) | subtarea "transversal" del plan que lo necesite | una por plan |
+| `templates/base.html`, `templates/panel/base.html`, `static/src/**`, `static/css/**` | subtarea "diseño" | los implementadores de dominio la consumen, no la editan |
+| `docs/bitacora.md`, `docs/decisiones.md` | principal de cada sesión | solo al cierre, con rebase |
+| `docs/planes/<plan>.md` | principal de ese plan | nunca otra sesión |
+
+Una subtarea cuyo `Puede tocar` incluya un archivo de otro dueño es hallazgo bloqueante del `juez-plan`.
+
+### Olas por grafo de FK
+```
+Ola 1: accounts, clientes, servicios, productos    (sin FK entre sí)
+Ola 2: sitios        → clientes
+Ola 3: proyectos     → sitios, servicios, accounts
+Ola 4: visitas       → proyectos, productos, accounts
+Ola 5: informes      → visitas, clientes
+```
+Dentro de una ola, todo en paralelo; dos subtareas de la misma ola nunca crean migraciones en la misma app.
+
+### Worktrees (scripts en `.claude/hooks/`, los usa el principal)
+```bash
+# Crear: worktrees/<slug>-T<n>, rama <slug>-T<n>, junction venv -> <raíz>/venv, humo manage.py check
+bash .claude/hooks/worktree-crear.sh <slug> T<n> [rama_base]
+# Integrar: rechaza cambios sin commitear y archivos fuera de las rutas; merge --no-ff ("T<n>: integra <slug>-T<n>"),
+# makemigrations --check, test --keepdb; quita la junction, el worktree y la rama
+bash .claude/hooks/worktree-integrar.sh <slug> T<n> <rama_destino> <ruta>...
+```
+`T<n>` acepta sufijo de letra (`T5a`). Dentro de un worktree los comandos canónicos funcionan por la junction `venv`; nunca se toca ni se borra.
 
 ## Comandos canónicos (Windows, desde la raíz)
 ```bash
@@ -54,6 +102,8 @@ PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.p
 # Tests (forma canónica: la misma que usan los criterios de los planes)
 PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb
 PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_qr.ResolverQRTests.test_qr_inexistente_da_404 --keepdb -v 2
+# Tests de hooks (pytest está instalado en el Python del sistema, no en el venv)
+py -3 -m pytest .claude/hooks/<archivo>::<función> -q
 # Calidad
 ./venv/Scripts/python.exe -m ruff check .
 ./venv/Scripts/python.exe -m ruff format .
@@ -73,7 +123,7 @@ No se mantiene acá la lista de endpoints: la fuente de verdad es `config/urls.p
 | `/admin/` | Admin técnico de Django | sesión + `is_superuser` |
 | `/api/v1/` | API (`apps.api`) | JWT; empleados y administradores |
 
-Para ver las rutas de una app: `grep -n "path(" apps/<app>/urls.py`.
+Para ver las rutas de una app: `grep -n "path(" apps/<app>/api_urls.py apps/<app>/panel_urls.py`.
 
 ## Roles (`apps/accounts`)
 - `User.rol` ∈ {`administrador`, `empleado`}; properties `es_administrador`, `es_empleado`.

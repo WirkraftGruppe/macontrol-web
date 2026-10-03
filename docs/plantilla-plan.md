@@ -22,9 +22,10 @@ commit `docs(plan): <slug>` y lo verifica `bash .claude/hooks/congelado.sh <plan
 Un cambio de contrato es un commit nuevo `docs(plan): <slug> — modificado: <motivo>`, decidido por
 el usuario.
 
-El hook de cierre (`.claude/hooks/verificar_plan.py`, evento Stop) ejecuta los criterios de las
-subtareas en estado `hecha` del plan activo de `docs/bitacora.md`, y los de cierre global cuando
-todas están `hecha`. Por eso el estado vive en la tabla del Registro, no en los encabezados.
+El hook de cierre (`.claude/hooks/verificar_plan.py`, evento Stop) deriva el plan de la rama
+(`plan/<slug>` o `<slug>-T<n>` → `docs/planes/*-<slug>.md`), con `Plan activo:` de
+`docs/bitacora.md` como respaldo, y ejecuta los criterios de las subtareas en estado `hecha`, y los
+de cierre global cuando todas están `hecha`. Por eso el estado vive en la tabla del Registro, no en los encabezados.
 -->
 
 - **slug**: `<slug>`
@@ -42,6 +43,17 @@ todas están `hecha`. Por eso el estado vive en la tabla del Registro, no en los
 Enlaces a archivos concretos con ruta, y a la sección de `docs/01-modelo-y-arquitectura.md`
 que aplica. Sin narrativa.>
 
+## Olas
+
+<!-- Las olas siguen el grafo de FK entre apps (CLAUDE.md § 5, "Olas"). Dentro de una ola todas las
+subtareas corren en paralelo, cada una en su worktree; la ola siguiente ramifica desde la integración
+de la anterior. Si el plan no necesita paralelismo, una sola ola. -->
+
+| Ola | Subtareas | Apps (migraciones) |
+|---|---|---|
+| 1 | T1, T2 | <apps sin FK entre sí> |
+| 2 | T3 | <apps que dependen de la ola 1> |
+
 ## Subtareas
 
 <!--
@@ -53,20 +65,23 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - Un [test] se escribe como comando completo:
   PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test <ruta.punteada.Clase.test_nombre> --keepdb
   (el hook lo ejecuta tal cual con bash; la ruta punteada sola falla con exit 127).
+  Los tests de hooks usan pytest: py -3 -m pytest .claude/hooks/<archivo>::<función> -q
 - Toda subtarea que corrige un defecto lleva un [test] que reproduzca el defecto.
 - Un [test] tiene que ser NUEVO respecto de commit_base.
 - Prohibido: "funciona", "tests pasando", "revisado", "sin regresiones", "quedó implementado".
 - Dos subtareas no escriben el mismo archivo ni crean migraciones en la misma app en paralelo.
+- `Puede tocar` respeta la tabla de propiedad de `convenciones-proyecto`: nada de otro dueño.
 -->
 
 <!-- Las subtareas se llaman siempre T<n>: el hook de cierre solo reconoce `### T<n>` y las filas `| T<n> |`. -->
 ### T1 — <título imperativo, p. ej. "Crear el modelo Sitio con qr_codigo único">
 
+- **Ola**: <n>
 - **Depende de**: — | T<n>
 - **Puede tocar**: `apps/sitios/models.py`, `apps/sitios/migrations/0001_initial.py`, `apps/sitios/tests/test_models.py`
 - **No puede tocar**: `docs/planes/`, `config/settings/`, migraciones existentes de otras apps
 - **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Models
-- **Worktree**: sí/no
+- **Worktree**: sí (por defecto; `no` solo si es pasivo o un único archivo de documentación)
 - **Ruta**: inline | delegada · Evidencia: … · Commit: …
 - **Presupuesto**: <N> líneas agregadas (por defecto 400)
 - **Qué hacer**: <2 a 5 líneas concretas. Qué modelo, qué campo, qué comportamiento.>
@@ -80,6 +95,7 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 
 ### T2 — <título>
 
+- **Ola**: <n>
 - **Depende de**: T1
 - **Puede tocar**: …
 - **No puede tocar**: `docs/planes/`, …
@@ -90,9 +106,17 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 
 ## Trabajo del principal (integración)
 
-<Qué hace el principal después de que las subtareas pasan: cablear urls, migrar, ajustar imports,
-resolver conflictos. Lleva sus propios criterios igual que una subtarea. Si no hay nada, se
-escribe "nada" y la verificación final corre directo.>
+<Por ola: crear los worktrees con `worktree-crear.sh`, integrar con `worktree-integrar.sh` en
+`plan/<slug>`, cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar, ajustar imports, resolver
+conflictos. Lleva sus propios criterios igual que una subtarea. Si no hay nada, se escribe "nada"
+y la verificación final corre directo.>
+
+### Ola 1
+
+- **Criterios**:
+  - `[cmd]` `<…>`
+
+### Ola 2
 
 - **Criterios**:
   - `[cmd]` `<…>`

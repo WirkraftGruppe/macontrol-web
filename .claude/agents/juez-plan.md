@@ -79,6 +79,10 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
   ejecutándolo.
 - **Migraciones en paralelo**: dos subtareas sin dependencia que crean migraciones en la
   misma app producen un conflicto de grafo; es hallazgo (b) y (c).
+- **Olas que rompen el grafo de FK**: las olas del plan respetan el grafo de FK de
+  `convenciones-proyecto` (accounts, clientes, servicios, productos → sitios → proyectos →
+  visitas → informes). Una subtarea que depende de migraciones de una app de una ola igual o
+  posterior es hallazgo (b).
 - **No ejecutable**: ruta inexistente, `cd` que falta, comando o flag que no existe,
   comillas desbalanceadas, comando de Django sin el prefijo canónico
   (`PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe`), tipo de
@@ -89,6 +93,10 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
 Cruzas los `Puede tocar` de todas las subtareas. Si dos comparten un archivo y ninguna
 depende (directa o transitivamente) de la otra, es hallazgo. También es hallazgo un
 archivo que una subtarea escribe y otra sin dependencia usa en sus criterios.
+
+Cruzas además cada `Puede tocar` con la tabla de propiedad de `convenciones-proyecto`
+(sección "Tabla de propiedad"): una subtarea cuyo `Puede tocar` incluya un archivo de otro
+dueño es hallazgo bloqueante, aunque ninguna otra subtarea lo toque.
 
 ### (d) Alcance sensible sin `seguridad: sí`
 

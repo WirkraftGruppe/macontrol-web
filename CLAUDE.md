@@ -12,7 +12,7 @@ Eres Claude Code, el asistente automatizado principal de desarrollo de MAControl
 La raíz es un repositorio git propio. Cuando exista `mobile/`, será otro repositorio y la raíz lo ignorará.
 
 ## Al entrar
-- El hook `SessionStart` (`.claude/hooks/contexto.sh`) inyecta el comienzo de `docs/bitacora.md` ("Estado actual" y la última entrada), el encabezado y la tabla de estado del plan activo, y las últimas decisiones de `docs/decisiones.md`.
+- El hook `SessionStart` (`.claude/hooks/contexto.sh`) inyecta el comienzo de `docs/bitacora.md` ("Estado actual" y la última entrada), el encabezado y la tabla de estado del plan de la rama (o el activo de la bitácora), y las últimas decisiones de `docs/decisiones.md`.
 - No preguntes lo que ya está ahí (plan activo, rama, pendiente inmediato, problemas abiertos): léelo y seguí desde ese punto.
 - **Resumen de entrada**: la primera respuesta de la sesión abre con un resumen de 3 a 5 líneas de lo que Claude cree que es el estado: plan activo, último trabajo registrado, pendiente inmediato y rama. Antes de escribirlo se corre `git branch --show-current` y `git log -1 --oneline` y se marca toda diferencia con la bitácora (otra rama, commits posteriores a la última entrada): es la señal de trabajo hecho a mano, fuera de Claude. Si el primer pedido implica escribir, se muestra el resumen y se espera la confirmación del usuario antes de la primera escritura; leer no espera.
 - Si el pedido del usuario contradice una decisión registrada en `docs/decisiones.md`, avisalo citando la decisión **antes de avanzar**. Cambiar una decisión es del usuario, y queda como una línea nueva que dice a cuál reemplaza.
@@ -76,7 +76,14 @@ Aplica a todo trabajo que toque más de un archivo o que se vaya a dividir en su
 - El implementador devuelve un informe con esta estructura y nada más: archivos tocados; comandos que ejecutó con su **salida literal y código de salida**; tests nuevos por nombre; lo que quedó fuera o a medias. Prohibido devolver "listo", "implementado" o "tests pasando" sin la salida que lo respalda.
 - El principal **no da por cumplida una subtarea leyendo el informe**. Los informes son optimistas por naturaleza; la única verificación válida es la del punto 6.
 
-**Paralelismo**: cuando dos subtareas no dependen entre sí y cada una suma más de dos archivos, cada implementador trabaja en un worktree: `git worktree add worktrees/<slug>-T<n> -b <slug>-T<n>`. Los worktrees viven en `worktrees/` (ignorado). Antes de integrar se revisa `bash .claude/hooks/cambios.sh . <rama_base>`, no los informes. Al integrar, el principal mergea la rama y limpia con `git worktree remove` y borra la rama `<slug>-T<n>`. Las migraciones de Django son lineales: dos subtareas paralelas no pueden crear migraciones en la misma app.
+**Regla de worktree por defecto**: toda subtarea delegada que escriba código va en su propio worktree. Inline solo va lo pasivo o lo que escribe un único archivo de documentación. Los worktrees viven en `worktrees/` (ignorado) y no tienen `venv/`: el script crea una junction.
+- **Ramas**: un plan = una rama `plan/<slug>`; las subtareas son `<slug>-T<n>` (con sufijo de letra si hay varias en una: `T5a`) y cuelgan de ella. `main` solo recibe planes con la verificación `TODO` en PASA, y el merge lo decide el usuario.
+- **Plan derivado de la rama**: los hooks `SessionStart` (`contexto.sh`) y `Stop` (`verificar_plan.py`) toman `git branch --show-current`; si es `plan/<slug>` o `<slug>-T<n>`, el plan es `docs/planes/*-<slug>.md`. Si no, usan la línea `Plan activo:` de la bitácora como respaldo.
+- **Olas**: el plan ordena las subtareas en olas según el grafo de FK entre apps (la plantilla las declara y cada subtarea lleva `Ola: <n>`). Dentro de una ola todas las subtareas corren en paralelo, cada una con sus migraciones en su worktree; dos subtareas de la misma ola nunca crean migraciones en la misma app. La ola siguiente ramifica desde el commit de integración de la anterior.
+- **Propiedad**: cada app de dominio es dueña de sus archivos; los archivos transversales tienen un dueño único según la "Tabla de propiedad" de `convenciones-proyecto`. Una subtarea no declara en `Puede tocar` un archivo de otro dueño.
+- **Crear e integrar es trabajo del principal, por ola**: `bash .claude/hooks/worktree-crear.sh <slug> T<n> [rama_base]` crea `worktrees/<slug>-T<n>` y su rama, con la junction `venv` y `manage.py check` como prueba de humo. Con la subtarea commiteada y verificada, `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` rechaza cambios sin commitear y archivos fuera de las rutas declaradas, mergea con `--no-ff` (`T<n>: integra <slug>-T<n>`), corre `makemigrations --check` y `test --keepdb`, y quita la junction, el worktree y la rama. Antes de integrar se revisa `bash .claude/hooks/cambios.sh . <rama_base>`, no los informes.
+- **Tests de hooks**: son `[test]` escritos como `py -3 -m pytest .claude/hooks/<archivo>::<test> -q`; los de Django siguen con `manage.py test … --keepdb`.
+- **Sesiones paralelas**: cada sesión abre Claude Code en `worktrees/<slug>` (el worktree de su plan), no en la raíz. Las sesiones se comunican solo por git y por el Registro de cada plan; una sesión no edita el plan ni el worktree de otra. `docs/bitacora.md` y `docs/decisiones.md` los actualiza el principal de cada sesión al cierre, con rebase. La caché del hook de cierre (`.claude/.ultimo-verificado`) es por worktree.
 
 ### 6. Verificación independiente obligatoria
 
@@ -106,9 +113,9 @@ Se copian tal cual al último bloque del plan.
 
 ## Cierre de sesión
 Antes de terminar una sesión de trabajo:
-- Actualizar "Estado actual" de `docs/bitacora.md` (plan activo, rama, pendiente inmediato, problemas abiertos) y agregar una entrada nueva arriba de todo en "Entradas", con fecha y título.
+- Actualizar "Estado actual" de `docs/bitacora.md` (tabla `| plan | rama | ola actual | pendiente inmediato | sesión |`, con la línea `Plan activo:` como compatibilidad, y problemas abiertos) y agregar una entrada nueva arriba de todo en "Entradas", con fecha y título.
 - Registrar las decisiones nuevas en `docs/decisiones.md`, una línea cada una con el formato `- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)`.
-- Marcar una tarea como `hecha` en la tabla `### Estado de subtareas` **solo después de ver pasar sus criterios**. El hook de cierre (`.claude/hooks/verificar_plan.py`, evento `Stop`) ejecuta los criterios de todas las tareas `hecha` del plan activo y, cuando están todas, los de cierre global.
+- Marcar una tarea como `hecha` en la tabla `### Estado de subtareas` **solo después de ver pasar sus criterios**. El hook de cierre (`.claude/hooks/verificar_plan.py`, evento `Stop`) ejecuta los criterios de todas las tareas `hecha` del plan de la rama (con `Plan activo:` como respaldo) y, cuando están todas, los de cierre global.
 - Si el hook de cierre avisa una falla, se corrige la causa, **nunca el criterio**. Si el criterio está mal, es un cambio de contrato y lo decide el usuario (§ 4).
 
 ## Referencia del proyecto

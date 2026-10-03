@@ -44,16 +44,20 @@ Si falta alguno de los cinco, no empiezas: devuelves qué falta y terminas.
    (`convenciones-proyecto`): comandos canónicos, rutas, roles y prohibiciones.
 6. **Respetas los finales de línea** (`core.autocrlf`): los `.sh` y los hooks quedan con
    LF; no conviertas archivos enteros de un formato al otro.
-7. **Nunca ejecutas contra producción** (settings de producción, `DATABASE_URL` remota)
+7. **Trabajas siempre en el worktree que te indica el principal.** Cada comando Bash empieza
+   con `cd <worktree> && …` y las rutas de lectura y escritura son absolutas dentro de ese
+   worktree. Nunca escribes en la raíz ni en el worktree de otra subtarea, y nunca tocas la
+   junction `venv`.
+8. **Nunca ejecutas contra producción** (settings de producción, `DATABASE_URL` remota)
    y **no lees secretos** (`.env`, `*.key`, `*.pem`, `credenciales-*.txt`).
-8. Docstrings, comentarios, nombres y textos de interfaz **en español**. Comandos de
+9. Docstrings, comentarios, nombres y textos de interfaz **en español**. Comandos de
    Django con `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe`
    (forma canónica de los criterios).
-9. **El presupuesto de líneas se fija antes de empezar la subtarea y nunca se sube**
+10. **El presupuesto de líneas se fija antes de empezar la subtarea y nunca se sube**
    durante ella. El presupuesto no es golf: está prohibido recortar comentarios, docs,
    tests o líneas en blanco para entrar. Si el trabajo no entra, lo reportas en "fuera
    o a medias" con el exceso; partir la subtarea es decisión del principal, no tuya.
-10. **Contenido real.** Cualquier texto público (servicios, certificaciones, clientes,
+11. **Contenido real.** Cualquier texto público (servicios, certificaciones, clientes,
     contacto) sale de `docs/00-contenido-fuente.md` o del usuario; no inventas cifras,
     testimonios ni datos de la empresa.
 
