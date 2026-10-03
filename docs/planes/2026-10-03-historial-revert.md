@@ -140,4 +140,4 @@ commit_base: c2dc617
 | 2026-10-03 | T1 | cd8d00c | PASA 5/5 (verificador y verificador-b) | integrada en d7166e1 |
 | 2026-10-03 | T2 | 9a0256a | PASA 4/4 (verificador y verificador-b) | integrada |
 | 2026-10-03 | T3 | 6d4ea23 | PASA 5/5 (verificador y verificador-b) | integrada |
-| | TODO | | | |
+| 2026-10-03 | TODO | 83e00bd | PASA 25/25 (verificador) y 26/26 (verificador-b) | auditor: N2 cerrado; menor nuevo: el except de T2 tolera archivos corruptos y bomba ICNS (bitácora) |

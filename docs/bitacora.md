@@ -1,15 +1,15 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-03-visitas.md (TODO PASA 60/60 en `plan/visitas`, sin fusionar en `main`)
+Plan activo: (ninguno; `visitas`, `visitas-auditoria` e `historial-revert` cerrados con TODO PASA y fusionados en `main`)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `visitas` | `plan/visitas` | cerrado (olas 1 y 2 integradas) | decidir merge a `main` y qué hallazgos del auditor se corrigen (ver abajo) | 2026-10-03 |
+| (ninguno) | `main` | — | decidir los menores abiertos de fotos (abajo) o seguir con el plan de API/autenticación | — |
 
-Después: plan de corrección de los hallazgos importantes del auditor de `visitas` (o directo a la API, si se difieren), y después el plan de API/autenticación.
+Después: plan de API/autenticación (antes, decidir si se corrigen los menores de fotos y N5).
 
 Problemas abiertos:
 - [menor, abierto, decisión del usuario] Auditoría de `paralelismo` sobre `worktree-integrar.sh`:
@@ -18,15 +18,13 @@ Problemas abiertos:
   - `rama_base` de `worktree-crear.sh` no se valida (un valor que empiece con `-` se toma como opción), e integrar no comprueba que la ruta sea un worktree registrado;
   - si la prueba de humo falla, la junction queda viva en `worktrees/`: limpiar con `cmd /c rmdir <venv>` y después `git worktree remove`; nunca `Remove-Item -Recurse` de PowerShell 5.1, que sigue la junction y vacía el venv real.
   - Observaciones de T1: `RE_FECHA_SLUG` usa `\d` (acepta dígitos Unicode, `contexto.sh` usa `[0-9]`); `plan_de_rama` vuelve a la bitácora sin avisar cuando `validar_plan` rechaza el candidato; una rama con el slug de un plan viejo hace verificar ese plan congelado (el mismo riesgo que ya existía con `Plan activo:`).
-- [importante, abierto, decisión del usuario] Auditoría de `visitas` (0 bloqueantes hoy; el 1 pasa a bloqueante cuando la API reciba fotos):
-  1. Bomba de descompresión: `apps/visitas/imagenes.py` decodifica la imagen entera antes de reducir (un JPEG de 13000×13000 de 2,6 MB lleva el pico a 1,4 GB). Propuesta: tope de píxeles, `draft()` antes de `exif_transpose`, `DecompressionBombWarning` como error y test.
-  2. El admin permite cambiar coordenadas, `datos`, `empleado`, `origen` y `proyecto` de una visita realizada; coordenadas y `datos` no tienen historial, así que no queda rastro. Propuesta: `get_readonly_fields` con todos los campos de evidencia cuando `estado != pendiente`.
-  3. Fotos y productos de una visita realizada se cambian, borran o mueven desde el admin sin historial. Propuesta: permisos de cambio/alta/baja en `False` si la visita no está pendiente; `HistoricalRecords` en `ProductoAplicado`.
-  4. Doble registro: `registrar_visita_realizada` comprueba `pendiente` sobre el objeto en memoria y sin bloqueo; un reintento o una instancia vieja vuelve a registrar y pisa la evidencia. Propuesta: `select_for_update` de visita y proyecto dentro del `atomic` y test de doble registro (resuelve también que la visita quede mutada en memoria si falla `full_clean`).
-  5. Una visita offline que llega tarde hace retroceder `encargado_actual` y `proxima_visita`. Propuesta: actualizar el proyecto solo si `realizada_en` es la más reciente; rechazar `realizada_en` futura.
-  6. Borrar una foto o una visita deja el JPEG en disco, y `HistoricalVisita` conserva texto libre tras una supresión. Propuesta: `has_delete_permission=False` en el admin de visitas y fotos, `post_delete` que borre el archivo; decisión legal sobre retención de visitas al suprimir un sitio (hoy `PROTECT` lo impide).
-  - Menores: el comentario JPEG/GIF (marcador COM) sobrevive al reencodeo (`imagen.info = {}`); archivo no imagen da 500 por `Foto.objects.create` (relanzar como `ValidationError`); HEIC no se abre (la app debe mandar JPEG); el original con GPS pasa por el temporal del sistema si pesa más de 2,5 MB; el servicio no compara `empleado` con el asignado (definir en el plan de API); `HistoricalVisita` guarda `motivo_manual`, `observaciones` e `incidencia_detalle` (política de retención); MEDIA no se sirve y, cuando se sirva, tiene que ser con vista autenticada por permiso sobre la visita.
-  - Observaciones de verificación: `ProyectoTests.test_str_tolera_sitio_inexistente` usa `count() + 99999` como pk inexistente; T3 y T4 escribieron los tests junto con el código (no se los vio fallar uno por uno); `Visita.Meta.ordering = ["-creado"]` se agregó sin estar en el plan; `datos` todavía no se valida contra el esquema (va con el serializer).
+- [menor, abierto] Pendientes de la auditoría de `visitas` (los importantes 1-7, 9, 11 y el bloqueante N2 de revertir desde el historial quedaron cerrados por `visitas-auditoria` e `historial-revert`):
+  - Regresión menor de `historial-revert` T2 (re-auditoría): en `apps/visitas/imagenes.py` el `except Exception` alrededor de `exif_transpose` también se traga errores de decodificación (`exif_transpose` llama a `load()`): un PNG con IDAT corrupto, un GIF corrupto o un ICNS con un PNG bomba embebido se aceptan como imagen gris/en blanco en vez de rechazarse. Corrección validada por el auditor: `original.load()` antes del `try`, y tests con PNG corrupto e ICNS bomba.
+  - N1 (latente hasta que la API reciba fotos): WebP/PNG/TIFF chicos por debajo de `MAX_PIXELES` usan cientos de MB (WebP 8000×4900 de 2 KB → 660 MB). Propuesta: `Image.open(..., formats=("JPEG", "PNG", "WEBP"))`, tope por formato y `exif_transpose(in_place=True)`. Con `formats` también se cierra el 500 por `ValueError` de ICNS.
+  - N4: la `ValidationError` de `Foto.save` da 500 en el admin; validar en el formulario (`clean_imagen`).
+  - N5 (decisión de producto): `observaciones`, `incidencia`, `incidencia_detalle`, `programada_para` y `asignada_por` siguen editables en una visita realizada (con historial).
+  - Diferidos: el original con GPS pasa por el temporal del sistema si pesa más de 2,5 MB; HEIC no se abre; el servicio no compara `empleado` con el asignado (plan de API); retención de `HistoricalVisita` y de visitas al suprimir un sitio (decisión legal; hoy `PROTECT` lo impide); servir MEDIA solo con vista autenticada por permiso sobre la visita.
+  - Observaciones: `ProyectoAdmin` permite revertir desde el historial (no explotable: los mismos campos se editan en el formulario); `test_borrar_visita_borra_los_archivos_de_sus_fotos` y las aserciones agregadas en la corrección de T4 de `visitas-auditoria` no se vieron fallar antes; `select_for_update` no bloquea en SQLite (desarrollo), sí en Postgres; `ProyectoTests.test_str_tolera_sitio_inexistente` usa `count() + 99999`; `datos` todavía no se valida contra el esquema.
 - [menor, abierto] Los bloques `### Ola` de `docs/plantilla-plan.md` no los ejecuta ni `verificar_plan.py` ni `verificador`: en `visitas` los criterios de integración se pusieron en el cierre global. Corregir la plantilla o el hook.
 - [menor, abierto] Re-auditoría de `auditoria-dominio`:
   - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
@@ -44,6 +42,14 @@ Problemas abiertos:
 - Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-03 — Correcciones de la auditoría de visitas y bloqueo de la reversión desde el historial; fusión en main
+Hecho:
+- Plan `docs/planes/2026-10-03-visitas-auditoria.md` (una ola, 4 subtareas en paralelo; TODO PASA 48/48): `procesar_imagen` con tope de píxeles, `draft()`, comentario descartado y `ValidationError` para no imágenes; historial de `ProductoAplicado` (`visitas/0002`) y borrado del archivo al borrar o reemplazar una foto; `registrar_visita_realizada` con `select_for_update`, sin retroceder el proyecto ante visitas atrasadas y sin fechas futuras (tolerancia 10 min); admin con `CAMPOS_EVIDENCIA` de solo lectura en visitas no pendientes, sin borrado de visitas ni fotos y con fotos/productos bloqueados. T4 necesitó una ronda de corrección del principal (inline de fotos sin borrado y `visita` de solo lectura en los admins sueltos).
+- La re-auditoría encontró un bloqueante nuevo (N2): revertir desde el historial de simple_history devolvía una visita realizada a pendiente y reactivaba QR regenerados. Por decisión del usuario, plan `docs/planes/2026-10-03-historial-revert.md` (3 subtareas; TODO PASA): `history_form_view` niega el POST en `VisitaAdmin` y `SitioAdmin`; un EXIF corrupto ya no da 500. Re-auditoría: N2 cerrado; un menor nuevo (ver Problemas abiertos).
+- `juez-plan` corrido como agente Plan en los dos planes: 1 bloqueante en `visitas-auditoria` (test de doble registro que pasaba antes del cambio), corregido antes de congelar; 0 en `historial-revert`.
+- `main` avanzó por fast-forward hasta `plan/historial-revert` (incluye `visitas`, `visitas-auditoria` e `historial-revert`; 95 tests).
+Pendiente: menores de fotos y N5 (Problemas abiertos), después el plan de API/autenticación.
 
 ### 2026-10-03 — Registro de visitas (Visita, Foto, ProductoAplicado) y correcciones de Proyecto
 Hecho (plan `docs/planes/2026-10-03-visitas.md`, rama `plan/visitas`, primer plan con olas y worktrees):
