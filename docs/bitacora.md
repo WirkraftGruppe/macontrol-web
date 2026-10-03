@@ -1,9 +1,9 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno; `acciones-sitio` cerrado con TODO PASA 25/25)
-Rama: main
-Pendiente inmediato: plan de Visita. Antes, decidir si se corrige el hallazgo menor del historial de Proyecto (ver abajo).
+Plan activo: docs/planes/2026-10-02-paralelismo.md
+Rama: plan/paralelismo
+Pendiente inmediato: ola 1 (T2, scripts de worktree) del plan `paralelismo`; después, plan de Visita (antes, decidir si se corrige el hallazgo menor del historial de Proyecto, ver abajo).
 Problemas abiertos:
 - [menor, abierto, decisión del usuario] Auditoría de `acciones-sitio` (PLAUSIBLE, no probado en ejecución): si un proyecto se borra y después su sitio se suprime, quedan dos problemas:
   - `HistoricalProyecto` conserva `sitio_id`, el título y el detalle del proyecto, que podrían mencionar el domicilio o al titular.

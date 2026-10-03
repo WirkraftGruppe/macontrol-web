@@ -212,7 +212,7 @@ Ola 3: T5 (prueba de fuego)             el principal, con dos worktrees
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: 2823e82
 
 ### Estado de subtareas
 
