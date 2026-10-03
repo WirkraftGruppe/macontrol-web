@@ -227,7 +227,7 @@ commit_base: b437ec1
 | 2026-10-03 | T3 | 6d07ea9 | PASA (verificador, verificador-b) | |
 | 2026-10-03 | T4 | 906f590 | PASA (verificador, verificador-b) | |
 | 2026-10-03 | T1 (corrección) | 6d901dc | FALLA 1 (presupuesto, por contrato modificado 3478391); resto PASA (verificador, verificador-b) | re-auditoría: MPO y ValueError cerrados; memoria sigue abierta (importante) |
-| | TODO | | | |
+| 2026-10-03 | TODO | 88a449c | FALLA 5/49 — 5 esperados por contrato modificado; aprobado por el usuario el 2026-10-03 | 4 presupuestos (commit_base vacío por contrato modificado, medidos a mano contra b437ec1 con margen) y `congelado.sh` (reporta el único cambio arriba del corte, 3478391, aprobado por el usuario); entra a `main` por la decisión del 2026-10-03 |
 
 ## Al cerrar (principal)
 
