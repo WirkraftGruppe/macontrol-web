@@ -1,42 +1,66 @@
 """Filtro de logging que oculta datos personales y sensibles."""
 
 import logging
+from collections.abc import Mapping
 
 from django.db.models import Model
 
-CLAVES_SENSIBLES = {"password", "token", "latitud", "longitud", "cuit"}
+# Fragmentos que, contenidos en el nombre de una clave, marcan su valor como sensible.
+FRAGMENTOS_SENSIBLES = (
+    "password",
+    "contrasena",
+    "contraseña",
+    "token",
+    "access",
+    "refresh",
+    "secret",
+    "authorization",
+    "cuit",
+    "latitud",
+    "longitud",
+    "telefono",
+    "contacto",
+)
 OCULTO = "[oculto]"
+PROFUNDIDAD_MAXIMA = 5
+_ESTANDAR = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
+    "message",
+    "asctime",
+}
 
 
-def _limpiar_dict(datos):
-    return {
-        k: OCULTO if k in CLAVES_SENSIBLES else _limpiar_valor(v)
-        for k, v in datos.items()
-    }
+def _es_sensible(clave):
+    return isinstance(clave, str) and any(
+        f in clave.lower() for f in FRAGMENTOS_SENSIBLES
+    )
 
 
-def _limpiar_valor(valor):
+def _limpiar(valor, nivel=0):
+    """Devuelve una copia sin datos sensibles; más allá del tope oculta todo."""
     if isinstance(valor, Model):
         return f"<{valor._meta.label} pk={valor.pk}>"
-    if isinstance(valor, dict):
-        return _limpiar_dict(valor)
+    if isinstance(valor, Mapping | list | tuple | set | frozenset):
+        if nivel >= PROFUNDIDAD_MAXIMA:
+            return OCULTO
+        if isinstance(valor, Mapping):
+            return {
+                k: OCULTO if _es_sensible(k) else _limpiar(v, nivel + 1)
+                for k, v in valor.items()
+            }
+        tipo = next(t for t in (list, tuple, set, frozenset) if isinstance(valor, t))
+        return tipo(_limpiar(v, nivel + 1) for v in valor)
     return valor
 
 
 class FiltroDatosPersonales(logging.Filter):
-    """Reemplaza claves sensibles e instancias de modelo en args y extras."""
+    """Limpia msg, args y atributos extra del record."""
 
     def filter(self, record):
-        if isinstance(record.args, dict):
-            record.args = _limpiar_dict(record.args)
-        elif isinstance(record.args, tuple):
-            record.args = tuple(_limpiar_valor(a) for a in record.args)
-        estandar = logging.LogRecord("", 0, "", 0, "", (), None).__dict__
-        for clave in list(record.__dict__):
-            if clave in estandar or clave in ("message", "asctime"):
+        if not isinstance(record.msg, str):
+            record.msg = _limpiar(record.msg)
+        record.args = _limpiar(record.args)
+        for clave, valor in list(record.__dict__.items()):
+            if clave in _ESTANDAR:
                 continue
-            if clave in CLAVES_SENSIBLES:
-                setattr(record, clave, OCULTO)
-            else:
-                setattr(record, clave, _limpiar_valor(record.__dict__[clave]))
+            setattr(record, clave, OCULTO if _es_sensible(clave) else _limpiar(valor))
         return True

@@ -146,4 +146,13 @@ LOGGING = {
         },
     },
     "root": {"handlers": ["consola"], "level": "INFO"},
+    # Sin los handlers por defecto de Django (sin filtro, con mail_admins).
+    "loggers": {
+        "django": {"handlers": ["consola"], "level": "INFO", "propagate": False},
+        "django.server": {
+            "handlers": ["consola"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
 }

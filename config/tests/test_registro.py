@@ -68,3 +68,69 @@ class RegistroTests(SimpleTestCase):
         log.warning("datos %(password)s", {"password": "secreto"})
         self.assertNotIn("secreto", flujo.getvalue())
         self.assertIn("[oculto]", flujo.getvalue())
+
+
+def _filtrar(msg, args=(), **extra):
+    r = _record(msg, args, **extra)
+    FiltroDatosPersonales().filter(r)
+    return r
+
+
+class FiltroAuditoriaTests(SimpleTestCase):
+    def test_claves_por_subcadena_y_sin_mayusculas(self):
+        r = _filtrar(
+            "%(a)s",
+            (
+                {
+                    "Password": 1,
+                    "CUIT": 2,
+                    "refresh": 3,
+                    "new_password1": 4,
+                    "HTTP_AUTHORIZATION": 5,
+                    "Teléfono_contacto": 6,
+                    "nombre": "ok",
+                },
+            ),
+        )
+        self.assertEqual(r.args["nombre"], "ok")
+        self.assertEqual(
+            [v for k, v in r.args.items() if k != "nombre"], ["[oculto]"] * 6
+        )
+
+    def test_limpieza_recursiva_en_args(self):
+        r = _filtrar("%s", ([{"cuit": "S6"}],))
+        self.assertEqual(r.args, ([{"cuit": "[oculto]"}],))
+        r = _filtrar("%s %s", ("x", {"latitud": "S7"}))
+        self.assertEqual(r.args, ("x", {"latitud": "[oculto]"}))
+        r = _filtrar("%s", ({"a": {"b": ({"token": "S"},)}},))
+        self.assertEqual(r.args["a"]["b"], ({"token": "[oculto]"},))
+
+    def test_modelo_dentro_de_lista(self):
+        usuario = get_user_model()(pk=3)
+        r = _filtrar("%s", ([usuario],))
+        self.assertEqual(r.getMessage(), "['<accounts.User pk=3>']")
+
+    def test_extra_con_estructuras_anidadas(self):
+        r = _filtrar("m", datos=[{"token": "S15"}], access="x")
+        self.assertEqual(r.datos, [{"token": "[oculto]"}])
+        self.assertEqual(r.access, "[oculto]")
+
+    def test_profundidad_maxima_oculta(self):
+        anidado = "S"
+        for _ in range(10):
+            anidado = [anidado]
+        r = _filtrar("%s", (anidado,))
+        self.assertNotIn("S", r.getMessage())
+        self.assertIn("[oculto]", r.getMessage())
+
+    def test_msg_que_no_es_texto(self):
+        r = _filtrar({"cuit": "S1"})
+        self.assertEqual(r.getMessage(), "{'cuit': '[oculto]'}")
+        usuario = get_user_model()(pk=9)
+        self.assertEqual(_filtrar(usuario).getMessage(), "<accounts.User pk=9>")
+
+    def test_loggers_de_django_usan_solo_el_handler_filtrado(self):
+        for nombre in ("django", "django.server"):
+            cfg = settings.LOGGING["loggers"][nombre]
+            self.assertEqual(cfg["handlers"], ["consola"])
+            self.assertIs(cfg["propagate"], False)
