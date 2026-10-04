@@ -1,18 +1,30 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-04-contrato-app.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| `contrato-app` | `plan/contrato-app` | 2 (cerrada) | merge a `main` (decisión del usuario) | 2026-10-04 |
 
-Siguiente: plan corto antes de producción con P-api-movil-15, -16 y -20, ya decididos en `docs/decisiones.md` (2026-10-04): pendiente sin evidencia previa, `ATRASO_MAXIMO_HORAS = 168` y token solo JSON. Un exceso de presupuesto se parte en T<n> y T<n>b antes de integrar. Los importantes de red siguen para el plan de despliegue.
+Siguiente: el usuario decide el merge de `plan/contrato-app` (verificación TODO en PASA). Después, el plan de despliegue: límite de cuerpo en el proxy (P-contrato-app-2) cubriendo también los logins (P-contrato-app-6), y revisar pendientes con evidencia antes de desplegar (P-contrato-app-7).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Plan `contrato-app`: evidencia de pendientes, atraso máximo, token JSON y contrato OpenAPI
+Hecho:
+- Plan congelado (`51e92b0`) tras `juez-plan` con 2 bloqueantes corregidos: presupuestos con rutas disjuntas (T3 lleva sus tests a `test_atraso.py`) y la integración del principal como subtarea T4.
+- T1 (token y renovación solo JSON, 415), T2 (una pendiente no lleva evidencia; la app crea una visita nueva con incidencia y responde 201) y T3 (`realizada_en` con más de `ATRASO_MAXIMO_HORAS` da 400), cada una en su worktree, verificadas por `verificador` y `verificador-b` y auditadas.
+- Por decisión del usuario sobre la auditoría de T3: un reintento tardío con el mismo `cliente_uuid` responde 409 (chequeo en `validate()`) y `ATRASO_MAXIMO_HORAS` queda acotado a 1..8760.
+- `docs/api/openapi-v1.yaml` versionado (`cb31993`) y bullet "Contrato de la app" en `docs/01-modelo-y-arquitectura.md` §6.
+- Verificación TODO (HEAD `52fc995`): PASA en los dos verificadores; auditor final sin hallazgos de seguridad nuevos.
+- Pendientes nuevos: P-contrato-app-1 a -11 (los importantes: -2 y -6, límite de cuerpo en despliegue; -4, `presupuesto.sh` por subtarea; -9, documentación de 400/415 en el contrato).
+- Incidente: `worktree-integrar.sh` no pudo borrar el worktree de T1 porque el shell del principal estaba dentro; se limpió a mano (carpeta vacía y `branch -d`) tras `git status` en raíz y worktrees.
+Pendiente: merge a `main` (lo decide el usuario).
 
 ### 2026-10-04 — Fusión en `main` de `api-movil`
 Hecho:
