@@ -151,21 +151,39 @@ commit_base: 605202d
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
-| T5 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
+| T5 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-04 | T3 | 063036f | verificador PASA 0/11; verificador-b PASA 0/11 | verificador-b como general-purpose (no registrado aún) |
+| 2026-10-04 | T1 | 25bc6fe | verificador PASA 0/7; verificador-b PASA 0/7 | |
+| 2026-10-04 | T2 | 9aa8ec3 | verificador PASA 0/4; verificador-b PASA 0/4 | |
+| 2026-10-04 | T4 | 89b3107 | verificador PASA 0/10; verificador-b PASA 0/10 | |
 
 ## Pendientes que deja este plan
 
 ### Problemas
 
+- P-herramientas-plan-1 [observación] `presupuesto.sh --subtarea` avisa lo no commiteado con `git status --porcelain` del repo entero (incluye sin rastrear): el aviso sale aunque lo pendiente no sea de la subtarea (informe de T1).
+- P-herramientas-plan-2 [observación] `worktree-integrar.sh` solo ve el cwd del proceso que lo invoca: si otro shell (por ejemplo, el persistente del principal) tiene el cwd dentro del worktree, Windows igual impide el borrado; el script lo sugiere en el mensaje de error de `git worktree remove`, pero no lo puede detectar antes.
+- P-herramientas-plan-3 [observación] El test `test_frontmatter_de_agentes_es_yaml_valido` está parametrizado por agente: su nombre sin parámetro como criterio corre todos los casos (informe de T3).
+
 ### Decisiones
 
+- 2026-10-04 — La integración de cada ola es una subtarea numerada `### T<n> — Integración (principal)` con fila en la tabla; la de la última ola es la última subtarea, y el hook ejecuta sus criterios — los encabezados `### Trabajo del principal` no los ejecutaba nadie (P-contrato-app-5), decisión del usuario al planificar — reemplaza a: 2026-10-03
+- 2026-10-04 — El presupuesto de una subtarea se mide con `presupuesto.sh . '<commit_base>' <N> --subtarea T<n>` (commits no-merge `T<n>:` y `T<n>b:`); el modo por rutas queda por compatibilidad y, si se usa, las rutas no se solapan entre subtareas — dos subtareas que comparten un archivo se contaminaban (P-contrato-app-4) — reemplaza a: (nada; complementa 2026-10-01)
+- 2026-10-04 — `worktree-integrar.sh` busca el worktree de la subtarea en `git worktree list` y aborta con exit 3, sin tocar nada, si el cwd está dentro; no se usa `--git-common-dir` para no romper el anidado de las sesiones paralelas — incidente de T1 en `contrato-app` (P-limites-ingreso-17) — reemplaza a: (nada)
+
 ### Cierra
+
+- cierra: P-contrato-app-3 — causa: `description` sin comillas con `: ` hacía inválido el YAML del frontmatter de `juez-plan.md` y `verificador-b.md`; se entrecomilló (T3) y `test_agentes.py` lo cubre. Tras integrar T3 la sesión los listó como tipos de agente.
+- cierra: P-contrato-app-4 — `presupuesto.sh --subtarea T<n>` (T1), con `test_dos_subtareas_mismo_archivo_no_se_suman`.
+- cierra: P-contrato-app-5 — la plantilla usa `### T<n> — Integración (principal)` (T4) y `test_plantilla_integracion_es_subtarea_numerada` lo fija.
+- cierra: P-contrato-app-12 — `verificador.md` y `verificador-b.md` calculan el veredicto contando las líneas de criterio del informe (T3).
+- cierra: P-limites-ingreso-17 — `worktree-integrar.sh` aborta con exit 3 si el cwd está dentro del worktree (T2), con `test_integrar_aborta_si_cwd_esta_dentro`.
