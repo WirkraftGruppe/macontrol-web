@@ -144,8 +144,8 @@ commit_base: 51e92b0
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
 | T3 | pendiente |
 | T4 | pendiente |
 
@@ -153,6 +153,8 @@ commit_base: 51e92b0
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-04 | T1 | fc8b0b1 | PASA 5/5 (verificador y verificador-b) | auditor: sin hallazgos en el alcance; MEDIA fuera de alcance → P-contrato-app-6 |
+| 2026-10-04 | T2 | 0f28f43 | PASA 9/9 (verificador y verificador-b) | auditor: BAJA → P-contrato-app-7; observaciones → P-contrato-app-8 |
 
 ## Pendientes que deja este plan
 
@@ -163,6 +165,9 @@ commit_base: 51e92b0
 - P-contrato-app-3 [menor] juez-plan y verificador-b no están registrados como tipos de agente; se corren como general-purpose con su archivo de instrucciones. Registrarlos en la configuración de agentes del proyecto.
 - P-contrato-app-4 [importante] presupuesto.sh mide por rutas desde commit_base y no por subtarea: dos subtareas que comparten una ruta se contaminan. Corregir el script para medir los commits T<n>: de cada subtarea; mientras tanto, la plantilla exige rutas de presupuesto disjuntas y juez-plan lo verifica.
 - P-contrato-app-5 [menor] 'Trabajo del principal' no es ### T<n> y el hook no lo ejecuta; la plantilla debe convertirlo en la última subtarea numerada.
+- P-contrato-app-6 [importante] Los logins del panel (`/panel/ingresar/`) y del admin (`/admin/login/`) parsean multipart anónimo con archivos en `CsrfViewMiddleware` antes del 403 y sin throttle: escritura a disco ilimitada bajo WSGI (auditor sobre T1). El límite de cuerpo del despliegue debe cubrir esas rutas, o un middleware rechaza multipart antes del CSRF.
+- P-contrato-app-7 [menor] Una pendiente que ya tenía fotos antes de T2 queda trabada: el admin no la puede guardar (`Visita.clean`) ni borrarle fotos, y `_pendiente_para` la sigue eligiendo, así que toda visita de la app del empleado en ese proyecto sale con `incidencia_asignacion=True`. Revisar si hay datos así (`Visita.objects.filter(estado="pendiente").filter(Q(fotos__isnull=False)|Q(productos__isnull=False)).distinct().count()`) antes de desplegar (auditor sobre T2).
+- P-contrato-app-8 [observación] Falta un test de POST forjado al admin contra una pendiente (formsets y `latitud`/`datos`); el auditor lo comprobó a mano. Y `Visita.clean` no corre al pasar a realizada: cuando el panel complete visitas manuales con `registrar_visita_realizada`, debe rechazar una pendiente con evidencia.
 
 ### Decisiones
 
