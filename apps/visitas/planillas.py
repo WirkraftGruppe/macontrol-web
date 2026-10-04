@@ -1,10 +1,18 @@
 """Validación de los datos de una planilla contra el esquema de su servicio."""
 
+import math
 from datetime import date
+
+MAX_LARGO_TEXTO = 2000
+TIPOS = ("texto", "numero", "booleano", "opcion", "opcion_multiple", "fecha")
 
 
 def _es_numero(valor):
-    return isinstance(valor, (int, float)) and not isinstance(valor, bool)
+    return (
+        isinstance(valor, (int, float))
+        and not isinstance(valor, bool)
+        and (isinstance(valor, int) or math.isfinite(valor))
+    )
 
 
 def _es_fecha_iso(valor):
@@ -21,8 +29,13 @@ def _errores_de_campo(campo, valor):
     """Mensajes de error de un valor presente según el tipo del campo."""
     tipo = campo["tipo"]
     opciones = campo.get("opciones") or []
-    if tipo == "texto" and not isinstance(valor, str):
-        return ["Debe ser un texto."]
+    if tipo not in TIPOS:
+        return ["Tipo de campo desconocido."]
+    if tipo == "texto":
+        if not isinstance(valor, str):
+            return ["Debe ser un texto."]
+        if len(valor) > MAX_LARGO_TEXTO:
+            return [f"No puede superar los {MAX_LARGO_TEXTO} caracteres."]
     if tipo == "numero" and not _es_numero(valor):
         return ["Debe ser un número."]
     if tipo == "booleano" and not isinstance(valor, bool):

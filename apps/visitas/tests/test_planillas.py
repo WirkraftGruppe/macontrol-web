@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from apps.visitas.planillas import validar_datos
+from apps.visitas.planillas import MAX_LARGO_TEXTO, validar_datos
 
 
 def campo(clave, tipo, obligatorio=False, opciones=None):
@@ -72,3 +72,19 @@ class ValidarDatosTests(SimpleTestCase):
         self.assertEqual(validar_datos(ESQUEMA, datos), {})
         self.assertEqual(validar_datos(ESQUEMA, {"zona": "a"}), {})
         self.assertEqual(validar_datos([], {}), {})
+
+    def test_numero_no_finito_se_rechaza(self):
+        for valor in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(valor=valor):
+                errores = validar_datos(ESQUEMA, {"zona": "a", "cantidad": valor})
+                self.assertEqual(errores, {"cantidad": ["Debe ser un número."]})
+
+    def test_texto_demasiado_largo_se_rechaza(self):
+        self.assertEqual(validar_datos(ESQUEMA, {"zona": "x" * MAX_LARGO_TEXTO}), {})
+        errores = validar_datos(ESQUEMA, {"zona": "x" * (MAX_LARGO_TEXTO + 1)})
+        self.assertEqual(set(errores), {"zona"})
+
+    def test_tipo_de_campo_desconocido_da_error(self):
+        esquema = [campo("raro", "inventado")]
+        errores = validar_datos(esquema, {"raro": 1})
+        self.assertEqual(errores, {"raro": ["Tipo de campo desconocido."]})
