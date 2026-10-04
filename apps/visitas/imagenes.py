@@ -39,7 +39,12 @@ def procesar_imagen(archivo) -> ContentFile:
                 if original.format in ("JPEG", "MPO") and (
                     original.info.get("progressive")
                     or original.mode == "CMYK"
-                    or JpegImagePlugin.get_sampling(original) not in (1, 2)
+                    or (
+                        # Un JPEG en grises tiene un solo componente: get_sampling
+                        # da -1 y draft() sí lo reduce.
+                        original.mode != "L"
+                        and JpegImagePlugin.get_sampling(original) not in (1, 2)
+                    )
                 ):
                     tope = MAX_PIXELES_JPEG_COSTOSO
                 if ancho * alto > tope:
