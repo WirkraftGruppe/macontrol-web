@@ -1,19 +1,29 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-04-contrato-app.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `contrato-app` | `plan/contrato-app` | 2 (cerrada) | merge a `main` (decisión del usuario) | 2026-10-04 |
 
-Siguiente: el usuario decide el merge de `plan/contrato-app` (verificación TODO en PASA). Después, el plan de despliegue: límite de cuerpo en el proxy (P-contrato-app-2) cubriendo también los logins (P-contrato-app-6), y revisar pendientes con evidencia antes de desplegar (P-contrato-app-7).
+Siguiente: plan de despliegue, con los diferidos a despliegue (entre ellos P-contrato-app-2 y -6: límite de cuerpo en el proxy, que cubra también los logins). Antes de la etapa Expo: P-contrato-app-9 (documentar 400 y 415 en el contrato).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Fusión en `main` de `contrato-app`
+Hecho:
+- `main` recibió `plan/contrato-app` con `merge --no-ff` (`811d19c`), con la verificación TODO en PASA (verificador y verificador-b, HEAD `52fc995`).
+- Antes del merge, por decisión del usuario:
+  - cierra P-contrato-app-7 (no aplica: no hay datos previos ni producción; la consulta queda en el pendiente);
+  - cierra P-contrato-app-10 (aceptado; la regla de "Puede tocar" no cambia);
+  - etiqueta P-contrato-app-2 y -6 como "Diferido a despliegue" y P-contrato-app-9 como "Antes de la etapa Expo";
+  - registra P-contrato-app-12 (el total del veredicto del verificador debe calcularse sobre la lista).
+- Las 4 decisiones del plan se copiaron al final de `docs/decisiones.md`; la primera reemplaza el 409 de P-api-movil-15 por un 201 con visita nueva marcada.
+Pendiente: plan de despliegue.
 
 ### 2026-10-04 — Plan `contrato-app`: evidencia de pendientes, atraso máximo, token JSON y contrato OpenAPI
 Hecho:
