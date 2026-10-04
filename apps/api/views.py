@@ -13,6 +13,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.accounts.limites import baldes_llenos, limpiar_usuario_ip, registrar_fallo
 from apps.accounts.red import ip_del_cliente
 
+from .serializers import TokenNormalizadoSerializer
+
 
 class IpDelClienteMixin:
     """Identifica al cliente con `ip_del_cliente` y no con `X-Forwarded-For` crudo."""
@@ -68,14 +70,14 @@ class RaizView(APIView):
 class ObtenerToken(TokenObtainPairView):
     """Obtiene el token; comparte con el panel los baldes de fallos por usuario."""
 
+    serializer_class = TokenNormalizadoSerializer
     throttle_classes = [ThrottleToken]
 
     def post(self, request, *args, **kwargs):
         usuario = (
             request.data.get("username", "") if hasattr(request.data, "get") else ""
         )
-        if not isinstance(usuario, str):
-            usuario = ""
+        usuario = "" if usuario is None else str(usuario)
         if baldes_llenos(request, usuario, solo_usuario=True):
             raise Throttled()
         try:
