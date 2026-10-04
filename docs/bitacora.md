@@ -7,13 +7,20 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `docs/planes/2026-10-03-limites-ingreso.md` | `plan/limites-ingreso` | cierre (las 3 olas integradas) | verificación TODO y decisión del usuario sobre el merge (contrato modificado) | 2026-10-03 |
 
-Siguiente: decidir el merge de `limites-ingreso` en `main`; después, el plan de API (P-limites-ingreso-1, -4 y -7 tocan el token).
+Siguiente: plan de API, en una sesión nueva sobre `main` (P-limites-ingreso-4 y -7 tocan el token; P-pendientes-heredados-3 es urgente antes de que la API reciba fotos). Los importantes de red (P-limites-ingreso-1, -2 y -3) quedan para el plan de despliegue.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Fusión en `main` de `limites-ingreso`
+Hecho:
+- El usuario aprobó la corrida TODO con FALLA 2/78, con el mismo criterio que `menores-abiertos`. La primera FALLA es el contrato modificado (`387c9a7`), que él aprobó. La segunda es el criterio de la ola 2 con un recuento que el propio plan cambia (33 → 27): un defecto del plan, no del código. El cierre global con 27 pasa. Queda escrito en el Registro.
+- Se agregaron P-limites-ingreso-16 (regla (b) del juez: recuentos relativos o en el cierre global) y -17 (`worktree-integrar.sh` tiene que abortar si el cwd está dentro del worktree). Los tres importantes de red quedan como "Diferido a despliegue".
+- `main` recibió `plan/limites-ingreso` con `merge --no-ff` (`3583a00`). Las 5 decisiones del plan se copiaron al final de `docs/decisiones.md`, que es la primera aplicación de la regla nueva de cierre.
+- Pendientes abiertos: 44 (`py -3 .claude/hooks/pendientes.py`).
+Pendiente: plan de API.
 
 ### 2026-10-03 — Plan `limites-ingreso`: límites por fallos, `'<commit_base>'` desde el Registro y pendientes por plan
 Hecho:
