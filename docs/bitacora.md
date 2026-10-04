@@ -1,19 +1,25 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-04-herramientas-plan.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `herramientas-plan` | `plan/herramientas-plan` | 2 (cerrada) | merge a `main` (decisión del usuario) | 2026-10-04 |
 
 Siguiente: plan de despliegue, con los diferidos a despliegue (entre ellos P-contrato-app-2 y -6: límite de cuerpo en el proxy, que cubra también los logins). Antes de la etapa Expo: P-contrato-app-9 (documentar 400 y 415 en el contrato).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Fusión en `main` de `herramientas-plan`
+Hecho:
+- `main` recibió `plan/herramientas-plan` con `merge --no-ff` (`bb8b5bb`), con la verificación TODO en PASA 0/46 (verificador y verificador-b, HEAD `7b62861`).
+- Las 3 decisiones del plan se copiaron al final de `docs/decisiones.md` (integración numerada, reemplaza a 2026-10-03; presupuesto `--subtarea`; exit 3 de `worktree-integrar.sh`).
+- `docs/pendientes-snapshot.json` (`pendientes.py --json`) generado para el triage desde Claude Desktop; sin versionar (excluido en `.git/info/exclude`).
+Pendiente: triage de pendientes; después, plan de despliegue.
 
 ### 2026-10-04 — Plan `herramientas-plan`: presupuesto por subtarea, integración segura, plantilla y agentes registrados
 Hecho:
