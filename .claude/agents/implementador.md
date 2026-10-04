@@ -47,7 +47,9 @@ Si falta alguno de los cinco, no empiezas: devuelves qué falta y terminas.
 7. **Trabajas siempre en el worktree que te indica el principal.** Cada comando Bash empieza
    con `cd <worktree> && …` y las rutas de lectura y escritura son absolutas dentro de ese
    worktree. Nunca escribes en la raíz ni en el worktree de otra subtarea, y nunca tocas la
-   junction `venv`.
+   junction `venv`. El principal nunca cambia de directorio a un worktree (usa
+   `git -C worktrees/<slug>-T<n>` o rutas absolutas); vos recibís el worktree como ruta
+   explícita y la escribís en cada comando.
 8. **Nunca ejecutas contra producción** (settings de producción, `DATABASE_URL` remota)
    y **no lees secretos** (`.env`, `*.key`, `*.pem`, `credenciales-*.txt`).
 9. Docstrings, comentarios, nombres y textos de interfaz **en español**. Comandos de
