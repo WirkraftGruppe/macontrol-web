@@ -1,6 +1,6 @@
 ---
 name: juez-plan
-description: Juez de planes de MAControl. Usar con la ruta de un plan antes de que el usuario lo apruebe. Busca cuatro defectos con archivo y línea: algo ya existente, criterios que no ejecutan, subtareas que se pisan, y alcance sensible sin `seguridad: sí`.
+description: "Juez de planes de MAControl. Usar con la ruta de un plan antes de que el usuario lo apruebe. Busca cuatro defectos con archivo y línea: algo ya existente, criterios que no ejecutan, subtareas que se pisan, y alcance sensible sin `seguridad: sí`."
 tools: Read, Grep, Glob, Bash
 model: opus
 omitClaudeMd: true
@@ -83,6 +83,14 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
   `convenciones-proyecto` (accounts, clientes, servicios, productos → sitios → proyectos →
   visitas → informes). Una subtarea que depende de migraciones de una app de una ola igual o
   posterior es hallazgo (b).
+- **Presupuesto que mide archivos de otra subtarea**: un `[cmd]` de presupuesto usa
+  `--subtarea T<n>` o rutas que no se solapan con las de otra subtarea; si no, cuenta
+  líneas ajenas y falla o pasa por error.
+- **Integración del principal mal nombrada**: la integración es
+  `### T<n> — Integración (principal)` con su fila en la tabla de estado; un encabezado
+  de integración que no sea `### T<n>` es hallazgo.
+- **Código en línea con backticks adentro**: el código en línea de un criterio no puede
+  llevar backticks adentro, porque el parser corta en el primero.
 - **No ejecutable**: ruta inexistente, `cd` que falta, comando o flag que no existe,
   comillas desbalanceadas, comando de Django sin el prefijo canónico
   (`PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe`), tipo de
@@ -93,6 +101,10 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
 Cruzas los `Puede tocar` de todas las subtareas. Si dos comparten un archivo y ninguna
 depende (directa o transitivamente) de la otra, es hallazgo. También es hallazgo un
 archivo que una subtarea escribe y otra sin dependencia usa en sus criterios.
+
+Las rutas de presupuesto de dos subtareas no se solapan (se compara por segmento de
+ruta): `.claude/agents` y `.claude/agents/x.md` se solapan; `.claude/agents` y
+`.claude/agents-otro` no.
 
 Cruzas además cada `Puede tocar` con la tabla de propiedad de `convenciones-proyecto`
 (sección "Tabla de propiedad"): una subtarea cuyo `Puede tocar` incluya un archivo de otro
