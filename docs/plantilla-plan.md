@@ -51,12 +51,12 @@ que aplica. Sin narrativa.>
 
 <!-- Las olas siguen el grafo de FK entre apps (CLAUDE.md § 5, "Olas"). Dentro de una ola todas las
 subtareas corren en paralelo, cada una en su worktree; la ola siguiente ramifica desde la integración
-de la anterior. Si el plan no necesita paralelismo, una sola ola. -->
+de la anterior (subtarea `Integración (principal)`). Si el plan no necesita paralelismo, una sola ola. -->
 
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
-| 1 | T1, T2 | <apps sin FK entre sí> |
-| 2 | T3 | <apps que dependen de la ola 1> |
+| 1 | T1, T2, T3 (integración) | <apps sin FK entre sí> |
+| 2 | T4, T5 (integración) | <apps que dependen de la ola 1> |
 
 ## Subtareas
 
@@ -74,16 +74,20 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - Un [test] tiene que ser NUEVO respecto de commit_base.
 - Prohibido: "funciona", "tests pasando", "revisado", "sin regresiones", "quedó implementado".
 - Dos subtareas no escriben el mismo archivo ni crean migraciones en la misma app en paralelo.
+- Presupuesto: `presupuesto.sh . '<commit_base>' <N> --subtarea T<n>` mide los commits `T<n>:` y
+  `T<n>b:` (sin merges). Si se usan rutas en lugar de `--subtarea`, las rutas de presupuesto
+  no se solapan entre subtareas: un archivo cuenta en el presupuesto de una sola.
 - `Puede tocar` respeta la tabla de propiedad de `convenciones-proyecto`: nada de otro dueño.
 -->
 
 <!-- Las subtareas se llaman siempre T<n>: el hook de cierre solo reconoce `### T<n>` y las filas `| T<n> |`. -->
-<!-- Integración por ola: cada ola termina con un encabezado `### Trabajo del principal (integración de la
-ola N)`, nunca con un párrafo en negrita: el hook corta la tarea en cualquier encabezado, y sin él sus
-criterios se sumarían a la última `### T<n>`. `verificar_plan.py` y `verificador` solo ejecutan `### T<n>`
-y `## Criterios de cierre global`. Los criterios de integración los corre el principal antes de abrir la
-ola siguiente y pega la salida en `### Corridas`; lo que deba quedar comprobado al cierre se repite en el
-cierre global. -->
+<!-- Integración por ola: cada ola termina con una subtarea numerada `### T<n> — Integración (principal)`
+(la de la última ola es la última subtarea numerada), con Ola, Depende de, Pasos, Presupuesto y Criterios.
+Es una `### T<n>` como las demás: `verificar_plan.py` y `verificador` ejecutan sus criterios cuando
+la tabla de estado la marca `hecha`, y tiene fila en `### Estado de subtareas` y en `### Corridas`.
+Presupuesto de la integración: si solo hace merges y commits `registro:`, `--subtarea T<n>` mediría 0
+y pasaría siempre; entonces el presupuesto es "no aplica", salvo que el principal haga commits
+`T<n>:` de ajuste, y en ese caso lleva `--subtarea T<n>`. -->
 ### T1 — <título imperativo, p. ej. "Crear el modelo Sitio con qr_codigo único">
 
 - **Ola**: <n>
@@ -101,7 +105,7 @@ cierre global. -->
   - `[grep-1]` `grep -n "qr_codigo = models.UUIDField" apps/sitios/models.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> apps/sitios`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T1`
 
 ### T2 — <título>
 
@@ -110,44 +114,51 @@ cierre global. -->
 - **Puede tocar**: …
 - **No puede tocar**: `docs/planes/`, …
 - **Skill a leer antes**: …
+- **Presupuesto**: <N> líneas agregadas
 - **Qué hacer**: <…>
 - **Criterios**:
   - `[test]` …
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T2`
 
-### Trabajo del principal (integración de la ola 1)
+### T3 — Integración (principal)
 
-<Ola 1: integrar T1 y T2 en `plan/<slug>`. Si no hay nada que integrar, se escribe "nada".>
-
+- **Ola**: 1 (después de verificar T1 y T2)
+- **Depende de**: T1, T2
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
-  2. `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
+  2. Desde la raíz (no desde dentro del worktree: exit 3), `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
   3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
-  4. Crear los worktrees de la ola siguiente con `bash .claude/hooks/worktree-crear.sh <slug> T3 plan/<slug>`.
+  4. Crear los worktrees de la ola siguiente con `bash .claude/hooks/worktree-crear.sh <slug> T4 plan/<slug>`.
+- **Presupuesto**: no aplica (solo merges y commits `registro:`); si el principal hace commits `T3:` de ajuste, `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T3`
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/<slug> | grep -q "T1: integra <slug>-T1"`
+  - `[cmd]` `git log --oneline plan/<slug> | grep -q "T2: integra <slug>-T2"`
 
-### T3 — <título>
+### T4 — <título>
 
 - **Ola**: 2
-- **Depende de**: T1, T2
+- **Depende de**: T3
 - **Puede tocar**: …
 - **No puede tocar**: `docs/planes/`, …
 - **Skill a leer antes**: …
+- **Presupuesto**: <N> líneas agregadas
 - **Qué hacer**: <…>
 - **Criterios**:
   - `[test]` …
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T4`
 
-### Trabajo del principal (integración de la ola 2)
+### T5 — Integración (principal)
 
-<Ola 2: integrar T3 en `plan/<slug>`.>
-
+- **Ola**: 2 (después de verificar T4)
+- **Depende de**: T4
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
-  2. `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
+  2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
   3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
   4. Con todo integrado, el cierre global y la verificación `TODO`.
+- **Presupuesto**: no aplica (solo merges y commits `registro:`); si el principal hace commits `T5:` de ajuste, `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T5`
 - **Criterios**:
-  - `[cmd]` `git log --oneline plan/<slug> | grep -q "T3: integra <slug>-T3"`
+  - `[cmd]` `git log --oneline plan/<slug> | grep -q "T4: integra <slug>-T4"`
 
 ## Criterios de cierre global
 
@@ -176,6 +187,8 @@ commit_base: <hash del commit docs(plan): <slug>>
 | T1 | pendiente |
 | T2 | pendiente |
 | T3 | pendiente |
+| T4 | pendiente |
+| T5 | pendiente |
 
 ### Corridas
 
@@ -186,6 +199,8 @@ corrida. Un veredicto vale solo para el HEAD verificado. -->
 |---|---|---|---|---|
 | | T1 | | | |
 | | T3 | | | |
+| | T4 | | | |
+| | T5 | | | |
 | | TODO | | | |
 
 ## Pendientes que deja este plan

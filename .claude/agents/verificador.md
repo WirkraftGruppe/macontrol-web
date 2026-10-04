@@ -175,5 +175,8 @@ Reglas del informe:
 - El veredicto es `PASA` únicamente si **todos** los criterios pedidos están en `PASA`,
   el contrato está intacto y la inocuidad es `OK`. Cualquier otra combinación es
   `FALLA`. No existe "PASA con observaciones".
+- El veredicto se calcula contando las líneas de criterio del informe, nunca de memoria:
+  `<m>` es la cantidad de criterios listados y `<n>` la de líneas que dicen `FALLA`. Antes
+  de escribir la línea final recorres el informe y cuentas.
 - No agregas recomendaciones, no propones fixes, no felicitas. El informe se pega
   sin editar al usuario; escribes para él, no para el principal.

@@ -97,6 +97,9 @@ Devuelves esto y nada más, en español:
 ## Pendientes propuestos
 - <problema o decisión que viste y que el contrato no cubre: severidad
   (bloqueante|importante|menor|observación) y texto> | ninguno
+
+## Commits
+- cada commit de esta subtarea lleva el prefijo T<n>: (los hace el principal)
 ```
 
 Reglas del informe:

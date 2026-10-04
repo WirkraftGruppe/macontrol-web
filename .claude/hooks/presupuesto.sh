@@ -2,6 +2,7 @@
 # Presupuesto de líneas agregadas por subtarea, medido contra el commit base de un plan.
 #
 # Uso: presupuesto.sh <repo> <base> <max> [rutas...]
+#      presupuesto.sh <repo> <base> <max> --subtarea T<n>[a-z]?
 #   <repo>  directorio del repositorio git a inspeccionar (. | backend | mobile)
 #   <base>  commit contra el que se mide el diff (normalmente commit_base del plan). Si es
 #           literalmente `<commit_base>` (entre comillas simples, para que bash no lo tome como
@@ -9,6 +10,14 @@
 #           `commit_base:` del Registro del plan de la rama (o el activo de la bitácora)
 #   <max>   máximo de líneas agregadas permitido (entero >= 0)
 #   [rutas] opcional: limita el conteo a esas rutas, relativas a <repo>
+#   --subtarea T<n>  modo por subtarea (no admite rutas; el id debe ser T<n> o T<n><letra>)
+#
+# Modo por subtarea: toma `git log --no-merges <base>..HEAD` y cuenta solo los commits cuyo asunto
+# empieza con `T<n>:` o `T<n>b:` (si el id ya trae letra, solo el exacto: `T1` no cuenta `T10:`).
+# Suma por archivo las agregadas de `git diff-tree --no-commit-id --numstat -r <hash>` (binarios
+# con 0). Sin commits con el prefijo, el total es 0 y la salida dice `sin commits T<n>: desde
+# <base>`. Lo no commiteado no cuenta (se avisa) y los commits del rango sin prefijo `T…:` se
+# listan por stderr como informativo. Misma salida y mismos códigos que el modo por rutas.
 #
 # Cuenta las líneas agregadas desde <base> hasta el árbol de trabajo (incluye lo que no está
 # commiteado): el diff de los archivos ya versionados (`git diff --numstat <base>`) más el
@@ -34,6 +43,21 @@ base="$2"
 max="$3"
 shift 3
 rutas=("$@")
+
+# Modo por subtarea: `--subtarea T<n>[a-z]?` y nada más (con rutas o id inválido, uso inválido).
+subtarea=""
+if [ "${#rutas[@]}" -gt 0 ] && [ "${rutas[0]}" = "--subtarea" ]; then
+  if [ "${#rutas[@]}" -ne 2 ]; then
+    echo "uso inválido: --subtarea recibe un único id T<n> y no admite rutas" >&2
+    exit 2
+  fi
+  subtarea="${rutas[1]}"
+  if ! printf '%s' "$subtarea" | grep -Eq '^T[0-9]+[a-z]?$'; then
+    echo "uso inválido: id de subtarea '$subtarea' (se espera T<n> o T<n><letra>)" >&2
+    exit 2
+  fi
+  rutas=()
+fi
 
 # <max> debe ser un entero no negativo: cualquier otra cosa es un error de uso, no de presupuesto.
 case "$max" in
@@ -89,6 +113,31 @@ tab="$(printf '\t')"
 detalle="$(mktemp)"
 trap 'rm -f "$detalle"' EXIT
 
+if [ -n "$subtarea" ]; then
+  crudo="$(mktemp)"
+  trap 'rm -f "$detalle" "$crudo"' EXIT
+  cuenta=0
+  # Commits del rango sin merges, del más nuevo al más viejo: "<hash>\t<asunto>".
+  while IFS="$tab" read -r hash asunto; do
+    [ -n "$hash" ] || continue
+    if [[ "$asunto" == "${subtarea}:"* ]] ||
+       { [[ "$subtarea" =~ ^T[0-9]+$ ]] && [[ "$asunto" == "${subtarea}b:"* ]]; }; then
+      cuenta=$((cuenta + 1))
+      git -C "$repo" diff-tree --no-commit-id --numstat -r "$hash" >>"$crudo"
+    else
+      echo "informativo: commit sin prefijo ${subtarea}: no cuenta: ${hash:0:7} $asunto" >&2
+    fi
+  done <<EOF
+$(git -C "$repo" log --no-merges --format="%H%x09%s" "$base..HEAD" | tr -d '\r')
+EOF
+  # Suma por archivo: un mismo archivo en varios commits de la subtarea es una sola fila.
+  awk -F'\t' '{ if ($1 == "-") bin[$3] = 1; else suma[$3] += $1; vistos[$3] = 1 }
+    END { for (a in vistos) if ((a in bin) && !(a in suma)) printf "0\tbinario\t%s\n", a;
+                            else printf "%d\t%d\t%s\n", suma[a], suma[a], a }' "$crudo" >"$detalle"
+  if [ -n "$(git -C "$repo" status --porcelain)" ]; then
+    aviso="aviso: hay cambios sin commitear; no cuentan en el modo por subtarea"
+  fi
+else
 # Archivos ya versionados: diff --numstat da "<agregadas>\t<borradas>\t<archivo>".
 if [ "${#rutas[@]}" -gt 0 ]; then
   numstat="$(git -C "$repo" diff --numstat "$base" -- "${rutas[@]}")"
@@ -127,6 +176,8 @@ $sin_rastrear
 EOF
 fi
 
+fi
+
 total=0
 if [ -s "$detalle" ]; then
   while IFS="$tab" read -r orden _mostrar _archivo; do
@@ -143,6 +194,10 @@ if [ -s "$detalle" ]; then
 else
   echo "  (sin cambios en las rutas indicadas)"
 fi
+if [ -n "$subtarea" ] && [ "$cuenta" -eq 0 ]; then
+  echo "sin commits ${subtarea}: desde $base"
+fi
+[ -z "${aviso:-}" ] || echo "$aviso"
 
 if [ "$total" -gt "$max" ]; then
   echo "No recortar comentarios, docs, tests ni líneas en blanco para entrar: partí la subtarea o reportá el exceso." >&2

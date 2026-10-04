@@ -241,3 +241,28 @@ def test_crear_rechaza_rama_base_invalida(repo, rama_base):
     assert proceso.returncode == 2, texto(proceso.stdout) + texto(proceso.stderr)
     assert not (repo / "worktrees" / "demo-T1").exists()
     assert git(repo, "branch", "--list", "demo-T1").strip() == ""
+
+
+def _aborta_con_cwd_en(repo, subcarpeta):
+    """Corre integrar con cwd dentro del worktree (o una subcarpeta) y verifica que no tocó nada."""
+    wt = crear(repo)
+    commitear_archivo(wt, "app.txt")
+    cwd = wt / subcarpeta if subcarpeta else wt
+    cwd.mkdir(parents=True, exist_ok=True)
+    antes = git(repo, "rev-parse", "main").strip()
+    proceso = correr(INTEGRAR, cwd, "demo", "T1", "main", "app.txt")
+    assert proceso.returncode == 3, texto(proceso.stdout) + texto(proceso.stderr)
+    assert "el directorio actual está dentro de" in texto(proceso.stderr)
+    assert "salir del worktree antes de integrar" in texto(proceso.stderr)
+    assert git(repo, "rev-parse", "main").strip() == antes
+    assert not (repo / "app.txt").exists()
+    assert wt.exists()
+    assert git(repo, "branch", "--list", "demo-T1").strip().endswith("demo-T1")
+
+
+def test_integrar_aborta_si_cwd_esta_dentro(repo):
+    _aborta_con_cwd_en(repo, None)
+
+
+def test_integrar_aborta_si_cwd_esta_en_subcarpeta_del_worktree(repo):
+    _aborta_con_cwd_en(repo, "sub/carpeta")
