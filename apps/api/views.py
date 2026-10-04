@@ -1,6 +1,8 @@
 """Vistas transversales de la API: raíz y tokens JWT."""
 
 from django.contrib.auth import get_user_model
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import AuthenticationFailed, Throttled
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -63,6 +65,7 @@ class RenovacionSerializer(TokenRefreshSerializer):
 class RaizView(APIView):
     """Con los permisos por defecto: anónimo 401, autenticado ve su rol."""
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response({"usuario": request.user.username, "rol": request.user.rol})
 
