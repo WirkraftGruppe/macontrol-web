@@ -92,14 +92,23 @@ class CrearVisitaSerializer(serializers.Serializer):
         required=False, allow_blank=True, default="", max_length=MAX_LARGO_TEXTO
     )
 
-    def validate_realizada_en(self, valor):
+    def validate(self, attrs):
+        """Rechaza el atraso excesivo, salvo en un reintento ya aceptado.
+
+        Si la visita ya existe, se deja pasar para que el servicio responda 409.
+        """
         horas = settings.ATRASO_MAXIMO_HORAS
-        if valor < timezone.now() - timedelta(hours=horas):
-            raise serializers.ValidationError(
-                f"La visita tiene más de {horas} horas de atraso. "
-                "Avise al administrador para que la cargue como manual."
-            )
-        return valor
+        if attrs["realizada_en"] < timezone.now() - timedelta(hours=horas):
+            if not Visita.objects.filter(cliente_uuid=attrs["cliente_uuid"]).exists():
+                raise serializers.ValidationError(
+                    {
+                        "realizada_en": [
+                            f"La visita tiene más de {horas} horas de atraso. "
+                            "Avise al administrador para que la cargue como manual."
+                        ]
+                    }
+                )
+        return attrs
 
     def validate_productos_aplicados(self, valor):
         if len(valor) > MAX_PRODUCTOS:
