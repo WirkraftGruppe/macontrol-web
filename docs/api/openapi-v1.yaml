@@ -1,0 +1,620 @@
+openapi: 3.0.3
+info:
+  title: API de MAControl
+  version: 1.0.0
+  description: API de la app móvil de los empleados de MAControl S.A.
+paths:
+  /api/v1/:
+    get:
+      operationId: root_retrieve
+      description: 'Con los permisos por defecto: anónimo 401, autenticado ve su rol.'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /api/v1/auth/token/:
+    post:
+      operationId: auth_token_create
+      description: Obtiene el token; comparte con el panel los baldes de fallos por
+        usuario.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenNormalizadoRequest'
+        required: true
+      responses:
+        '200':
+          description: No response body
+  /api/v1/auth/token/refresh/:
+    post:
+      operationId: auth_token_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenovacionRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Renovacion'
+          description: ''
+  /api/v1/fotos/{codigo}/:
+    get:
+      operationId: fotos_retrieve
+      description: Devuelve el JPEG; 404 si no existe y 403 si no corresponde.
+      summary: Descargar una foto
+      parameters:
+      - in: path
+        name: codigo
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - fotos
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '403':
+          description: La foto es de otro empleado.
+        '404':
+          description: La foto no existe.
+  /api/v1/me/historial/:
+    get:
+      operationId: me_historial_list
+      description: Lista paginada; `desde` y `hasta` son inclusivos (fecha local).
+      summary: Mi historial de visitas realizadas
+      parameters:
+      - in: query
+        name: desde
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-DD
+      - in: query
+        name: hasta
+        schema:
+          type: string
+          format: date
+        description: AAAA-MM-DD
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: tamano
+        required: false
+        in: query
+        description: Número de resultados a devolver por página.
+        schema:
+          type: integer
+      tags:
+      - me
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVisitaRealizadaList'
+          description: ''
+  /api/v1/me/visitas/:
+    get:
+      operationId: me_visitas_list
+      description: Lista paginada de las pendientes propias.
+      summary: Mis visitas pendientes
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: tamano
+        required: false
+        in: query
+        description: Número de resultados a devolver por página.
+        schema:
+          type: integer
+      tags:
+      - me
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVisitaPendienteList'
+          description: ''
+  /api/v1/productos/:
+    get:
+      operationId: productos_list
+      description: Lista completa y sin paginar de los productos activos. Devuelve
+        un `ETag`; con `If-None-Match` igual responde 304 sin cuerpo.
+      summary: Catálogo de productos activos
+      tags:
+      - productos
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Producto'
+          description: ''
+        '304':
+          description: El catálogo no cambió.
+  /api/v1/qr/{codigo}/resolver/:
+    post:
+      operationId: qr_resolver_create
+      description: Solo empleados. Un QR inexistente o de un sitio inactivo responde
+        el mismo 404.
+      summary: Resolver un código QR
+      parameters:
+      - in: path
+        name: codigo
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - qr
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolverQR'
+          description: ''
+  /api/v1/visitas/:
+    post:
+      operationId: visitas_create
+      description: Multipart. `datos` y `productos_aplicados` son texto JSON; `fotos`
+        se repite de 1 a 10 veces (hasta 8 MB cada una). Un `cliente_uuid` ya registrado
+        responde 409; `visita` solo viene si es del mismo empleado.
+      summary: Registrar una visita realizada
+      tags:
+      - visitas
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CrearVisitaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitaRealizada'
+          description: ''
+        '409':
+          description: El `cliente_uuid` ya fue registrado.
+components:
+  schemas:
+    ClienteQR:
+      type: object
+      properties:
+        razon_social:
+          type: string
+      required:
+      - razon_social
+    CrearVisitaRequest:
+      type: object
+      description: Forma y límites del alta; las reglas de negocio las aplica el servicio.
+      properties:
+        qr_codigo:
+          type: string
+          format: uuid
+        proyecto:
+          type: integer
+        cliente_uuid:
+          type: string
+          format: uuid
+        realizada_en:
+          type: string
+          format: date-time
+        latitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        precision_m:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,1})?$
+          nullable: true
+        datos:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        productos_aplicados:
+          type: string
+          minLength: 1
+          maxLength: 50000
+        fotos:
+          type: array
+          items:
+            type: string
+            format: binary
+          maxItems: 10
+          minItems: 1
+        observaciones:
+          type: string
+          default: ''
+          maxLength: 2000
+        incidencia:
+          type: boolean
+          default: false
+        incidencia_detalle:
+          type: string
+          default: ''
+          maxLength: 2000
+      required:
+      - cliente_uuid
+      - fotos
+      - latitud
+      - longitud
+      - proyecto
+      - qr_codigo
+      - realizada_en
+    PaginatedVisitaPendienteList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitaPendiente'
+    PaginatedVisitaRealizadaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/VisitaRealizada'
+    Producto:
+      type: object
+      description: Representación de solo lectura de un producto del catálogo.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre_comercial:
+          type: string
+          readOnly: true
+        principio_activo:
+          type: string
+          readOnly: true
+        registro:
+          type: string
+          readOnly: true
+          description: Número de registro ANMAT/SENASA del producto.
+        presentacion:
+          type: string
+          readOnly: true
+          title: Presentación
+        unidad_dosis_por_defecto:
+          type: string
+          readOnly: true
+          title: Unidad de dosis por defecto
+          description: 'Por ejemplo: ml/l.'
+      required:
+      - id
+      - nombre_comercial
+      - presentacion
+      - principio_activo
+      - registro
+      - unidad_dosis_por_defecto
+    ProductoAplicado:
+      type: object
+      properties:
+        producto:
+          type: integer
+          readOnly: true
+        lote:
+          type: string
+          readOnly: true
+        dosis:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          readOnly: true
+        unidad:
+          type: string
+          readOnly: true
+        cantidad:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,7}(?:\.\d{0,3})?$
+          readOnly: true
+          nullable: true
+      required:
+      - cantidad
+      - dosis
+      - lote
+      - producto
+      - unidad
+    ProyectoQR:
+      type: object
+      description: Proyecto activo del sitio con la planilla que debe completar el
+        empleado.
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: string
+        tipo_servicio:
+          $ref: '#/components/schemas/TipoServicioQR'
+        esquema_planilla:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        visita_pendiente_propia:
+          type: integer
+          nullable: true
+      required:
+      - esquema_planilla
+      - id
+      - tipo_servicio
+      - titulo
+      - visita_pendiente_propia
+    ProyectoResumen:
+      type: object
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: string
+      required:
+      - id
+      - titulo
+    Renovacion:
+      type: object
+      description: Rechaza renovar si el usuario no existe o cambió su contraseña.
+      properties:
+        refresh:
+          type: string
+        access:
+          type: string
+          readOnly: true
+      required:
+      - access
+      - refresh
+    RenovacionRequest:
+      type: object
+      description: Rechaza renovar si el usuario no existe o cambió su contraseña.
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    ResolverQR:
+      type: object
+      properties:
+        sitio:
+          $ref: '#/components/schemas/SitioQR'
+        cliente:
+          $ref: '#/components/schemas/ClienteQR'
+        proyectos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProyectoQR'
+      required:
+      - cliente
+      - proyectos
+      - sitio
+    SitioQR:
+      type: object
+      description: Datos mínimos del sitio; sin coordenadas, contactos, notas ni horario.
+      properties:
+        nombre:
+          type: string
+        direccion:
+          type: string
+        localidad:
+          type: string
+      required:
+      - direccion
+      - localidad
+      - nombre
+    SitioResumen:
+      type: object
+      description: Sitio sin coordenadas, contactos ni notas.
+      properties:
+        nombre:
+          type: string
+        direccion:
+          type: string
+        localidad:
+          type: string
+      required:
+      - direccion
+      - localidad
+      - nombre
+    TipoServicioQR:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+      required:
+      - id
+      - nombre
+    TokenNormalizadoRequest:
+      type: object
+      description: Normaliza el usuario igual que el panel antes de autenticar.
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    VisitaPendiente:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        proyecto:
+          allOf:
+          - $ref: '#/components/schemas/ProyectoResumen'
+          readOnly: true
+        sitio:
+          allOf:
+          - $ref: '#/components/schemas/SitioResumen'
+          readOnly: true
+        programada_para:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+      required:
+      - id
+      - programada_para
+      - proyecto
+      - sitio
+    VisitaRealizada:
+      type: object
+      description: Visita realizada para la respuesta del alta y el historial (sin
+        coordenadas).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        proyecto:
+          allOf:
+          - $ref: '#/components/schemas/ProyectoResumen'
+          readOnly: true
+        sitio:
+          allOf:
+          - $ref: '#/components/schemas/SitioResumen'
+          readOnly: true
+        realizada_en:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        cliente_uuid:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          title: Identificador del cliente
+        datos:
+          readOnly: true
+          title: Datos de la planilla
+        observaciones:
+          type: string
+          readOnly: true
+        incidencia:
+          type: boolean
+          readOnly: true
+        incidencia_detalle:
+          type: string
+          readOnly: true
+          title: Detalle de la incidencia
+        productos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductoAplicado'
+          readOnly: true
+        fotos:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - cliente_uuid
+      - datos
+      - fotos
+      - id
+      - incidencia
+      - incidencia_detalle
+      - observaciones
+      - productos
+      - proyecto
+      - realizada_en
+      - sitio
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
