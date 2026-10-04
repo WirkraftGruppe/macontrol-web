@@ -15,13 +15,16 @@
 #
 # Validaciones: una <ruta> vacía (o solo "/") es uso inválido; la "/" final de cada prefijo se
 # quita y el alcance compara por segmento (`app` admite `app` y `app/…`, no `app_v2/…`);
-# `worktrees/<slug>-T<n>` debe figurar en la lista de worktrees de git (ruta normalizada).
+# la ruta de `worktrees/<slug>-T<n>` sale de la lista de worktrees de git (ruta normalizada), por lo
+# que el script puede invocarse desde dentro de otro worktree (pero no del de la subtarea: exit 3).
 # Si makemigrations --check o los tests fallan tras el merge, se deshace con
 # un reset duro a ORIG_HEAD en el destino (estaba limpio por el paso 1) y el worktree y la rama
 # de la subtarea quedan intactos.
 #
 # exit 0 → integrada y limpia
 # exit 2 → uso inválido
+# exit 3 → el directorio actual está dentro del worktree de la subtarea (no se tocó nada; salir
+#          del worktree y reintentar)
 # exit 1 → rechazada o fallida (si falló antes del merge no se modificó nada; si falló después,
 #          el merge se deshizo)
 set -u
@@ -57,32 +60,53 @@ if ! printf '%s' "$tarea" | grep -Eq '^T[0-9]+[a-z]?$'; then
 fi
 
 dir_hooks="$(cd "$(dirname "$0")" && pwd)"
-raiz="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+toplevel="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "no se está dentro de un repositorio git" >&2
   exit 2
 }
 
 nombre="$slug-$tarea"
-ruta_sub="$raiz/worktrees/$nombre"
+normalizar() { cygpath -m "$1" 2>/dev/null | tr 'A-Z' 'a-z'; }
 
+# La ruta de la subtarea sale de `git worktree list`: el registrado cuya ruta normalizada termina en
+# `/worktrees/<nombre>`, prefiriendo el que cuelga del toplevel actual (así funciona invocado desde
+# dentro del propio worktree, donde el toplevel es el worktree y no la raíz).
+lista_wt="$(git -C "$toplevel" worktree list --porcelain)"
+sufijo="/worktrees/$nombre"
+sufijo_norm="$(printf '%s' "$sufijo" | tr 'A-Z' 'a-z')"
+top_norm="$(normalizar "$toplevel")"
+ruta_sub=""
+while IFS= read -r linea; do
+  case "$linea" in
+    "worktree "*)
+      cand="${linea#worktree }"
+      cand_norm="$(normalizar "$cand")"
+      case "$cand_norm" in
+        *"$sufijo_norm")
+          if [ -z "$ruta_sub" ]; then ruta_sub="$cand"; fi
+          case "$cand_norm" in "$top_norm"/*) ruta_sub="$cand" ;; esac
+          ;;
+      esac
+      ;;
+  esac
+done <<< "$lista_wt"
+if [ -z "$ruta_sub" ]; then
+  echo "no hay un worktree registrado en git worktree list que termine en $sufijo" >&2
+  exit 1
+fi
 if [ ! -d "$ruta_sub" ]; then
   echo "no existe el worktree $ruta_sub" >&2
   exit 1
 fi
+# Raíz = el worktree bajo el que `worktree-crear.sh` anidó la subtarea (ruta sin el sufijo).
+raiz="${ruta_sub:0:${#ruta_sub}-${#sufijo}}"
 
-# La ruta de la subtarea debe estar registrada como worktree (rutas normalizadas).
-normalizar() { cygpath -m "$1" 2>/dev/null | tr 'A-Z' 'a-z'; }
-esperada="$(normalizar "$ruta_sub")"
-lista_wt="$(git -C "$raiz" worktree list --porcelain)"
-registrado=0
-while IFS= read -r linea; do
-  case "$linea" in
-    "worktree "*) [ "$(normalizar "${linea#worktree }")" = "$esperada" ] && registrado=1 ;;
-  esac
-done <<< "$lista_wt"
-if [ "$registrado" -eq 0 ]; then
-  echo "$ruta_sub no figura en git worktree list" >&2
-  exit 1
+# Antes de cualquier modificación: el cwd no puede estar dentro del worktree que se va a borrar.
+cwd_norm="$(normalizar "$(pwd -P)")"
+sub_norm="$(normalizar "$(cd "$ruta_sub" && pwd -P)")"
+if [ "$cwd_norm" = "$sub_norm" ] || [ "${cwd_norm#"$sub_norm"/}" != "$cwd_norm" ]; then
+  echo "el directorio actual está dentro de $ruta_sub; salir del worktree antes de integrar" >&2
+  exit 3
 fi
 
 # Worktree donde está la rama destino.
@@ -151,7 +175,10 @@ if [ -e "$ruta_sub/venv" ]; then
     exit 1
   }
 fi
-git -C "$raiz" worktree remove "$ruta_sub" || exit 1
+git -C "$raiz" worktree remove "$ruta_sub" || {
+  echo "no se pudo quitar el worktree $ruta_sub; quizá otro shell tiene el directorio actual adentro" >&2
+  exit 1
+}
 
 # 7. Borra la rama.
 git -C "$raiz" branch -d "$nombre" || exit 1
