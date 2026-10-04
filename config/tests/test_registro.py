@@ -2,6 +2,7 @@
 
 import io
 import logging
+import sys
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -68,6 +69,19 @@ class RegistroTests(SimpleTestCase):
         log.warning("datos %(password)s", {"password": "secreto"})
         self.assertNotIn("secreto", flujo.getvalue())
         self.assertIn("[oculto]", flujo.getvalue())
+
+    def test_limpia_exc_info(self):
+        try:
+            raise ValueError("DETAIL: Key (cuit)=(20123456786) already exists.")
+        except ValueError:
+            r = logging.LogRecord(
+                "t", logging.ERROR, __file__, 1, "falla", (), sys.exc_info()
+            )
+        FiltroDatosPersonales().filter(r)
+        self.assertIsNone(r.exc_info)
+        salida = logging.Formatter().format(r)
+        self.assertNotIn("20123456786", salida)
+        self.assertIn("ValueError", salida)
 
 
 def _filtrar(msg, args=(), **extra):
