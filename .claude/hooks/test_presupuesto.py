@@ -249,5 +249,92 @@ def test_marcador_sin_registro_sale_con_dos(tmp_path):
     assert "commit_base sin resolver" in texto(proceso.stderr)
 
 
+# ---------------------------------------------------------------------------
+# Modo por subtarea `--subtarea T<n>` (T1 de docs/planes/2026-10-04-herramientas-plan.md)
+# ---------------------------------------------------------------------------
+
+def commitear(repo, asunto, archivo, lineas, modo="a"):
+    """Agrega `lineas` líneas a `archivo` y commitea con ese asunto."""
+    with (repo / archivo).open(modo, encoding="utf-8") as f:
+        f.write("".join(f"{asunto} línea {i}\n" for i in range(lineas)))
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", asunto)
+
+
+def repo_con_base(tmp_path):
+    """Repo temporal con un commit base; devuelve (repo, hash_base)."""
+    repo = tmp_path / "repo"
+    preparar_repo(repo)
+    commitear(repo, "docs(plan): demo", "base.txt", 1)
+    return repo, git(repo, "rev-parse", "HEAD").strip()
+
+
+def test_modo_subtarea_mide_solo_commits_con_prefijo(tmp_path):
+    repo, base = repo_con_base(tmp_path)
+    commitear(repo, "T1: agrega a", "a.txt", 3)
+    commitear(repo, "sin prefijo", "b.txt", 5)
+    commitear(repo, "registro: algo", "c.txt", 2)
+    (repo / "d.txt").write_text("x\ny\n", encoding="utf-8")  # sin commitear: no cuenta
+    proceso = correr_presupuesto(repo, base, 10, "--subtarea", "T1")
+    assert proceso.returncode == 0, texto(proceso.stderr)
+    salida = texto(proceso.stdout)
+    assert "total de líneas agregadas: 3 (máximo: 10)" in salida
+    assert "a.txt" in salida and "b.txt" not in salida
+    assert "sin commitear" in salida  # aviso de lo no commiteado
+    error = texto(proceso.stderr)
+    assert "sin prefijo" in error and "registro: algo" in error  # informativo por stderr
+    assert correr_presupuesto(repo, base, 2, "--subtarea", "T1").returncode == 1
+    # Sin ningún commit con el prefijo: total 0, exit 0 y el aviso.
+    vacio = correr_presupuesto(repo, base, 10, "--subtarea", "T2")
+    assert vacio.returncode == 0, texto(vacio.stderr)
+    assert "total de líneas agregadas: 0" in texto(vacio.stdout)
+    assert f"sin commits T2: desde {base}" in texto(vacio.stdout)
+
+
+def test_dos_subtareas_mismo_archivo_no_se_suman(tmp_path):
+    repo, base = repo_con_base(tmp_path)
+    commitear(repo, "T1: primera", "compartido.txt", 2)
+    commitear(repo, "T2: segunda", "compartido.txt", 4)
+    t1 = correr_presupuesto(repo, base, 100, "--subtarea", "T1")
+    t2 = correr_presupuesto(repo, base, 100, "--subtarea", "T2")
+    assert "total de líneas agregadas: 2 " in texto(t1.stdout)
+    assert "total de líneas agregadas: 4 " in texto(t2.stdout)
+
+
+def test_modo_rutas_sigue_funcionando(tmp_path):
+    repo, base = repo_con_base(tmp_path)
+    commitear(repo, "sin prefijo", "a.txt", 3)  # el modo por rutas no mira los asuntos
+    (repo / "b.txt").write_text("x\n", encoding="utf-8")  # sin rastrear: cuenta
+    proceso = correr_presupuesto(repo, base, 10, "a.txt", "b.txt")
+    assert proceso.returncode == 0, texto(proceso.stderr)
+    assert "total de líneas agregadas: 4 (máximo: 10)" in texto(proceso.stdout)
+    assert correr_presupuesto(repo, base, 3, "a.txt", "b.txt").returncode == 1
+
+
+def test_modo_subtarea_ignora_merges_y_cuenta_sufijo_b(tmp_path):
+    repo, base = repo_con_base(tmp_path)
+    git(repo, "switch", "-q", "-c", "rama")
+    commitear(repo, "T1: en la rama", "a.txt", 2)
+    git(repo, "switch", "-q", "main")
+    commitear(repo, "T1b: correccion", "b.txt", 3)
+    commitear(repo, "T10: otra subtarea", "c.txt", 7)
+    git(repo, "merge", "-q", "--no-ff", "-m", "T1: integra rama", "rama")
+    t1 = correr_presupuesto(repo, base, 100, "--subtarea", "T1")
+    assert t1.returncode == 0, texto(t1.stderr)
+    assert "total de líneas agregadas: 5 " in texto(t1.stdout)  # 2 de T1 + 3 de T1b; ni merge ni T10
+    assert "c.txt" not in texto(t1.stdout)
+    # Con letra en el id solo cuenta el exacto.
+    assert "total de líneas agregadas: 3 " in texto(correr_presupuesto(repo, base, 100, "--subtarea", "T1b").stdout)
+    assert "total de líneas agregadas: 7 " in texto(correr_presupuesto(repo, base, 100, "--subtarea", "T10").stdout)
+
+
+def test_modo_subtarea_rechaza_rutas_e_id_invalido(tmp_path):
+    repo, base = repo_con_base(tmp_path)
+    assert correr_presupuesto(repo, base, 10, "--subtarea", "T1", "a.txt").returncode == 2
+    for invalido in ("", "T", "1", "t1", "T1B", "T1ab", "T1:", "X1"):
+        assert correr_presupuesto(repo, base, 10, "--subtarea", invalido).returncode == 2, invalido
+    assert correr_presupuesto(repo, base, 10, "--subtarea").returncode == 2
+
+
 if __name__ == "__main__":
     unittest.main()
