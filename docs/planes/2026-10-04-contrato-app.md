@@ -138,7 +138,7 @@
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): contrato-app>
+commit_base: 51e92b0
 
 ### Estado de subtareas
 
