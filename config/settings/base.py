@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
+    "drf_spectacular",
+    "drf_spectacular_sidecar",
     "csp",
     "simple_history",
     "apps.accounts",
@@ -131,8 +133,31 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_THROTTLE_RATES": {"token": "10/min"},
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "apps.api.paginacion.PaginacionEstandar",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "apps.api.excepciones.manejar_excepcion",
+    "DEFAULT_THROTTLE_RATES": {
+        "token": "10/min",
+        "qr": "30/min",
+        "crear_visita": "120/hour",
+    },
     "NUM_PROXIES": NUM_PROXIES,
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "API de MAControl",
+    "DESCRIPTION": "API de la app móvil de los empleados de MAControl S.A.",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
+    "SERVE_AUTHENTICATION": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_DIST": "SIDECAR",
+    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
 }
 
 SIMPLE_JWT = {

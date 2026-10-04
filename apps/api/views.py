@@ -1,6 +1,8 @@
 """Vistas transversales de la API: raíz y tokens JWT."""
 
 from django.contrib.auth import get_user_model
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import AuthenticationFailed, Throttled
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -12,6 +14,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts.limites import baldes_llenos, limpiar_usuario_ip, registrar_fallo
 from apps.accounts.red import ip_del_cliente
+
+from .serializers import TokenNormalizadoSerializer
 
 
 class IpDelClienteMixin:
@@ -61,6 +65,7 @@ class RenovacionSerializer(TokenRefreshSerializer):
 class RaizView(APIView):
     """Con los permisos por defecto: anónimo 401, autenticado ve su rol."""
 
+    @extend_schema(responses=OpenApiTypes.OBJECT)
     def get(self, request):
         return Response({"usuario": request.user.username, "rol": request.user.rol})
 
@@ -68,14 +73,14 @@ class RaizView(APIView):
 class ObtenerToken(TokenObtainPairView):
     """Obtiene el token; comparte con el panel los baldes de fallos por usuario."""
 
+    serializer_class = TokenNormalizadoSerializer
     throttle_classes = [ThrottleToken]
 
     def post(self, request, *args, **kwargs):
         usuario = (
             request.data.get("username", "") if hasattr(request.data, "get") else ""
         )
-        if not isinstance(usuario, str):
-            usuario = ""
+        usuario = "" if usuario is None else str(usuario)
         if baldes_llenos(request, usuario, solo_usuario=True):
             raise Throttled()
         try:
