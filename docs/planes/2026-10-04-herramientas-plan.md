@@ -145,7 +145,7 @@ Archivos disjuntos entre T1–T4. Sus presupuestos usan el modo por rutas, con r
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): herramientas-plan>
+commit_base: 605202d
 
 ### Estado de subtareas
 
