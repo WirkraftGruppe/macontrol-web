@@ -268,6 +268,17 @@ class RegistrarDesdeAppTests(TestCase):
         self.proyecto.refresh_from_db()
         self.assertEqual(self.proyecto.encargado_actual, self.empleado)
 
+    def test_completar_pendiente_limpia_motivo_manual(self):
+        self.pendiente.origen = Visita.Origen.MANUAL
+        self.pendiente.motivo_manual = "Carga a mano"
+        self.pendiente.save()
+        visita = self.registrar()
+        self.assertEqual(visita.pk, self.pendiente.pk)
+        self.assertEqual(visita.origen, Visita.Origen.APP)
+        self.assertEqual(visita.motivo_manual, "")
+        self.pendiente.refresh_from_db()
+        self.assertEqual(self.pendiente.motivo_manual, "")
+
     def test_crea_nueva_con_origen_app_sin_pendiente(self):
         self.pendiente.delete()
         visita = self.registrar()

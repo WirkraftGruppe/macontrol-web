@@ -46,6 +46,10 @@ CAMPOS_VISITA = (
 ) + CAMPOS_DE_LA_APP
 
 
+# Registro de la app: en el alta y en pendientes no se cargan a mano.
+CAMPOS_REGISTRO_APP = ("latitud", "longitud", "precision_m", "datos")
+
+
 def _visita_cerrada(visita):
     """Una visita ya no pendiente es evidencia: no se modifica."""
     return visita is not None and visita.estado != Visita.Estado.PENDIENTE
@@ -120,10 +124,19 @@ class VisitaAdmin(SimpleHistoryAdmin):
     readonly_fields = ("estado", "realizada_en", "esquema_planilla") + CAMPOS_DE_LA_APP
     inlines = (FotoInline, ProductoAplicadoInline)
 
+    def get_inlines(self, request, obj):
+        """La evidencia solo se ve fuera de pendiente (en el alta tampoco)."""
+        if obj is None or obj.estado == Visita.Estado.PENDIENTE:
+            return ()
+        return super().get_inlines(request, obj)
+
     def get_readonly_fields(self, request, obj=None):
         if _visita_cerrada(obj):
             return CAMPOS_EVIDENCIA + CAMPOS_PLANIFICACION + CAMPOS_DE_LA_APP
-        return super().get_readonly_fields(request, obj)
+        base = super().get_readonly_fields(request, obj)
+        if obj is None or obj.estado == Visita.Estado.PENDIENTE:
+            return base + CAMPOS_REGISTRO_APP
+        return base
 
     def has_delete_permission(self, request, obj=None):
         return False
