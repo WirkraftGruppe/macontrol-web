@@ -107,7 +107,7 @@ Extiende `AbstractUser`: `rol` (administrador/empleado), `telefono`, `activo`. L
 1. Inicia sesión (JWT). `GET /api/v1/me/visitas/?estado=pendiente` → lista de asignaciones.
 2. Escanea QR → `POST /api/v1/qr/{codigo}/resolver/` → devuelve sitio + proyectos activos + planilla de cada uno. Si el sitio no existe o está inactivo, error explícito.
 3. Elige proyecto (o se abre directo si es único). Si tiene una visita pendiente asignada para ese proyecto, la app la usa; si no, crea una nueva (`origen=app`).
-4. Completa planilla, agrega los productos utilizados eligiendo del catálogo (lote y dosis), saca ≥1 foto, opcionalmente marca incidencia. `POST /api/v1/visitas/` con multipart (JSON + fotos + geolocalización). Sin conexión: se guarda local y se reintenta; el servidor acepta `realizada_en` del cliente y guarda además `recibida_en`.
+4. Completa planilla, agrega los productos utilizados eligiendo del catálogo (lote y dosis), saca ≥1 foto (la app redimensiona a 1600 px de lado mayor antes de subir: el servidor rechaza JPEG progresivos de más de 16 MP y WebP de más de 8 MP), opcionalmente marca incidencia. `POST /api/v1/visitas/` con multipart (JSON + fotos + geolocalización). Sin conexión: se guarda local y se reintenta; el servidor acepta `realizada_en` del cliente y guarda además `recibida_en`.
 5. `GET /api/v1/me/historial/` y `GET /api/v1/me/historial.pdf` para descargar su propio historial.
 
 ### 4.2 Administrador (panel)

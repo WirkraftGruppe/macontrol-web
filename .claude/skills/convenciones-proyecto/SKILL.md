@@ -20,6 +20,7 @@ Fuente de verdad del dominio: `docs/01-modelo-y-arquitectura.md`. Del contenido 
 - WeasyPrint (PDF: certificados, informes, historial, etiquetas QR) · `segno` (QR) · Pillow (fotos)
 - `django-simple-history` (auditoría de Sitio, Proyecto, Visita) · `django-storages` (fotos, backend intercambiable)
 - Calidad: `ruff` (lint + formato), tests con el runner de Django (`manage.py test`)
+- `SitioAdministracion.login` (`config/admin.py`) copia `AdminSite.login` de Django 5.2 para usar el mixin de límites: revisarla al actualizar Django
 
 ## Estructura
 ```
@@ -90,6 +91,8 @@ bash .claude/hooks/worktree-crear.sh <slug> T<n> [rama_base]
 bash .claude/hooks/worktree-integrar.sh <slug> T<n> <rama_destino> <ruta>...
 ```
 `T<n>` acepta sufijo de letra (`T5a`). Dentro de un worktree los comandos canónicos funcionan por la junction `venv`; nunca se toca ni se borra.
+
+Si la prueba de humo de `worktree-crear.sh` falla, la junction queda viva en `worktrees/<slug>-T<n>/venv`. Limpieza: primero `cmd /c rmdir worktrees\<slug>-T<n>\venv` (quita solo la junction) y después `git worktree remove worktrees/<slug>-T<n>`. Nunca `Remove-Item -Recurse` de PowerShell 5.1: sigue la junction y vacía el venv real.
 
 ## Comandos canónicos (Windows, desde la raíz)
 ```bash

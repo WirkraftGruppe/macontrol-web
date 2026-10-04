@@ -10,14 +10,19 @@ SCRIPT = DIR_HOOKS / "pendientes.py"
 CORTE = "## Registro de verificación\n\n(vacío)\n\n## Pendientes que deja este plan\n\n"
 
 
-def plan(raiz, nombre, problemas="", decisiones="", cierra="", arriba=""):
-    """Escribe docs/planes/<nombre>.md con la sección de pendientes debajo del corte."""
+def plan(raiz, nombre, problemas="", decisiones="", cierra="", arriba="", etiquetas=""):
+    """Escribe docs/planes/<nombre>.md con la sección de pendientes debajo del corte.
+
+    `etiquetas` agrega la subsección `### Etiquetas` (solo si no está vacío).
+    """
     carpeta = Path(raiz) / "docs" / "planes"
     carpeta.mkdir(parents=True, exist_ok=True)
     cuerpo = (
         f"# Plan\n\n{arriba}\n{CORTE}"
         f"### Problemas\n\n{problemas}\n### Decisiones\n\n{decisiones}\n### Cierra\n\n{cierra}\n"
     )
+    if etiquetas:
+        cuerpo += f"### Etiquetas\n\n{etiquetas}\n"
     (carpeta / f"{nombre}.md").write_text(cuerpo, encoding="utf-8")
 
 
@@ -110,3 +115,60 @@ def test_salida_de_texto_agrupa_por_severidad_y_avisos_al_final(tmp_path):
     )
     salida = correr(tmp_path).stdout.decode("utf-8")
     assert salida.index("P-uno-2") < salida.index("P-uno-1") < salida.index("duplicado")
+
+
+def test_etiqueta_se_muestra_y_filtra(tmp_path):
+    plan(
+        tmp_path,
+        "2026-01-01-uno",
+        problemas="- P-uno-1 [menor] a\n- P-uno-2 [menor] b\n- P-uno-3 [menor] c\n",
+    )
+    # las etiquetas valen desde cualquier plan, y se aceptan varias por id
+    plan(
+        tmp_path,
+        "2026-01-02-dos",
+        etiquetas=(
+            "- etiqueta: P-uno-1 → saneamiento\n"
+            "- etiqueta: P-uno-1 → despliegue — nota opcional\n"
+            "- etiqueta: P-uno-2 → despliegue\n"
+        ),
+    )
+    datos = como_json(tmp_path)
+    assert datos["avisos"] == []
+    por_id = {p["id"]: p["etiquetas"] for p in datos["abiertos"]}
+    assert por_id == {"P-uno-1": ["despliegue", "saneamiento"], "P-uno-2": ["despliegue"], "P-uno-3": []}
+    texto = correr(tmp_path).stdout.decode("utf-8")
+    assert "- P-uno-1 (uno) [despliegue, saneamiento] a" in texto
+    assert "- P-uno-3 (uno) c" in texto
+    filtrado = json.loads(correr(tmp_path, "--json", "--etiqueta", "despliegue").stdout.decode("utf-8"))
+    assert [p["id"] for p in filtrado["abiertos"]] == ["P-uno-1", "P-uno-2"]
+    filtrado_texto = correr(tmp_path, "--etiqueta", "saneamiento").stdout.decode("utf-8")
+    assert "P-uno-1" in filtrado_texto and "P-uno-2" not in filtrado_texto
+
+
+def test_etiqueta_de_id_inexistente_avisa(tmp_path):
+    plan(tmp_path, "2026-01-01-uno", etiquetas="- etiqueta: P-uno-9 → despliegue\n")
+    datos = como_json(tmp_path)
+    assert any(
+        "etiqueta de un id inexistente" in a and "P-uno-9" in a and "2026-01-01-uno.md:" in a
+        for a in datos["avisos"]
+    )
+
+
+def test_etiqueta_con_forma_invalida_o_destino_repetido_avisa(tmp_path):
+    plan(
+        tmp_path,
+        "2026-01-01-uno",
+        problemas="- P-uno-1 [menor] a\n",
+        etiquetas=(
+            "- etiqueta: P-uno-1 → Despliegue\n"
+            "- etiqueta: P-uno-1 despliegue\n"
+            "- etiqueta: P-uno-1 → despliegue\n"
+            "- etiqueta: P-uno-1 → despliegue — otra vez\n"
+        ),
+    )
+    datos = como_json(tmp_path)
+    forma = [a for a in datos["avisos"] if "forma inválida en Etiquetas" in a]
+    assert len(forma) == 2 and all("2026-01-01-uno.md:" in a for a in forma)
+    assert any("repetid" in a and "P-uno-1" in a and "despliegue" in a for a in datos["avisos"])
+    assert datos["abiertos"][0]["etiquetas"] == ["despliegue"]

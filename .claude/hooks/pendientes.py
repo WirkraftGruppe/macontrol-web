@@ -4,6 +4,11 @@
 Lee, de cada `AAAA-MM-DD-<slug>.md`, solo la sección `## Pendientes que deja este plan`
 que está debajo de `## Registro de verificación`. Abiertos = problemas declarados menos
 los cerrados con `cierra:` (de cualquier plan). Los avisos no hacen fallar: sale con 0.
+
+Etiquetas: la subsección `### Etiquetas` admite líneas `- etiqueta: <id> → <destino>` con un
+` — nota` opcional (`<destino>` en `[a-z0-9-]+`). Un id puede tener varias etiquetas (no el
+mismo destino dos veces) y valen desde cualquier plan, como `cierra:`. Cada abierto lleva
+`etiquetas` (lista ordenada) y `--etiqueta <nombre>` deja solo los abiertos que la tienen.
 """
 import argparse
 import json
@@ -19,6 +24,7 @@ RE_PLAN = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)\.md$")
 RE_ID = r"P-([a-z0-9][a-z0-9-]*)-\d+"
 RE_PROBLEMA = re.compile(rf"^- ({RE_ID}) \[([^\]]*)\] (.*)$")
 RE_CIERRA = re.compile(rf"^- cierra: ({RE_ID})(?: — .*)?$")
+RE_ETIQUETA = re.compile(rf"^- etiqueta: ({RE_ID}) → ([a-z0-9-]+)(?: — .*)?$")
 RE_DECISION = re.compile(r"^- \d{4}-\d{2}-\d{2} — .+ — .+ — reemplaza a: .+$")
 RE_COMENTARIO = re.compile(r"<!--.*?-->", re.DOTALL)
 
@@ -48,8 +54,8 @@ def leer_seccion(texto):
     return resultado
 
 
-def analizar_plan(archivo, slug, problemas, cierres, avisos):
-    """Agrega a `problemas` y `cierres` lo declarado en `archivo`; los avisos van a `avisos`."""
+def analizar_plan(archivo, slug, problemas, cierres, etiquetas, avisos):
+    """Agrega a `problemas`, `cierres` y `etiquetas` lo declarado en `archivo`; los avisos van a `avisos`."""
     texto = archivo.read_text(encoding="utf-8", errors="replace")
     subseccion = None
     ultimo = None  # problema al que se pegan las líneas sangradas
@@ -87,19 +93,25 @@ def analizar_plan(archivo, slug, problemas, cierres, avisos):
                 cierres.append((m.group(1), donde))
             else:
                 avisos.append(f"{donde}: línea con forma inválida en Cierra: {linea}")
+        elif subseccion == "etiquetas":
+            m = RE_ETIQUETA.match(linea)
+            if m:
+                etiquetas.append((m.group(1), m.group(3), donde))
+            else:
+                avisos.append(f"{donde}: línea con forma inválida en Etiquetas: {linea}")
         else:
             avisos.append(f"{donde}: línea con forma inválida fuera de una subsección: {linea}")
 
 
 def consolidar(raiz):
     """Devuelve (abiertos, avisos) recorriendo docs/planes/ de la raíz."""
-    problemas, cierres, avisos = [], [], []
+    problemas, cierres, etiquetas, avisos = [], [], [], []
     carpeta = Path(raiz) / "docs" / "planes"
     archivos = sorted(carpeta.glob("*.md")) if carpeta.is_dir() else []
     for archivo in archivos:
         m = RE_PLAN.match(archivo.name)
         if m:
-            analizar_plan(archivo, m.group(1), problemas, cierres, avisos)
+            analizar_plan(archivo, m.group(1), problemas, cierres, etiquetas, avisos)
     vistos = set()
     for p in problemas:
         if p["id"] in vistos:
@@ -112,8 +124,18 @@ def consolidar(raiz):
         elif id_ in cerrados:
             avisos.append(f"{donde}: cierre repetido de {id_}")
         cerrados.add(id_)
+    destinos = {}
+    for id_, destino, donde in etiquetas:
+        if id_ not in vistos:
+            avisos.append(f"{donde}: etiqueta de un id inexistente {id_}")
+        elif destino in destinos.setdefault(id_, set()):
+            avisos.append(f"{donde}: etiqueta repetida {destino} en {id_}")
+        destinos.setdefault(id_, set()).add(destino)
     abiertos = [
-        {k: p[k] for k in ("id", "severidad", "plan", "texto")}
+        {
+            **{k: p[k] for k in ("id", "severidad", "plan", "texto")},
+            "etiquetas": sorted(destinos.get(p["id"], ())),
+        }
         for p in problemas
         if p["id"] not in cerrados
     ]
@@ -131,7 +153,8 @@ def imprimir_texto(abiertos, avisos):
         print(f"\n[{severidad}] ({len(grupo)})")
         for p in grupo:
             sangrado = "\n    ".join(p["texto"].split("\n"))
-            print(f"- {p['id']} ({p['plan']}) {sangrado}")
+            marcas = f"[{', '.join(p['etiquetas'])}] " if p["etiquetas"] else ""
+            print(f"- {p['id']} ({p['plan']}) {marcas}{sangrado}")
     if avisos:
         print("\nAvisos:")
         for aviso in avisos:
@@ -142,9 +165,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raiz", default=".", help="raíz del proyecto (por defecto, el directorio actual)")
     parser.add_argument("--json", action="store_true", help="imprime JSON en vez de texto")
+    parser.add_argument("--etiqueta", help="deja solo los abiertos con esta etiqueta")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     abiertos, avisos = consolidar(args.raiz)
+    if args.etiqueta:
+        abiertos = [p for p in abiertos if args.etiqueta in p["etiquetas"]]
     if args.json:
         print(json.dumps({"abiertos": abiertos, "avisos": avisos}, ensure_ascii=False, indent=2))
     else:
