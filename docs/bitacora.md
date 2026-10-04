@@ -1,18 +1,30 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-04-herramientas-plan.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| `herramientas-plan` | `plan/herramientas-plan` | 2 (cerrada) | merge a `main` (decisión del usuario) | 2026-10-04 |
 
 Siguiente: plan de despliegue, con los diferidos a despliegue (entre ellos P-contrato-app-2 y -6: límite de cuerpo en el proxy, que cubra también los logins). Antes de la etapa Expo: P-contrato-app-9 (documentar 400 y 415 en el contrato).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Plan `herramientas-plan`: presupuesto por subtarea, integración segura, plantilla y agentes registrados
+Hecho:
+- Plan congelado (`605202d`) tras `juez-plan` con 2 bloqueantes corregidos: un grep con backticks dentro del código en línea y un presupuesto `--subtarea T5` que pasaba siempre.
+- T1: `presupuesto.sh … --subtarea T<n>` mide los commits no-merge `T<n>:`/`T<n>b:`; el modo por rutas sigue.
+- T2: `worktree-integrar.sh` busca el worktree en `git worktree list` y aborta con exit 3 si el cwd está dentro.
+- T3: `juez-plan` y `verificador-b` no se registraban porque su `description` sin comillas tenía `: ` (YAML inválido); entrecomillado y `test_agentes.py`. Tras integrar, la sesión los listó como tipos. El veredicto del verificador se cuenta sobre la lista.
+- T4: la plantilla usa `### T<n> — Integración (principal)` por ola y `--subtarea T<n>`; CLAUDE.md § 4 y § 5 actualizados.
+- Verificación TODO (HEAD `7b62861`): PASA 0/46 en `verificador` y `verificador-b`.
+- Cierra P-contrato-app-3, -4, -5, -12 y P-limites-ingreso-17; deja P-herramientas-plan-1 a -3 (observaciones).
+Pendiente: merge a `main` (lo decide el usuario); al fusionar, copiar las 3 decisiones a `docs/decisiones.md`.
 
 ### 2026-10-04 — Fusión en `main` de `contrato-app`
 Hecho:

@@ -165,6 +165,7 @@ commit_base: 605202d
 | 2026-10-04 | T1 | 25bc6fe | verificador PASA 0/7; verificador-b PASA 0/7 | |
 | 2026-10-04 | T2 | 9aa8ec3 | verificador PASA 0/4; verificador-b PASA 0/4 | |
 | 2026-10-04 | T4 | 89b3107 | verificador PASA 0/10; verificador-b PASA 0/10 | |
+| 2026-10-04 | TODO | 7b62861 | verificador PASA 0/46; verificador-b PASA 0/46 | ya como tipos registrados |
 
 ## Pendientes que deja este plan
 
