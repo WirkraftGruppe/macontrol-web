@@ -150,7 +150,7 @@ Archivos disjuntos entre T1, T2 y T3.
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): saneamiento>
+commit_base: cb7b8e3
 
 ### Estado de subtareas
 
