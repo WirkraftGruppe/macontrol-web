@@ -101,7 +101,7 @@ def test_json_trae_el_slug_del_plan(tmp_path):
 
 def test_salida_utf8_con_caracteres_fuera_de_cp1252(tmp_path):
     plan(tmp_path, "2026-01-01-uno", problemas="- P-uno-1 [menor] ａｄｍ\n")
-    entorno = {"PYTHONIOENCODING": "cp1252", "SYSTEMROOT": "C:\Windows"}
+    entorno = {"PYTHONIOENCODING": "cp1252", "SYSTEMROOT": r"C:\Windows"}
     proceso = correr(tmp_path, env=entorno)
     assert proceso.returncode == 0
     assert "ａｄｍ" in proceso.stdout.decode("utf-8")
