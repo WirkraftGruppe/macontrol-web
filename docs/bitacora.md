@@ -1,19 +1,30 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-03-api-movil.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `api-movil` | `plan/api-movil` | todas integradas | decisión del usuario sobre el merge a `main` (TODO: FALLA 1/84, presupuesto de T6 aprobado) | raíz |
 
-Siguiente: merge de `api-movil` si el usuario lo aprueba; después, un plan corto antes de producción con P-api-movil-15, -16 y -20 (evidencia previa de la pendiente, atraso de `realizada_en`, multipart en el token). Los importantes de red siguen para el plan de despliegue.
+Siguiente: plan corto antes de producción con P-api-movil-15, -16 y -20, ya decididos en `docs/decisiones.md` (2026-10-04): pendiente sin evidencia previa, `ATRASO_MAXIMO_HORAS = 168` y token solo JSON. Un exceso de presupuesto se parte en T<n> y T<n>b antes de integrar. Los importantes de red siguen para el plan de despliegue.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Fusión en `main` de `api-movil`
+Hecho:
+- El usuario aceptó la corrida TODO con FALLA 1/84 (presupuesto de T6, 712/650), aprobada por escrito. `main` recibió `plan/api-movil` con `merge --no-ff` (`a77bbe9`).
+- Las 4 decisiones del plan se copiaron al final de `docs/decisiones.md`, más 4 decisiones nuevas del usuario:
+  - un exceso de presupuesto se parte en T<n> y T<n>b, y la aprobación escrita queda solo para contrato modificado o criterio defectuoso;
+  - P-api-movil-15: una pendiente no puede tener evidencia;
+  - P-api-movil-16: `ATRASO_MAXIMO_HORAS = 168`;
+  - P-api-movil-20: token solo JSON.
+- A precisar al planificar P-api-movil-15: la decisión dice "409 y crea una nueva con `incidencia_asignacion`". Un 409 no crea nada, así que hay que elegir entre 409 sin crear y 201 con la visita nueva marcada.
+- Pendientes abiertos: 63 (`py -3 .claude/hooks/pendientes.py`).
+Pendiente: plan corto antes de producción (P-api-movil-15, -16 y -20).
 
 ### 2026-10-04 — Plan `api-movil`: API `/api/v1/` para la app de empleados
 Hecho:
