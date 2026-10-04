@@ -5,7 +5,7 @@ from io import BytesIO
 
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, JpegImagePlugin, UnidentifiedImageError
 
 LADO_MAXIMO = 1600
 CALIDAD_JPEG = 85
@@ -17,7 +17,8 @@ MAX_PIXELES_POR_FORMATO = {
     "WEBP": 8_000_000,
 }
 # Un JPEG progresivo o CMYK guarda los coeficientes a resolución completa y
-# draft() no los reduce: la memoria sube mucho más que con un baseline.
+# draft() no los reduce: la memoria sube mucho más que con un baseline. Lo mismo
+# pasa con un muestreo distinto de 4:2:2 y 4:2:0 (get_sampling fuera de 1 y 2).
 MAX_PIXELES_JPEG_COSTOSO = 16_000_000
 
 
@@ -36,12 +37,22 @@ def procesar_imagen(archivo) -> ContentFile:
                 if tope is None:
                     raise Image.DecompressionBombError("Formato sin tope.")
                 if original.format in ("JPEG", "MPO") and (
-                    original.info.get("progressive") or original.mode == "CMYK"
+                    original.info.get("progressive")
+                    or original.mode == "CMYK"
+                    or (
+                        # Un JPEG en grises tiene un solo componente: get_sampling
+                        # da -1 y draft() sí lo reduce.
+                        original.mode != "L"
+                        and JpegImagePlugin.get_sampling(original) not in (1, 2)
+                    )
                 ):
                     tope = MAX_PIXELES_JPEG_COSTOSO
                 if ancho * alto > tope:
                     raise Image.DecompressionBombError("Demasiados píxeles.")
                 original.draft("RGB", (LADO_MAXIMO, LADO_MAXIMO))
+                # draft() no reduce una imagen muy apaisada: quedaría entera en memoria.
+                if original.size[0] * original.size[1] > MAX_PIXELES_JPEG_COSTOSO:
+                    raise Image.DecompressionBombError("Demasiados píxeles tras draft.")
                 # Datos corruptos lanzan OSError acá, fuera del try del EXIF.
                 original.load()
                 try:
