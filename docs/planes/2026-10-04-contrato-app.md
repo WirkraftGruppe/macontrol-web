@@ -146,8 +146,8 @@ commit_base: 51e92b0
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | pendiente |
-| T4 | pendiente |
+| T3 | hecha |
+| T4 | hecha |
 
 ### Corridas
 
@@ -155,6 +155,8 @@ commit_base: 51e92b0
 |---|---|---|---|---|
 | 2026-10-04 | T1 | fc8b0b1 | PASA 5/5 (verificador y verificador-b) | auditor: sin hallazgos en el alcance; MEDIA fuera de alcance → P-contrato-app-6 |
 | 2026-10-04 | T2 | 0f28f43 | PASA 9/9 (verificador y verificador-b) | auditor: BAJA → P-contrato-app-7; observaciones → P-contrato-app-8 |
+| 2026-10-04 | T3 | 0649c3e | PASA 6/6 (verificador y verificador-b) | auditor: MEDIA (reintento tardío daba 400 y no 409) y BAJA (setting sin tope → 500); el usuario decidió corregir ambos |
+| 2026-10-04 | T3 (ronda 2) | bbeb226 | PASA 6/6 (verificador y verificador-b) | corrección del reintento en `validate()`; tope 1..8760 en settings (5642fbe, principal); auditor: cierra el hallazgo, sin hallazgos nuevos |
 
 ## Pendientes que deja este plan
 
