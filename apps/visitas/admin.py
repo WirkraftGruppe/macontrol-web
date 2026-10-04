@@ -23,6 +23,28 @@ CAMPOS_EVIDENCIA = (
 
 CAMPOS_PLANIFICACION = ("programada_para", "asignada_por")
 
+# Campos que llena la API al recibir la visita: nunca se editan a mano.
+CAMPOS_DE_LA_APP = ("incidencia_asignacion", "cliente_uuid", "recibida_en")
+
+CAMPOS_VISITA = (
+    "proyecto",
+    "empleado",
+    "origen",
+    "motivo_manual",
+    "programada_para",
+    "asignada_por",
+    "realizada_en",
+    "estado",
+    "latitud",
+    "longitud",
+    "precision_m",
+    "datos",
+    "esquema_planilla",
+    "observaciones",
+    "incidencia",
+    "incidencia_detalle",
+) + CAMPOS_DE_LA_APP
+
 
 def _visita_cerrada(visita):
     """Una visita ya no pendiente es evidencia: no se modifica."""
@@ -51,7 +73,7 @@ class FotoInlineForm(forms.ModelForm):
 
     class Meta:
         model = Foto
-        fields = "__all__"
+        fields = ("visita", "imagen", "tomada_en", "orden")
 
     def clean_imagen(self):
         archivo = self.cleaned_data.get("imagen")
@@ -94,12 +116,13 @@ class VisitaAdmin(SimpleHistoryAdmin):
     list_filter = ("estado", "origen", "incidencia")
     search_fields = ("proyecto__titulo", "empleado__username")
     raw_id_fields = ("proyecto",)
-    readonly_fields = ("estado", "realizada_en", "esquema_planilla")
+    fields = CAMPOS_VISITA
+    readonly_fields = ("estado", "realizada_en", "esquema_planilla") + CAMPOS_DE_LA_APP
     inlines = (FotoInline, ProductoAplicadoInline)
 
     def get_readonly_fields(self, request, obj=None):
         if _visita_cerrada(obj):
-            return CAMPOS_EVIDENCIA + CAMPOS_PLANIFICACION
+            return CAMPOS_EVIDENCIA + CAMPOS_PLANIFICACION + CAMPOS_DE_LA_APP
         return super().get_readonly_fields(request, obj)
 
     def has_delete_permission(self, request, obj=None):

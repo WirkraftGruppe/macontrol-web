@@ -11,7 +11,7 @@ from django.utils import timezone
 from PIL import Image
 
 from apps.accounts.models import User
-from apps.visitas.admin import CAMPOS_EVIDENCIA
+from apps.visitas.admin import CAMPOS_EVIDENCIA, FotoInlineForm
 from apps.visitas.models import Foto, ProductoAplicado, Visita
 
 from .test_models import crear_visita
@@ -230,3 +230,20 @@ class VisitaAdminTests(TestCase):
             self.assertNotIn(campo, abierta)
         for campo in ("observaciones", "incidencia", "incidencia_detalle"):
             self.assertNotIn(campo, cerrada)
+
+
+class FormVisitaTests(TestCase):
+    def test_form_de_visita_declara_campos(self):
+        modeladmin = admin.site._registry[Visita]
+        self.assertNotEqual(modeladmin.fields, "__all__")
+        editables = {
+            f.name for f in Visita._meta.get_fields() if getattr(f, "editable", False)
+        }
+        editables -= {"id"}
+        self.assertEqual(set(modeladmin.fields), editables)
+        for campo in ("incidencia_asignacion", "cliente_uuid", "recibida_en"):
+            self.assertIn(campo, modeladmin.readonly_fields)
+        self.assertNotIn("__all__", (FotoInlineForm._meta.fields,))
+        self.assertEqual(
+            set(FotoInlineForm._meta.fields), {"visita", "imagen", "tomada_en", "orden"}
+        )

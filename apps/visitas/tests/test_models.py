@@ -3,9 +3,11 @@ import tempfile
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
@@ -146,3 +148,36 @@ class ProductoAplicadoTests(TestCase):
         historial = aplicado.history.order_by("history_id")
         lotes = list(historial.values_list("lote", flat=True))
         self.assertEqual(lotes, ["L-1", "L-2"])
+
+
+class CamposAppTests(TestCase):
+    def test_cliente_uuid_es_unico(self):
+        identificador = uuid4()
+        visita = crear_visita(cliente_uuid=identificador)
+        self.assertIsNone(visita.recibida_en)
+        self.assertFalse(visita.incidencia_asignacion)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Visita.objects.create(
+                proyecto=visita.proyecto,
+                empleado=visita.empleado,
+                origen=Visita.Origen.APP,
+                cliente_uuid=identificador,
+            )
+        # Varias visitas sin cliente_uuid conviven (NULL no choca).
+        Visita.objects.create(
+            proyecto=visita.proyecto, empleado=visita.empleado, origen="app"
+        )
+        Visita.objects.create(
+            proyecto=visita.proyecto, empleado=visita.empleado, origen="app"
+        )
+
+    def test_codigo_de_foto_se_genera_y_es_unico(self):
+        visita = crear_visita()
+        with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
+            primera = Foto.objects.create(visita=visita, imagen=imagen_real())
+            segunda = Foto.objects.create(visita=visita, imagen=imagen_real("blue"))
+        self.assertIsInstance(primera.codigo, UUID)
+        self.assertNotEqual(primera.codigo, segunda.codigo)
+        segunda.codigo = primera.codigo
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            segunda.save()
