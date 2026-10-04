@@ -170,6 +170,35 @@ class CrearVisitaTests(BaseApiTests):
         self.assertEqual(r.data["id"], pendiente.id)
         self.assertEqual(Visita.objects.count(), 1)
 
+    def test_pendiente_con_fotos_crea_nueva_con_incidencia(self):
+        pendiente = self._visita(self.empleado, programada_para=date(2026, 9, 1))
+        Foto.objects.create(visita=pendiente, imagen=jpeg_chico())
+        r = self._post()
+        self.assertEqual(r.status_code, 201, r.content)
+        nueva = Visita.objects.get(pk=r.data["id"])
+        self.assertNotEqual(nueva.id, pendiente.id)
+        self.assertTrue(nueva.incidencia_asignacion)
+        self.assertEqual(nueva.estado, Visita.Estado.REALIZADA)
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+        self.assertEqual(pendiente.fotos.count(), 1)
+        self.assertEqual(nueva.fotos.count(), 1)
+
+    def test_pendiente_con_productos_crea_nueva_con_incidencia(self):
+        pendiente = self._visita(self.empleado, programada_para=date(2026, 9, 1))
+        ProductoAplicado.objects.create(
+            visita=pendiente, producto=self.producto, lote="L0", dosis=1, unidad="ml"
+        )
+        r = self._post()
+        self.assertEqual(r.status_code, 201, r.content)
+        nueva = Visita.objects.get(pk=r.data["id"])
+        self.assertNotEqual(nueva.id, pendiente.id)
+        self.assertTrue(nueva.incidencia_asignacion)
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+        self.assertEqual(pendiente.productos.count(), 1)
+        self.assertEqual(nueva.productos.count(), 0)
+
     def test_pendiente_de_otro_marca_incidencia_asignacion(self):
         ajena = self._visita(self.otro, programada_para=date(2026, 9, 1))
         r = self._post()
