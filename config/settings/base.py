@@ -5,11 +5,36 @@ from pathlib import Path
 
 import environ
 from csp.constants import NONCE, NONE, SELF
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # Solo se lee del entorno del proceso; no se carga ningún archivo .env.
 env = environ.Env()
+
+
+def leer_num_proxies():
+    """Cantidad de proxies inversos de confianza (entero >= 0; default 0)."""
+    crudo = env("NUM_PROXIES", default="0")
+    try:
+        valor = int(crudo)
+    except ValueError:
+        valor = -1
+    if valor < 0:
+        raise ImproperlyConfigured("NUM_PROXIES debe ser un entero mayor o igual a 0.")
+    return valor
+
+
+# Proxies inversos de confianza delante de Django; define la IP real del cliente.
+NUM_PROXIES = leer_num_proxies()
+
+# Cupos del login del panel y del admin: solo cuentan los intentos fallidos.
+INTENTOS_FALLIDOS_POR_IP = 20  # fallos por IP dentro de la ventana
+VENTANA_MINUTOS = 15  # ventana de los cupos por IP y por (usuario, IP)
+FALLOS_POR_USUARIO_E_IP = 5  # fallos por par (usuario, IP) dentro de la ventana
+FALLOS_POR_USUARIO = 50  # fallos globales por usuario, desde cualquier IP
+VENTANA_USUARIO_MINUTOS = 60  # ventana del cupo global por usuario
+
 
 INSTALLED_APPS = [
     "config.apps.AdminMAControlConfig",
@@ -106,7 +131,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_THROTTLE_RATES": {"autenticacion": "10/min"},
+    "DEFAULT_THROTTLE_RATES": {"token": "10/min"},
+    "NUM_PROXIES": NUM_PROXIES,
 }
 
 SIMPLE_JWT = {

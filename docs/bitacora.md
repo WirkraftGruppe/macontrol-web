@@ -7,53 +7,26 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| `docs/planes/2026-10-03-limites-ingreso.md` | `plan/limites-ingreso` | cierre (las 3 olas integradas) | verificación TODO y decisión del usuario sobre el merge (contrato modificado) | 2026-10-03 |
 
-Siguiente: plan `limites-ingreso` (N1-N4 y H2 de abajo), en una sesión nueva sobre `main`; después, el plan de API.
+Siguiente: decidir el merge de `limites-ingreso` en `main`; después, el plan de API (P-limites-ingreso-1, -4 y -7 tocan el token).
 
-Problemas abiertos:
-- [menor, abierto] Restos de la auditoría de `paralelismo` (lo demás cerrado por `menores-abiertos` T3):
-  - si la prueba de humo falla, la junction queda viva en `worktrees/`: limpiar con `cmd /c rmdir <venv>` y después `git worktree remove`; nunca `Remove-Item -Recurse` de PowerShell 5.1, que sigue la junction y vacía el venv real.
-  - Observaciones de T1: `RE_FECHA_SLUG` usa `\d` (acepta dígitos Unicode, `contexto.sh` usa `[0-9]`); `plan_de_rama` vuelve a la bitácora sin avisar cuando `validar_plan` rechaza el candidato; una rama con el slug de un plan viejo hace verificar ese plan congelado (el mismo riesgo que ya existía con `Plan activo:`).
-- [importante, abierto] Memoria de `procesar_imagen` (re-auditoría de `menores-abiertos` T1, hallazgo 3, quedó abierto tras dos rondas):
-  - un JPEG secuencial no entrelazado (SOF0, un scan por componente) de 0,47 MB y menos de 40 MP llega a ≈393 MB: Pillow no lo marca `progressive`;
-  - con proporción extrema (40000×1000), `draft()` no reduce nada (≈168 MB).
-  - Corrección propuesta y medida por el auditor (scratchpad `prop/`): tratar también como costoso un JPEG con `JpegImagePlugin.get_sampling(original) not in (1, 2)` y rechazar si después de `draft` quedan más de 16 MP. Baja el peor caso aceptado a ≈170 MB. Es urgente antes de que la API reciba fotos.
-- [menor, abierto] Nuevos de la re-auditoría de `menores-abiertos`:
-  - se rechazan JPEG progresivos de más de 16 MP (reexportados por un editor o una app de mensajería) y WebP de más de 8 MP: la app tiene que redimensionar a 1600 px antes de subir;
-  - todo rechazo dice "El archivo no es una imagen válida.", también cuando el motivo es la resolución; conviene un mensaje propio para `DecompressionBombError`;
-  - en un WebP, libwebp reserva el lienzo en `Image.open`, antes del tope (2 GB de commit con un archivo de 10 KB de 16383²; no se toca la memoria, así que en Linux no se cuenta en el RSS). Ya pasaba antes de este plan.
-- [menor, abierto] Pendientes de la auditoría de `visitas` (los demás quedaron cerrados por `visitas-auditoria`, `historial-revert` y `menores-abiertos`):
-  - Diferidos: el original con GPS pasa por el temporal del sistema si pesa más de 2,5 MB; HEIC no se abre; el servicio no compara `empleado` con el asignado (plan de API); retención de `HistoricalVisita` y de visitas al suprimir un sitio (decisión legal; hoy `PROTECT` lo impide); servir MEDIA solo con vista autenticada por permiso sobre la visita.
-  - Observaciones: `ProyectoAdmin` permite revertir desde el historial (no explotable: los mismos campos se editan en el formulario); `test_borrar_visita_borra_los_archivos_de_sus_fotos` y las aserciones agregadas en la corrección de T4 de `visitas-auditoria` no se vieron fallar antes; `select_for_update` no bloquea en SQLite (desarrollo), sí en Postgres; `ProyectoTests.test_str_tolera_sitio_inexistente` usa `count() + 99999`; `datos` todavía no se valida contra el esquema.
-- [menor, abierto] Proceso: `congelado.sh` sale con 1 y no imprime el `commit_base` cuando hay un commit `docs(plan): <slug> — modificado: …`. Por eso, en cuanto se modifica un contrato, todo criterio de presupuesto que lo use falla, junto con el cierre global, y el plan no puede llegar a TODO PASA. Le pasó a `menores-abiertos`. Decidir si un contrato modificado por el usuario se vuelve a congelar (y cómo) o si los hallazgos del auditor van siempre a un plan aparte.
-- [menor, abierto] Re-auditoría de `auditoria-dominio`:
-  - H1-b: `notas` y `horario_acceso` siguen en el historial (texto libre que puede contener contactos).
-  - Las columnas borradas por `sitios/0002` siguen en disco hasta un `VACUUM FULL` y siguen en los backups (decisión de retención).
-  - H2: `bulk_create`/`update()` saltean la validación de encargados. Hoy no se usan.
-  - H4: ante resto 10 se acepta 9 aunque AFIP nunca emite ese caso con el mismo prefijo, y los CUIT ya cargados no se revalidan.
-- [menor] `apps/sitios/models.py:60` lleva `# noqa: E501` porque el criterio del plan exigía la línea de `excluded_fields` en una sola línea; `ruff format` la partiría.
-- [importante, abierto, diferido al plan de despliegue por decisión del usuario: hoy es solo desarrollo] La barrera de `config/settings/dev.py` solo mira `ALLOWED_HOSTS`. Con `DJANGO_ENV=development` y `ALLOWED_HOSTS` vacío en un hosting, el sitio arranca con `DEBUG=True` y la página técnica del 400 expone tracebacks y settings; con `runserver`, también `DATABASE_URL`, porque no coincide con el patrón de ocultamiento (comprobado por el auditor). Propuesta del auditor: abortar si hay variables propias del hosting (`RAILWAY_ENVIRONMENT`, `RENDER`, `DYNO`, `FLY_APP_NAME`, `K_SERVICE`…), que hay que ajustar al hosting real. [menor] Las IP privadas en `ALLOWED_HOSTS` no limitan quién se conecta (el Host lo elige el cliente). (El `.strip()` de `ALLOWED_HOSTS` ya está corregido: plan `hosts-espacios`.)
-- [importante, abierto, plan `limites-ingreso`] Límites de ingreso (re-auditoría de `autenticacion` T3):
-  - N1: el cupo por usuario de `/panel/ingresar/` cuenta todos los POST: 10/min desde una IP bloquean el ingreso de un administrador desde cualquier IP (DoS de cuenta). Propuesta: contar solo fallos, cupo estricto por (usuario, IP) y uno global por usuario más alto y largo.
-  - N2: la clave del cupo por usuario usa el username crudo (`strip().lower()`); variantes NFKC ("ａｄｍ", "𝐚𝐝𝐦") tienen balde propio y autentican igual. Normalizar con `unicodedata.normalize("NFKC", …).strip().casefold()`.
-  - N3: `/admin/login/` no tiene ningún límite (viene de T1): aplicar los mismos límites en `SitioAdministracion.login`, con un módulo común (p. ej. `apps/accounts/limites.py`).
-  - N4 [menor]: el cupo por IP del panel comparte scope `autenticacion` con `/api/v1/auth/token/`.
-  - Oráculo acotado: dentro del cupo, la clave correcta de un empleado en el panel responde "no tiene acceso".
-- [importante, abierto, condición obligatoria del despliegue] H2: sin `NUM_PROXIES`, DRF toma la IP de `X-Forwarded-For` (la controla el cliente) y los límites de token y panel se esquivan; además la caché por defecto es LocMem (un cupo por worker). Antes de producción: `REST_FRAMEWORK["NUM_PROXIES"]` desde el entorno según el hosting y `CACHES` compartida.
-- [menor, abierto] Restos de `autenticacion`:
-  - `crear_usuario` construye `User(...)` sin `normalize_username` ni `full_clean`: "ａna" se crea y nunca puede ingresar; acepta emails inválidos; carrera `exists()`/`save()` termina en `IntegrityError`.
-  - `User.save` borra `skip_history_when_saving` aunque lo haya puesto quien llama.
-  - `test_csp` no comprueba que el nonce cambie entre respuestas; el `<style>` inline de `admin/change_list.html` queda bloqueado por la CSP (solo estética en pantallas angostas; no relajar la política).
-  - Filtro de logging: oculta claves inocuas con las subcadenas (`access_count`, `secretaria`); no cubre `lat`/`lng`, `cookie`, `session`, `teléfono` con tilde, `cuil`, `dni`; no limpia mensajes ya formateados (f-strings) ni `exc_info`; el SQL de `django.db.backends` en DEBUG saldría con valores. Regla de revisión propuesta: nada de f-strings ni `%` previo en `logger.*`.
-  - Los tests de T2 y T3 se escribieron junto con el código: no hay corrida roja registrada.
-- WeasyPrint está instalado pero no se probó en tiempo de ejecución (en Windows suele necesitar GTK/Pango).
-- Observación del verificador: `apps/web/tests/test_base.py:13` no distingue el atributo `data-tema="oscuro"` del selector CSS.
-- Falta el ejemplo del certificado que la empresa entrega hoy (diseño y texto legal del PDF). Ver `docs/01-modelo-y-arquitectura.md` § 7.
-- Falta confirmar si el 02241 49 6047 atiende WhatsApp y el horario de atención para el sitio público.
-- Las planillas por servicio (`CampoPlanilla`) se cargan como fixtures provisorias y se editan a mano con lo que usen realmente los encargados y operarios.
-- Logo: se usa provisoriamente el de "MAControl Group" (`static/img/logo.png`); la razón social en textos es MAControl S.A.
+Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-03 — Plan `limites-ingreso`: límites por fallos, `'<commit_base>'` desde el Registro y pendientes por plan
+Hecho:
+- Plan `docs/planes/2026-10-03-limites-ingreso.md` (rama `plan/limites-ingreso`), 5 subtareas en 3 olas, todas integradas.
+  - T1: settings `NUM_PROXIES` y cupos.
+  - T2: `apps/accounts/limites.py` con tres baldes que cuentan solo fallos, en el panel, `/admin/login/` y el token; `ip_del_cliente`; `crear_usuario` normaliza; test del nonce.
+  - T3: `'<commit_base>'` resuelto del Registro.
+  - T4: `pendientes.py` y `contexto.sh`.
+  - T5: plantilla, `CLAUDE.md` y agentes.
+- Contrato modificado (`387c9a7`) por decisión del usuario: el token entra en los baldes de usuario, tras un hallazgo del auditor sobre T1. Los presupuestos pasaron a `'<commit_base>'`. Desde ahí `congelado.sh` sale con 1 y los verificadores dan FALLA formal con todos los criterios en PASA (T2 24/24 y 26/26, T5 10/10).
+- La lista de problemas de la bitácora pasó a `docs/planes/2026-10-03-pendientes-heredados.md` (33). Este plan cierra 6 y deja 15 propios (3 importantes: throttles DRF sin /64, IPv4 mapeadas en `::/64`, `NUM_PROXIES` obligatorio en producción).
+- Incidente: la integración de T1 no pudo borrar la carpeta del worktree porque la sesión tenía su cwd adentro. Quedó vacía y sin junction, y se limpió con `rmdir` y `git branch -d`.
+Pendiente: verificación TODO, decisión del usuario sobre el merge y copiar las decisiones del plan a `decisiones.md` al fusionar.
 
 ### 2026-10-03 — Fusión en `main` de `menores-abiertos` y `autenticacion`
 Hecho:

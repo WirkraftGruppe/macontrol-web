@@ -103,4 +103,21 @@ if [ -f "$decisiones" ]; then
   echo
 fi
 
+# 4. Pendientes abiertos de todos los planes (py -3, si no python3). Sin Python, avisa y sigue.
+echo "=== Pendientes abiertos (pendientes.py) ==="
+raiz_py="$raiz"
+if command -v cygpath >/dev/null 2>&1; then
+  convertida="$(cygpath -w "$raiz" 2>/dev/null)"
+  [ -n "$convertida" ] && raiz_py="$convertida"
+fi
+guion="$(dirname "$0")/pendientes.py"
+if command -v py >/dev/null 2>&1 && py -3 -c "" >/dev/null 2>&1; then
+  py -3 "$guion" --raiz "$raiz_py" 2>/dev/null | tr -d '\r'
+elif command -v python3 >/dev/null 2>&1; then
+  python3 "$guion" --raiz "$raiz_py" 2>/dev/null | tr -d '\r'
+else
+  echo "(Python no disponible: no se pudieron listar los pendientes)"
+fi
+echo
+
 exit 0

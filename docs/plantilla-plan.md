@@ -13,7 +13,11 @@ Flujo (CLAUDE.md § Flujo de trabajo):
   6. Después de cada subtarea:   verificador  →  <ruta del plan>  T<n>
      Recién con sus criterios en PASA se marca `hecha` en la tabla de estado.
   7. Al final:                    verificador  →  <ruta del plan>  TODO
-Todo lo que está entre <> se reemplaza; los comentarios <!-- --> se borran.
+Todo lo que está entre <> se reemplaza; los comentarios <!-- --> se borran. Excepción: en los
+criterios de presupuesto, `'<commit_base>'` queda literal y entre comillas simples (sin comillas,
+bash lo toma como redirección). `presupuesto.sh` lo resuelve con `verificar_plan.py --commit-base`,
+que lee la línea `commit_base:` del Registro y exige que sea un commit `docs(plan): <slug>`.
+Si no resuelve, el criterio es FALLA con `commit_base sin resolver en <plan>: <motivo>`.
 
 Corte del congelado: todo lo anterior a `## Registro de verificación` queda congelado desde el
 commit `docs(plan): <slug>` y lo verifica `bash .claude/hooks/congelado.sh <plan> <slug>`
@@ -97,7 +101,7 @@ cierre global. -->
   - `[grep-1]` `grep -n "qr_codigo = models.UUIDField" apps/sitios/models.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
-  - `[cmd]` `bash .claude/hooks/presupuesto.sh . <commit_base> <N> apps/sitios`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> apps/sitios`
 
 ### T2 — <título>
 
@@ -183,3 +187,36 @@ corrida. Un veredicto vale solo para el HEAD verificado. -->
 | | T1 | | | |
 | | T3 | | | |
 | | TODO | | | |
+
+## Pendientes que deja este plan
+
+<!--
+Debajo del corte, lo escribe el principal. `py -3 .claude/hooks/pendientes.py [--json]` lee solo
+esta sección de cada plan (los comentarios no cuentan). Abiertos = problemas declarados menos los
+cerrados con `cierra:` en cualquier plan. Si no hay nada, dejar las tres subsecciones vacías.
+
+Ejemplo (el id lleva el slug de ESTE plan; severidad: bloqueante | importante | menor | observación;
+una línea sangrada continúa la anterior):
+
+### Problemas
+
+- P-<slug>-1 [importante] Texto del problema, con archivo y línea si aplica.
+  - detalle opcional, sangrado.
+
+### Decisiones
+
+- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)
+
+### Cierra
+
+- cierra: P-<otro-slug>-3 — cómo lo resuelve este plan
+
+Un problema de otro plan se cierra solo con `cierra:` acá; el plan de origen no se edita.
+Al fusionar en `main` solo las Decisiones se copian a `docs/decisiones.md`.
+-->
+
+### Problemas
+
+### Decisiones
+
+### Cierra
