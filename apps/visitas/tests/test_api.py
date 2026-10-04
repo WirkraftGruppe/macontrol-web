@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from datetime import date, datetime, timedelta
 from io import BytesIO
+from unittest import mock
 from uuid import uuid4
 
 from django.core.cache import cache
@@ -231,6 +232,34 @@ class CrearVisitaTests(BaseApiTests):
         r = self._post(fotos=[grande])
         self.assertEqual(r.status_code, 400)
         self.assertIn("fotos.0", r.data["campos"])
+
+    def test_textos_libres_tienen_tope(self):
+        for campo in ("observaciones", "incidencia_detalle"):
+            with self.subTest(campo=campo):
+                r = self._post(**{campo: "x" * 2001})
+                self.assertEqual(r.status_code, 400, r.content)
+                self.assertIn(campo, r.data["campos"])
+        self.assertEqual(self._post(observaciones="x" * 2000).status_code, 201)
+
+    def test_pedido_demasiado_grande_da_413_sin_escribir_a_disco(self):
+        with mock.patch(
+            "django.core.files.uploadhandler.TemporaryFileUploadHandler.new_file"
+        ) as nuevo_archivo:
+            r = self.api.post(
+                "/api/v1/visitas/",
+                self._cuerpo(),
+                format="multipart",
+                CONTENT_LENGTH=str(11 * 1024 * 1024 * 10),
+            )
+        self.assertEqual(r.status_code, 413)
+        self.assertEqual(r.data["detalle"], "El pedido supera el tamaño permitido.")
+        nuevo_archivo.assert_not_called()
+        self.assertFalse(Visita.objects.exists())
+
+    def test_demasiados_archivos_da_413(self):
+        r = self._post(fotos=[jpeg_chico() for _ in range(101)])
+        self.assertEqual(r.status_code, 413)
+        self.assertFalse(Visita.objects.exists())
 
 
 class MisVisitasTests(BaseApiTests):

@@ -1,11 +1,16 @@
 """Vistas de la API de Visitas: pendientes, alta, historial y fotos."""
 
+from django.core.exceptions import (
+    RequestDataTooBig,
+    TooManyFieldsSent,
+    TooManyFilesSent,
+)
 from django.db.models import F
 from django.http import FileResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, serializers, status
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
@@ -16,6 +21,8 @@ from apps.accounts.permisos import EsAdministrador, EsEmpleado
 
 from .models import Foto, Visita
 from .serializers import (
+    MAX_BYTES_FOTO,
+    MAX_FOTOS,
     CrearVisitaSerializer,
     VisitaPendienteSerializer,
     VisitaRealizadaSerializer,
@@ -23,6 +30,13 @@ from .serializers import (
 from .services import VisitaDuplicada, registrar_visita_desde_app
 
 MENSAJE_DUPLICADA = "La visita ya fue registrada."
+MAX_BYTES_PEDIDO = MAX_FOTOS * MAX_BYTES_FOTO + 1024 * 1024
+
+
+class PedidoDemasiadoGrande(APIException):
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    default_detail = "El pedido supera el tamaño permitido."
+    default_code = "pedido_demasiado_grande"
 
 
 class MisVisitasView(generics.ListAPIView):
@@ -69,7 +83,18 @@ class CrearVisitaView(APIView):
     )
     def post(self, request):
         """Valida la forma y delega en el servicio, que maneja su transacción."""
-        entrada = CrearVisitaSerializer(data=request.data)
+        try:
+            largo = int(request.META.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            largo = 0
+        # Se corta antes de leer el cuerpo: Django escribe los archivos a disco.
+        if largo > MAX_BYTES_PEDIDO:
+            raise PedidoDemasiadoGrande()
+        try:
+            datos_pedido = request.data
+        except (RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent):
+            raise PedidoDemasiadoGrande()
+        entrada = CrearVisitaSerializer(data=datos_pedido)
         entrada.is_valid(raise_exception=True)
         try:
             visita = registrar_visita_desde_app(

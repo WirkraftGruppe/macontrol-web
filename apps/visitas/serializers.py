@@ -7,6 +7,7 @@ from django.urls import reverse
 from rest_framework import serializers
 
 from .models import ProductoAplicado, Visita
+from .planillas import MAX_LARGO_TEXTO
 
 MAX_FOTOS = 10
 MAX_BYTES_FOTO = 8 * 1024 * 1024
@@ -80,10 +81,12 @@ class CrearVisitaSerializer(serializers.Serializer):
         min_length=1,
         max_length=MAX_FOTOS,
     )
-    observaciones = serializers.CharField(required=False, allow_blank=True, default="")
+    observaciones = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=MAX_LARGO_TEXTO
+    )
     incidencia = serializers.BooleanField(required=False, default=False)
     incidencia_detalle = serializers.CharField(
-        required=False, allow_blank=True, default=""
+        required=False, allow_blank=True, default="", max_length=MAX_LARGO_TEXTO
     )
 
     def validate_productos_aplicados(self, valor):
