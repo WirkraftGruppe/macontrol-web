@@ -8,11 +8,21 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
 
-Siguiente: plan de despliegue, con los diferidos a despliegue (entre ellos P-contrato-app-2 y -6: límite de cuerpo en el proxy, que cubra también los logins). Antes de la etapa Expo: P-contrato-app-9 (documentar 400 y 415 en el contrato).
+Siguiente: plan `panel` (diseño aprobado; usa `pendientes.py --etiqueta panel`). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo` (entre ellos P-contrato-app-9).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Plan `triage`: 68 → 46 pendientes abiertos, todos con destino
+Hecho:
+- Plan congelado (`7eac70e`) tras `juez-plan` con 2 bloqueantes corregidos (dos `grep "T2: "`/`"T3: "` en T4 que pasaban siempre por el historial).
+- 22 pendientes cerrados sin código (`cierra:` en el plan); los 46 restantes etiquetados: despliegue 16, saneamiento 17, expo 5, panel 4, empresa 5 (P-api-movil-21 en dos).
+- T1: `pendientes.py` reconoce `### Etiquetas`, muestra `[destino]` y filtra con `--etiqueta`; avisa id inexistente, forma inválida y destino repetido.
+- T2: `convenciones-proyecto` § Worktrees (limpieza de la junction) y § Stack (`SitioAdministracion.login` al actualizar Django). T3: `docs/01` § 4.1, la app redimensiona a 1600 px antes de subir.
+- Verificación TODO en PASA 0/25 (verificador y verificador-b, HEAD `7b896c4`); `main` recibió `plan/triage` con `merge --no-ff` (`db801d9`). Las 2 decisiones se copiaron a `docs/decisiones.md`.
+- Incidente: `worktree-integrar.sh` mergeó pero no pudo quitar `worktrees/triage-T1` (cwd del shell del principal adentro, caso de P-herramientas-plan-2); se quitó la carpeta vacía con `rmdir` y la rama con `git branch -d`; venv intacto.
+Pendiente: plan `panel`.
 
 ### 2026-10-04 — Fusión en `main` de `herramientas-plan`
 Hecho:
