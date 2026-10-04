@@ -294,12 +294,13 @@ PASA — 0 criterios en FALLA de 38
 - P-contrato-app-3 [menor] juez-plan y verificador-b no están registrados como tipos de agente; se corren como general-purpose con su archivo de instrucciones. Registrarlos en la configuración de agentes del proyecto.
 - P-contrato-app-4 [importante] presupuesto.sh mide por rutas desde commit_base y no por subtarea: dos subtareas que comparten una ruta se contaminan. Corregir el script para medir los commits T<n>: de cada subtarea; mientras tanto, la plantilla exige rutas de presupuesto disjuntas y juez-plan lo verifica.
 - P-contrato-app-5 [menor] 'Trabajo del principal' no es ### T<n> y el hook no lo ejecuta; la plantilla debe convertirlo en la última subtarea numerada.
-- P-contrato-app-6 [importante] Los logins del panel (`/panel/ingresar/`) y del admin (`/admin/login/`) parsean multipart anónimo con archivos en `CsrfViewMiddleware` antes del 403 y sin throttle: escritura a disco ilimitada bajo WSGI (auditor sobre T1). El límite de cuerpo del despliegue debe cubrir esas rutas, o un middleware rechaza multipart antes del CSRF.
+- P-contrato-app-6 [importante] Diferido a despliegue. Los logins del panel (`/panel/ingresar/`) y del admin (`/admin/login/`) parsean multipart anónimo con archivos en `CsrfViewMiddleware` antes del 403 y sin throttle: escritura a disco ilimitada bajo WSGI (auditor sobre T1). El límite de cuerpo del despliegue debe cubrir esas rutas, o un middleware rechaza multipart antes del CSRF.
 - P-contrato-app-7 [menor] Una pendiente que ya tenía fotos antes de T2 queda trabada: el admin no la puede guardar (`Visita.clean`) ni borrarle fotos, y `_pendiente_para` la sigue eligiendo, así que toda visita de la app del empleado en ese proyecto sale con `incidencia_asignacion=True`. Revisar si hay datos así (`Visita.objects.filter(estado="pendiente").filter(Q(fotos__isnull=False)|Q(productos__isnull=False)).distinct().count()`) antes de desplegar (auditor sobre T2).
 - P-contrato-app-8 [observación] Falta un test de POST forjado al admin contra una pendiente (formsets y `latitud`/`datos`); el auditor lo comprobó a mano. Y `Visita.clean` no corre al pasar a realizada: cuando el panel complete visitas manuales con `registrar_visita_realizada`, debe rechazar una pendiente con evidencia.
-- P-contrato-app-9 [importante] `docs/api/openapi-v1.yaml` no documenta el 400 por atraso de `POST /api/v1/visitas/` ni el 415 de `auth/token/` y `auth/token/refresh/`, y `auth/token/` declara "200: No response body" aunque devuelve los tokens; si la app se genera desde el contrato, falta `extend_schema` (auditor, cierre).
+- P-contrato-app-9 [importante] Antes de la etapa Expo. `docs/api/openapi-v1.yaml` no documenta el 400 por atraso de `POST /api/v1/visitas/` ni el 415 de `auth/token/` y `auth/token/refresh/`, y `auth/token/` declara "200: No response body" aunque devuelve los tokens; si la app se genera desde el contrato, falta `extend_schema` (auditor, cierre).
 - P-contrato-app-10 [observación] `.env.example` se tocó en el commit del principal 5642fbe (documentar `ATRASO_MAXIMO_HORAS`) sin figurar en ningún `Puede tocar`; lo marcan los dos verificadores en "Fuera del contrato".
 - P-contrato-app-11 [observación] `test_reintento_fuera_del_limite_responde_409` no comprueba `Visita.objects.count() == 1` ni el id devuelto, y depende de que el default sea >= 168 (auditor sobre la corrección de T3).
+- P-contrato-app-12 [menor] El informe del verificador reportó 35 criterios y listó 38; el total del veredicto debe calcularse sobre la lista.
 
 ### Decisiones
 
@@ -313,3 +314,5 @@ PASA — 0 criterios en FALLA de 38
 - cierra: P-api-movil-15 — `Visita.clean()`, inlines del admin solo fuera de pendiente, coordenadas y `datos` de solo lectura en pendiente, `motivo_manual` vaciado y visita nueva con incidencia ante una pendiente con evidencia (T2)
 - cierra: P-api-movil-16 — `ATRASO_MAXIMO_HORAS` (168) y 400 en `realizada_en` (T3)
 - cierra: P-api-movil-20 — parcial: token y renovación aceptan solo JSON (T1); la parte del proxy sigue abierta como P-contrato-app-2
+- cierra: P-contrato-app-7 — no aplica: no hay datos previos ni producción; la consulta queda documentada en el pendiente
+- cierra: P-contrato-app-10 — aceptado; la regla de declarar "Puede tocar" no cambia
