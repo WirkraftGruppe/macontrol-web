@@ -210,3 +210,34 @@ class FotoTests(TestCase):
         self.assertEqual(Foto.objects.count(), 0)
         self._crear("base.jpg", _bytes(imagen, "JPEG"), "image/jpeg")
         self.assertEqual(Foto.objects.count(), 1)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class MemoriaImagenTests(TestCase):
+    """Topes de memoria para JPEG: el muestreo y draft() condicionan el costo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.visita = crear_visita()
+
+    def _crear(self, datos):
+        return Foto.objects.create(
+            visita=self.visita,
+            imagen=SimpleUploadedFile("foto.jpg", datos, content_type="image/jpeg"),
+        )
+
+    def test_jpeg_secuencial_con_muestreo_costoso_se_rechaza(self):
+        # 20 MP secuencial 4:4:4 (muestreo 0): bajo el tope de JPEG (40 MP) pero
+        # sobre el de JPEG costoso (16 MP).
+        datos = _bytes(Image.new("RGB", (5000, 4000)), "JPEG", subsampling=0)
+        with self.assertRaises(ValidationError):
+            self._crear(datos)
+        self.assertEqual(Foto.objects.count(), 0)
+
+    def test_proporcion_extrema_se_rechaza(self):
+        # 30 MP muy apaisados: draft() no reduce porque el alto ya es menor que
+        # el lado máximo y quedarían 30 MP en memoria.
+        datos = _bytes(Image.new("RGB", (20000, 1500)), "JPEG")
+        with self.assertRaises(ValidationError):
+            self._crear(datos)
+        self.assertEqual(Foto.objects.count(), 0)

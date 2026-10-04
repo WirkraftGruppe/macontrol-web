@@ -1,18 +1,38 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-03-api-movil.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| `api-movil` | `plan/api-movil` | todas integradas | decisión del usuario sobre el merge a `main` (TODO: FALLA 1/84, presupuesto de T6 aprobado) | raíz |
 
-Siguiente: plan de API, en una sesión nueva sobre `main` (P-limites-ingreso-4 y -7 tocan el token; P-pendientes-heredados-3 es urgente antes de que la API reciba fotos). Los importantes de red (P-limites-ingreso-1, -2 y -3) quedan para el plan de despliegue.
+Siguiente: merge de `api-movil` si el usuario lo aprueba; después, un plan corto antes de producción con P-api-movil-15, -16 y -20 (evidencia previa de la pendiente, atraso de `realizada_en`, multipart en el token). Los importantes de red siguen para el plan de despliegue.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Plan `api-movil`: API `/api/v1/` para la app de empleados
+Hecho:
+- Plan `docs/planes/2026-10-03-api-movil.md` (rama `plan/api-movil`), 7 subtareas en 5 olas, todas integradas:
+  - T1: drf-spectacular con sidecar, errores `{detalle, campos}`, paginación, throttles y token normalizado.
+  - T2: catálogo con ETag.
+  - T3: resolver QR.
+  - T4: `cliente_uuid`, `recibida_en`, `incidencia_asignacion`, `Foto.codigo`, validador de planilla y memoria de imágenes.
+  - T5: servicio `registrar_visita_desde_app`.
+  - T6: endpoints de visitas, historial y fotos.
+  - T7: flujo de punta a punta y esquema.
+- Verificación TODO (verificador y verificador-b coinciden, HEAD `f0aa3e9`): FALLA 1/84. La única FALLA es el presupuesto de T6 (712/650), aprobada por escrito por el usuario: los topes y cortes de subida se agregaron después de congelar el plan.
+- Correcciones fuera de la regla de severidad, por decisión del usuario: el formato de error (T1), NaN, textos largos y tipos desconocidos en la planilla (T4), y el corte por `Content-Length` y los topes de texto (T6).
+- Cierra P-pendientes-heredados-3, P-limites-ingreso-4 y -7. Deja P-api-movil-1 a -22: tres importantes (15, 16 y 20) para un plan corto antes de producción.
+- Incidentes:
+  - el cwd de la sesión quedó un rato dentro del worktree de T1 (sin daño, `git status` limpio);
+  - la sesión se cortó con T4 a medio informar (recuperado del worktree);
+  - un test viejo de rutas (`productos/tests/test_rutas.py`) lo ajustó el principal por decisión del usuario.
+Pendiente: decisión del usuario sobre el merge a `main`; al fusionar, copiar las decisiones del plan a `docs/decisiones.md`.
 
 ### 2026-10-04 — Fusión en `main` de `limites-ingreso`
 Hecho:

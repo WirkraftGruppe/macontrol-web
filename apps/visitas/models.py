@@ -68,6 +68,13 @@ class Visita(models.Model):
     observaciones = models.TextField("observaciones", blank=True)
     incidencia = models.BooleanField("incidencia", default=False)
     incidencia_detalle = models.TextField("detalle de la incidencia", blank=True)
+    incidencia_asignacion = models.BooleanField(
+        "incidencia de asignación", default=False
+    )
+    cliente_uuid = models.UUIDField(
+        "identificador del cliente", unique=True, null=True, blank=True
+    )
+    recibida_en = models.DateTimeField("recibida en", null=True, blank=True)
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
@@ -105,6 +112,7 @@ class Foto(models.Model):
         related_name="fotos",
         verbose_name="visita",
     )
+    codigo = models.UUIDField("código", default=uuid4, unique=True, editable=False)
     imagen = models.ImageField("imagen", upload_to=ruta_foto)
     tomada_en = models.DateTimeField("tomada en", null=True, blank=True)
     orden = models.PositiveSmallIntegerField("orden", default=0)
