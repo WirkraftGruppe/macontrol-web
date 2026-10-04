@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import AuthenticationFailed, Throttled
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
@@ -74,6 +75,7 @@ class ObtenerToken(TokenObtainPairView):
     """Obtiene el token; comparte con el panel los baldes de fallos por usuario."""
 
     serializer_class = TokenNormalizadoSerializer
+    parser_classes = [JSONParser]
     throttle_classes = [ThrottleToken]
 
     def post(self, request, *args, **kwargs):
@@ -94,4 +96,5 @@ class ObtenerToken(TokenObtainPairView):
 
 class RenovarToken(TokenRefreshView):
     serializer_class = RenovacionSerializer
+    parser_classes = [JSONParser]
     throttle_classes = [ThrottleRenovacion]

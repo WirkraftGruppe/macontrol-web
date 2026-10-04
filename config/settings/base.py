@@ -36,6 +36,29 @@ FALLOS_POR_USUARIO = 50  # fallos globales por usuario, desde cualquier IP
 VENTANA_USUARIO_MINUTOS = 60  # ventana del cupo global por usuario
 
 
+def leer_atraso_maximo_horas():
+    """Atraso máximo de `realizada_en` en una visita desde la app, en horas.
+
+    Entero entre 1 y 8760 (un año); default 168 (una semana). El tope evita que un
+    valor enorme desborde la fecha al validar y dé 500 recién en el primer uso.
+    """
+    crudo = env("ATRASO_MAXIMO_HORAS", default="168")
+    try:
+        valor = int(crudo)
+    except ValueError:
+        valor = 0
+    if not 1 <= valor <= 8760:
+        raise ImproperlyConfigured(
+            "ATRASO_MAXIMO_HORAS debe ser un entero entre 1 y 8760."
+        )
+    return valor
+
+
+# Una visita desde la app con `realizada_en` más atrasada da 400: la carga el
+# administrador como manual (P-api-movil-16).
+ATRASO_MAXIMO_HORAS = leer_atraso_maximo_horas()
+
+
 INSTALLED_APPS = [
     "config.apps.AdminMAControlConfig",
     "django.contrib.auth",

@@ -11,7 +11,12 @@ from django.utils import timezone
 from PIL import Image
 
 from apps.accounts.models import User
-from apps.visitas.admin import CAMPOS_EVIDENCIA, FotoInlineForm
+from apps.visitas.admin import (
+    CAMPOS_EVIDENCIA,
+    FotoInline,
+    FotoInlineForm,
+    ProductoAplicadoInline,
+)
 from apps.visitas.models import Foto, ProductoAplicado, Visita
 
 from .test_models import crear_visita
@@ -81,7 +86,7 @@ class VisitaAdminTests(TestCase):
         for campo in CAMPOS_EVIDENCIA:
             self.assertIn(campo, solo_lectura)
         solo_lectura = modeladmin.get_readonly_fields(self._request(), pendiente)
-        for campo in ("proyecto", "empleado", "datos", "latitud"):
+        for campo in ("proyecto", "empleado"):
             self.assertNotIn(campo, solo_lectura)
 
     def test_no_se_borran_visitas_ni_fotos(self):
@@ -114,7 +119,8 @@ class VisitaAdminTests(TestCase):
             self.assertFalse(inline.has_add_permission(request, realizada))
             self.assertFalse(inline.has_change_permission(request, realizada))
             self.assertFalse(inline.has_delete_permission(request, realizada))
-        for inline in modeladmin.get_inline_instances(request, pendiente):
+        for clase in (FotoInline, ProductoAplicadoInline):
+            inline = clase(Visita, admin.site)
             self.assertTrue(inline.has_add_permission(request, pendiente))
             self.assertTrue(inline.has_change_permission(request, pendiente))
 
@@ -174,32 +180,46 @@ class VisitaAdminTests(TestCase):
         }
 
     def test_imagen_invalida_da_error_de_formulario_no_500(self):
-        """Una foto que procesar_imagen rechaza es error del formset, no un 500."""
+        """Una foto que procesar_imagen rechaza es error del formulario, no un 500."""
         realizada, _ = self._realizada_con_foto()
         pendiente = self._pendiente_de(realizada)
-        self.client.force_login(self.administrador)
-        url = reverse("admin:visitas_visita_change", args=[pendiente.pk])
-        respuesta = self.client.get(url)
-        datos = self._datos_iniciales(respuesta.context["adminform"].form)
-        for formset in respuesta.context["inline_admin_formsets"]:
-            prefijo = formset.formset.prefix
-            datos[f"{prefijo}-TOTAL_FORMS"] = 1 if prefijo == "fotos" else 0
-            datos[f"{prefijo}-INITIAL_FORMS"] = 0
-            datos[f"{prefijo}-MIN_NUM_FORMS"] = 0
-            datos[f"{prefijo}-MAX_NUM_FORMS"] = 1000
-            if prefijo == "fotos":
-                datos[f"{prefijo}-0-imagen"] = _png_demasiado_grande()
-                datos[f"{prefijo}-0-orden"] = 0
-        antes = Foto.objects.count()
-        respuesta = self.client.post(url, datos)
-        self.assertEqual(respuesta.status_code, 200)
-        formset_fotos = next(
-            f.formset
-            for f in respuesta.context["inline_admin_formsets"]
-            if f.formset.model is Foto
+        formulario = FotoInlineForm(
+            data={"visita": pendiente.pk, "orden": 0},
+            files={"imagen": _png_demasiado_grande()},
         )
-        self.assertTrue(any(formset_fotos.errors))
-        self.assertEqual(Foto.objects.count(), antes)
+        self.assertFalse(formulario.is_valid())
+        self.assertIn("imagen", formulario.errors)
+        self.assertEqual(pendiente.fotos.count(), 0)
+
+    def test_pendiente_no_muestra_inlines_de_evidencia(self):
+        realizada, _ = self._realizada_con_foto()
+        pendiente = self._pendiente_de(realizada)
+        modeladmin = admin.site._registry[Visita]
+        request = self._request()
+        self.assertEqual(modeladmin.get_inlines(request, None), ())
+        self.assertEqual(modeladmin.get_inlines(request, pendiente), ())
+        self.assertEqual(
+            modeladmin.get_inlines(request, realizada),
+            (FotoInline, ProductoAplicadoInline),
+        )
+        self.client.force_login(self.administrador)
+        for url in (
+            reverse("admin:visitas_visita_change", args=[pendiente.pk]),
+            reverse("admin:visitas_visita_add"),
+        ):
+            respuesta = self.client.get(url)
+            self.assertEqual(respuesta.status_code, 200)
+            self.assertEqual(respuesta.context["inline_admin_formsets"], [])
+
+    def test_coordenadas_y_datos_solo_lectura_en_pendiente(self):
+        realizada, _ = self._realizada_con_foto()
+        pendiente = self._pendiente_de(realizada)
+        modeladmin = admin.site._registry[Visita]
+        request = self._request()
+        for obj in (None, pendiente):
+            solo_lectura = modeladmin.get_readonly_fields(request, obj)
+            for campo in ("latitud", "longitud", "precision_m", "datos"):
+                self.assertIn(campo, solo_lectura)
 
     def test_foto_admin_imagen_invalida_da_error_de_formulario(self):
         """FotoAdmin también devuelve error de campo para una imagen inválida."""

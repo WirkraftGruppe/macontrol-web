@@ -1,9 +1,12 @@
 """Serializers de la API de Visitas: alta desde la app y listados del empleado."""
 
 import json
+from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import ProductoAplicado, Visita
@@ -88,6 +91,24 @@ class CrearVisitaSerializer(serializers.Serializer):
     incidencia_detalle = serializers.CharField(
         required=False, allow_blank=True, default="", max_length=MAX_LARGO_TEXTO
     )
+
+    def validate(self, attrs):
+        """Rechaza el atraso excesivo, salvo en un reintento ya aceptado.
+
+        Si la visita ya existe, se deja pasar para que el servicio responda 409.
+        """
+        horas = settings.ATRASO_MAXIMO_HORAS
+        if attrs["realizada_en"] < timezone.now() - timedelta(hours=horas):
+            if not Visita.objects.filter(cliente_uuid=attrs["cliente_uuid"]).exists():
+                raise serializers.ValidationError(
+                    {
+                        "realizada_en": [
+                            f"La visita tiene más de {horas} horas de atraso. "
+                            "Avise al administrador para que la cargue como manual."
+                        ]
+                    }
+                )
+        return attrs
 
     def validate_productos_aplicados(self, valor):
         if len(valor) > MAX_PRODUCTOS:

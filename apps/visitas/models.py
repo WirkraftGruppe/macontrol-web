@@ -98,6 +98,14 @@ class Visita(models.Model):
             raise ValidationError(
                 {"realizada_en": "Una cancelada no lleva fecha de realización."}
             )
+        if (
+            self.pk
+            and self.estado == self.Estado.PENDIENTE
+            and (self.fotos.exists() or self.productos.exists())
+        ):
+            raise ValidationError(
+                "Una visita pendiente no lleva fotos ni productos aplicados."
+            )
 
 
 def ruta_foto(instancia, nombre):

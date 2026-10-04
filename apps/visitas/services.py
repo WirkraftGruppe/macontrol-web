@@ -157,7 +157,8 @@ def registrar_visita_desde_app(
     `proyecto` es el id (o la instancia) del proyecto; `productos_aplicados` es una
     lista de dicts `{producto, lote, dosis, unidad, cantidad}` con `producto` como id;
     `fotos` es una lista de archivos subidos. Completa la pendiente propia más
-    antigua del proyecto o crea una visita nueva (marcando `incidencia_asignacion`
+    antigua del proyecto si no tiene fotos ni productos; si los tiene, o no hay
+    pendiente propia, crea una visita nueva marcando `incidencia_asignacion` (también
     si hay una pendiente de otro empleado). Todo ocurre en una transacción: si algo
     falla no queda visita, fotos, productos ni archivos. Levanta `VisitaDuplicada`
     si el `cliente_uuid` ya existe y `ValidationError` con errores por campo.
@@ -188,12 +189,20 @@ def registrar_visita_desde_app(
                 raise ValidationError(errores)
 
             visita, hay_de_otro = _pendiente_para(proyecto, empleado)
+            if visita is not None and (
+                visita.fotos.exists() or visita.productos.exists()
+            ):
+                # Una pendiente con evidencia no se hereda: queda intacta y la
+                # visita de la app se registra aparte, marcada como incidencia.
+                visita, hay_de_otro = None, True
             if visita is None:
                 visita = Visita(
                     proyecto=proyecto,
                     empleado=empleado,
                     incidencia_asignacion=hay_de_otro,
                 )
+            else:
+                visita.motivo_manual = ""
             visita.origen = Visita.Origen.APP
             visita.latitud, visita.longitud = latitud, longitud
             visita.precision_m = precision_m

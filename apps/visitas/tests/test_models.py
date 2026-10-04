@@ -69,6 +69,29 @@ class VisitaTests(TestCase):
             self.visita.full_clean()
         self.assertIn("realizada_en", ctx.exception.message_dict)
 
+    def test_pendiente_no_admite_fotos_ni_productos(self):
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        configuracion = override_settings(MEDIA_ROOT=media)
+        configuracion.enable()
+        self.addCleanup(configuracion.disable)
+        self.visita.full_clean()
+        Foto.objects.create(visita=self.visita, imagen=imagen_real())
+        with self.assertRaises(ValidationError):
+            self.visita.full_clean()
+        with self.captureOnCommitCallbacks(execute=True):
+            Foto.objects.all().delete()
+        self.visita.full_clean()
+        producto = Producto.objects.create(nombre_comercial="Cebo pend")
+        ProductoAplicado.objects.create(
+            visita=self.visita, producto=producto, lote="L", dosis=1, unidad="ml"
+        )
+        with self.assertRaises(ValidationError):
+            self.visita.full_clean()
+        self.visita.estado = Visita.Estado.REALIZADA
+        self.visita.realizada_en = timezone.now()
+        self.visita.full_clean()
+
     def test_historial_excluye_coordenadas_y_datos(self):
         campos = {f.name for f in Visita.history.model._meta.get_fields()}
         for excluido in ("latitud", "longitud", "precision_m", "datos"):

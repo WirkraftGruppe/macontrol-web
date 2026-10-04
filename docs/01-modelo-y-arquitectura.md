@@ -164,6 +164,7 @@ macontrol/
 - **Panel con templates + HTMX**, no un frontend separado: menos superficie de mantenimiento y coherente con el sitio público.
 - **API versionada** (`/api/v1/`) desde el primer día aunque la app llegue al final: el panel también puede consumirla para el mapa.
 - **JWT** (`djangorestframework-simplejwt`) con refresh largo para el empleado.
+- **Contrato de la app**: `docs/api/openapi-v1.yaml` es el contrato de `/api/v1/` que consume la app. Todo cambio de respuesta, de parámetro o de versión de drf-spectacular exige regenerarlo en el mismo commit con `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py spectacular --validate --file docs/api/openapi-v1.yaml`; un criterio de cierre lo compara con el generado.
 - **Fotos**: redimensionadas al subir (máx. 1600 px) con `Pillow`; almacenamiento local en etapa 1, backend intercambiable (`django-storages`) para S3/R2.
 - **PDF**: WeasyPrint desde templates HTML (`templates/pdf/`), mismo sistema visual que la web.
 - **QR**: `segno` o `qrcode`, contenido `https://macontrol.com.ar/q/{uuid}`. Abierto en un navegador común muestra solo "Sitio de MAControl S.A. — use la app"; la app intercepta la URL.

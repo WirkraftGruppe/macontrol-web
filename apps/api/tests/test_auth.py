@@ -1,6 +1,9 @@
 """Autenticación de la API: JWT, rotación, blacklist y límite de intentos."""
 
+from unittest import mock
+
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 
@@ -88,3 +91,31 @@ class AuthApiTests(TestCase):
             self._pedir_token("mala", f"x{i}")
         self.assertEqual(self._pedir_token("mala", "x10").status_code, 429)
         self.assertEqual(self._renovar(refresh).status_code, 200)
+
+    def _multipart_con_archivo(self, ruta, campo):
+        """Envía multipart con archivo y devuelve (respuesta, parsers simulados)."""
+        archivo = SimpleUploadedFile("dato.bin", b"x" * 1024)
+        with (
+            mock.patch("django.http.request.MultiPartParser") as parser,
+            mock.patch("rest_framework.parsers.DjangoMultiPartParser") as parser_drf,
+        ):
+            respuesta = self.client.post(ruta, {campo: "valor", "archivo": archivo})
+        return respuesta, parser, parser_drf
+
+    def _comprobar_415(self, respuesta, *parsers):
+        self.assertEqual(respuesta.status_code, 415)
+        cuerpo = respuesta.json()
+        self.assertEqual(set(cuerpo), {"detalle", "campos"})
+        self.assertTrue(cuerpo["detalle"])
+        self.assertEqual(cuerpo["campos"], {})
+        # No se parseó el cuerpo: no se escribe ningún temporal.
+        for parser in parsers:
+            parser.assert_not_called()
+
+    def test_token_rechaza_multipart_con_415(self):
+        respuesta, *parsers = self._multipart_con_archivo(TOKEN, "username")
+        self._comprobar_415(respuesta, *parsers)
+
+    def test_renovar_rechaza_multipart_con_415(self):
+        respuesta, *parsers = self._multipart_con_archivo(REFRESH, "refresh")
+        self._comprobar_415(respuesta, *parsers)
