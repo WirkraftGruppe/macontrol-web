@@ -39,16 +39,17 @@ VENTANA_USUARIO_MINUTOS = 60  # ventana del cupo global por usuario
 def leer_atraso_maximo_horas():
     """Atraso máximo de `realizada_en` en una visita desde la app, en horas.
 
-    Entero >= 1; default 168 (una semana).
+    Entero entre 1 y 8760 (un año); default 168 (una semana). El tope evita que un
+    valor enorme desborde la fecha al validar y dé 500 recién en el primer uso.
     """
     crudo = env("ATRASO_MAXIMO_HORAS", default="168")
     try:
         valor = int(crudo)
     except ValueError:
         valor = 0
-    if valor < 1:
+    if not 1 <= valor <= 8760:
         raise ImproperlyConfigured(
-            "ATRASO_MAXIMO_HORAS debe ser un entero mayor o igual a 1."
+            "ATRASO_MAXIMO_HORAS debe ser un entero entre 1 y 8760."
         )
     return valor
 
