@@ -1,6 +1,10 @@
 from django.test import SimpleTestCase
 
-from apps.visitas.planillas import MAX_LARGO_TEXTO, validar_datos
+from apps.visitas.planillas import (
+    MAX_DIGITOS_NUMERO,
+    MAX_LARGO_TEXTO,
+    validar_datos,
+)
 
 
 def campo(clave, tipo, obligatorio=False, opciones=None):
@@ -88,3 +92,34 @@ class ValidarDatosTests(SimpleTestCase):
         esquema = [campo("raro", "inventado")]
         errores = validar_datos(esquema, {"raro": 1})
         self.assertEqual(errores, {"raro": ["Tipo de campo desconocido."]})
+
+    def test_booleano_no_vale_como_numero(self):
+        esquema = [
+            campo("nivel", "opcion", opciones=[1, 2]),
+            campo("niveles", "opcion_multiple", opciones=[0, 1]),
+            campo("cantidad", "numero"),
+        ]
+        self.assertEqual(validar_datos(esquema, {"nivel": 1, "niveles": [0, 1]}), {})
+        errores = validar_datos(esquema, {"nivel": True})
+        self.assertEqual(
+            errores, {"nivel": ["Debe ser una de las opciones permitidas."]}
+        )
+        errores = validar_datos(esquema, {"niveles": [False, True]})
+        self.assertEqual(set(errores), {"niveles"})
+        errores = validar_datos(esquema, {"cantidad": True})
+        self.assertEqual(errores, {"cantidad": ["Debe ser un número."]})
+
+    def test_numero_con_demasiados_digitos_se_rechaza(self):
+        esquema = [campo("cantidad", "numero")]
+        self.assertEqual(
+            validar_datos(esquema, {"cantidad": 10**MAX_DIGITOS_NUMERO - 1}), {}
+        )
+        for valor in (
+            10**MAX_DIGITOS_NUMERO,
+            -(10**MAX_DIGITOS_NUMERO),
+            10**5000,
+            1e300,
+        ):
+            with self.subTest(valor=valor):
+                errores = validar_datos(esquema, {"cantidad": valor})
+                self.assertEqual(errores, {"cantidad": ["Debe ser un número."]})

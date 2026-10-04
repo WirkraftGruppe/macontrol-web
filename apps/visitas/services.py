@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
@@ -10,8 +11,13 @@ from apps.proyectos.models import Proyecto
 from apps.visitas.models import Foto, ProductoAplicado, Visita
 from apps.visitas.planillas import validar_datos
 
+# Topes de una visita desde la app; los comparte el serializer de la API.
+MAX_FOTOS = 10
+MAX_PRODUCTOS = 30
 TOLERANCIA_FUTURO = timedelta(minutes=10)
 MENSAJE_QR_INVALIDO = "El código QR no corresponde a este proyecto."
+
+logger = logging.getLogger(__name__)
 
 
 class VisitaDuplicada(Exception):
@@ -95,12 +101,25 @@ def _validar_proyecto_y_qr(proyecto, qr_codigo):
     return proyecto
 
 
+def _id_producto(item):
+    """Id entero del producto de un ítem, o None si no es utilizable."""
+    try:
+        return int(item.get("producto"))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
 def _armar_productos(productos_aplicados):
-    """Valida cada producto aplicado; devuelve (instancias sin guardar, errores)."""
+    """Valida cada producto aplicado; devuelve (instancias sin guardar, errores).
+
+    Busca todos los productos del pedido en una sola consulta.
+    """
+    ids = {_id_producto(item) for item in productos_aplicados} - {None}
+    catalogo = Producto.objects.filter(pk__in=ids, activo=True).in_bulk()
     errores, instancias = [], []
     for posicion, item in enumerate(productos_aplicados, start=1):
         try:
-            producto = Producto.objects.get(pk=item.get("producto"), activo=True)
+            producto = catalogo[_id_producto(item)]
             aplicado = ProductoAplicado(
                 producto=producto,
                 lote=item.get("lote") or "",
@@ -108,8 +127,9 @@ def _armar_productos(productos_aplicados):
                 unidad=item.get("unidad") or "",
                 cantidad=item.get("cantidad"),
             )
-            aplicado.full_clean(exclude=["visita"])
-        except (Producto.DoesNotExist, TypeError, ValueError, AttributeError):
+            # El producto ya se leyó del catálogo: no se vuelve a consultar.
+            aplicado.full_clean(exclude=["visita", "producto"])
+        except (KeyError, TypeError, ValueError, AttributeError):
             errores.append(f"Producto {posicion}: no existe o está inactivo.")
         except ValidationError as error:
             detalle = "; ".join(
@@ -119,6 +139,22 @@ def _armar_productos(productos_aplicados):
         else:
             instancias.append(aplicado)
     return instancias, errores
+
+
+def _validar_coordenadas(latitud, longitud):
+    """Errores por campo si la latitud o la longitud están fuera de rango."""
+    errores = {}
+    for clave, valor, limite in (
+        ("latitud", latitud, 90),
+        ("longitud", longitud, 180),
+    ):
+        try:
+            fuera = valor is not None and not -limite <= valor <= limite
+        except TypeError:
+            fuera = True
+        if fuera:
+            errores[clave] = [f"Debe estar entre -{limite} y {limite}."]
+    return errores
 
 
 def _pendiente_para(proyecto, empleado):
@@ -161,8 +197,12 @@ def registrar_visita_desde_app(
     pendiente propia, crea una visita nueva marcando `incidencia_asignacion` (también
     si hay una pendiente de otro empleado). Todo ocurre en una transacción: si algo
     falla no queda visita, fotos, productos ni archivos. Levanta `VisitaDuplicada`
-    si el `cliente_uuid` ya existe y `ValidationError` con errores por campo.
+    si el `cliente_uuid` ya existe y `ValidationError` con errores por campo (el
+    `cliente_uuid` es obligatorio). Atención: no debe llamarse dentro de otro `atomic`:
+    si el llamador revierte después, los archivos ya escritos no se recuperan.
     """
+    if cliente_uuid is None:
+        raise ValidationError({"cliente_uuid": "Este campo es obligatorio."})
     guardadas, confirmada = [], False
     try:
         with transaction.atomic():
@@ -171,7 +211,7 @@ def registrar_visita_desde_app(
                 raise VisitaDuplicada(existente)
             proyecto = _validar_proyecto_y_qr(proyecto, qr_codigo)
 
-            errores = {}
+            errores = _validar_coordenadas(latitud, longitud)
             esquema = proyecto.tipo_servicio.esquema_planilla()
             errores_datos = validar_datos(esquema, datos)
             if errores_datos:
@@ -180,11 +220,19 @@ def registrar_visita_desde_app(
                     for clave, mensajes in errores_datos.items()
                     for mensaje in mensajes
                 ]
-            aplicados, errores_productos = _armar_productos(productos_aplicados)
+            if len(productos_aplicados) > MAX_PRODUCTOS:
+                errores["productos_aplicados"] = [
+                    f"Se permiten hasta {MAX_PRODUCTOS} productos por visita."
+                ]
+                aplicados, errores_productos = [], []
+            else:
+                aplicados, errores_productos = _armar_productos(productos_aplicados)
             if errores_productos:
                 errores["productos_aplicados"] = errores_productos
             if not fotos:
                 errores["fotos"] = ["Se requiere al menos una foto."]
+            elif len(fotos) > MAX_FOTOS:
+                errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por visita."]
             if errores:
                 raise ValidationError(errores)
 
@@ -237,4 +285,8 @@ def registrar_visita_desde_app(
         if not confirmada:
             # La transacción revierte la base, no los archivos ya escritos.
             for foto in guardadas:
-                foto.imagen.storage.delete(foto.imagen.name)
+                try:
+                    foto.imagen.storage.delete(foto.imagen.name)
+                except Exception:  # noqa: BLE001
+                    # No debe tapar la excepción original que se está propagando.
+                    logger.exception("No se pudo borrar un archivo de foto.")

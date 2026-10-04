@@ -1,5 +1,6 @@
 """Modelos de Visitas: Visita, Foto y ProductoAplicado."""
 
+import logging
 from uuid import uuid4
 
 from django.conf import settings
@@ -12,6 +13,8 @@ from simple_history.models import HistoricalRecords
 from apps.accounts.models import User
 
 from . import imagenes
+
+logger = logging.getLogger(__name__)
 
 
 class Visita(models.Model):
@@ -139,10 +142,20 @@ class Foto(models.Model):
             anterior = (
                 Foto.objects.filter(pk=self.pk).values_list("imagen", flat=True).first()
             )
-        if self.imagen and not self.imagen._committed:
+        nuevo = bool(self.imagen) and not self.imagen._committed
+        if nuevo:
             contenido = imagenes.procesar_imagen(self.imagen)
             self.imagen.save("foto.jpg", contenido, save=False)
-        super().save(*args, **kwargs)
+        try:
+            super().save(*args, **kwargs)
+        except BaseException:
+            # El archivo nuevo ya está escrito y el INSERT falló: no se deja huérfano.
+            if nuevo:
+                try:
+                    self.imagen.storage.delete(self.imagen.name)
+                except Exception:  # noqa: BLE001
+                    logger.exception("No se pudo borrar la foto huérfana.")
+            raise
         if anterior and anterior != self.imagen.name:
             _borrar_archivo_al_confirmar(self.imagen.storage, anterior)
 
