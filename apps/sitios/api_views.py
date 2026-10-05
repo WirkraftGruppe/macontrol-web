@@ -1,22 +1,59 @@
-"""Vistas de la API de Sitios: resolución de códigos QR."""
+"""Vistas de la API de Sitios: resolver QR, imagen del plano y puntos del empleado."""
 
 from django.db.models import F
-from drf_spectacular.utils import extend_schema
-from rest_framework.exceptions import NotFound
+from django.http import FileResponse
+from django.urls import reverse
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
-from apps.accounts.permisos import EsEmpleado
+from apps.accounts.permisos import EsAdministrador, EsEmpleado
 from apps.proyectos.models import Proyecto
 from apps.visitas.models import Visita
 
-from .models import PuntoControl
-from .serializers import ResolverQRSerializer
+from .estado import estados_de_puntos
+from .models import Plano, PuntoControl
+from .serializers import MiPuntoSerializer, ResolverQRSerializer
+
+ESTADOS_CON_TRABAJO = (Visita.Estado.PENDIENTE, Visita.Estado.ABIERTA)
+
+
+def _datos_plano(punto):
+    """Plano activo del punto con los marcadores de sus puntos activos ubicados."""
+    plano = punto.plano
+    if plano is None or not plano.activo:
+        return None
+    marcadores = list(
+        plano.puntos.filter(activo=True, x__isnull=False, y__isnull=False).order_by(
+            "orden", "id"
+        )
+    )
+    estados = estados_de_puntos(marcadores)
+    return {
+        "id": plano.id,
+        "nombre": plano.nombre,
+        "url": reverse("api:sitios:plano-imagen", kwargs={"pk": plano.id}),
+        "ancho_px": plano.ancho_px,
+        "alto_px": plano.alto_px,
+        "puntos": [
+            {
+                "id": m.id,
+                "nombre": m.nombre,
+                "x": m.x,
+                "y": m.y,
+                "estado": estados[m.id],
+            }
+            for m in marcadores
+        ],
+    }
 
 
 class ResolverQRView(APIView):
-    """Dado el UUID de un QR, devuelve el sitio y sus proyectos activos."""
+    """Dado el UUID de un QR, devuelve el punto, su plano, el sitio y los proyectos."""
 
     permission_classes = [EsEmpleado]
     throttle_classes = [ScopedRateThrottle]
@@ -27,13 +64,13 @@ class ResolverQRView(APIView):
         responses={200: ResolverQRSerializer},
         summary="Resolver un código QR",
         description=(
-            "Solo empleados. Un QR inexistente o de un sitio inactivo responde el "
-            "mismo 404."
+            "Solo empleados. Un QR inexistente, de un punto o sitio inactivo o de "
+            "un cliente inactivo responde el mismo 404."
         ),
     )
     def post(self, request, codigo):
         punto = (
-            PuntoControl.objects.select_related("sitio__cliente")
+            PuntoControl.objects.select_related("sitio__cliente", "plano")
             .filter(
                 qr_codigo=codigo,
                 activo=True,
@@ -49,23 +86,31 @@ class ResolverQRView(APIView):
         proyectos = list(
             Proyecto.objects.filter(sitio=sitio, estado=Proyecto.Estado.ACTIVO)
             .select_related("tipo_servicio")
+            .prefetch_related("tipo_servicio__campos")
             .order_by("id")
         )
-        # Una sola consulta para las pendientes propias; la más antigua gana.
-        pendientes = {}
+        # Una sola consulta para las visitas propias; la pendiente más antigua gana.
+        pendientes, abiertas = {}, {}
         visitas = (
             Visita.objects.filter(
                 empleado=request.user,
-                estado=Visita.Estado.PENDIENTE,
+                estado__in=ESTADOS_CON_TRABAJO,
                 proyecto__in=proyectos,
             )
             .order_by(F("programada_para").asc(nulls_last=True), "id")
-            .values_list("proyecto_id", "id")
+            .values_list("proyecto_id", "id", "estado")
         )
-        for proyecto_id, visita_id in visitas:
-            pendientes.setdefault(proyecto_id, visita_id)
+        for proyecto_id, visita_id, estado in visitas:
+            destino = abiertas if estado == Visita.Estado.ABIERTA else pendientes
+            destino.setdefault(proyecto_id, visita_id)
 
         datos = {
+            "punto": {
+                "id": punto.id,
+                "nombre": punto.nombre,
+                "sector": punto.sector,
+                "plano": _datos_plano(punto),
+            },
             "sitio": sitio,
             "cliente": sitio.cliente,
             "proyectos": [
@@ -73,10 +118,105 @@ class ResolverQRView(APIView):
                     "id": p.id,
                     "titulo": p.titulo,
                     "tipo_servicio": p.tipo_servicio,
-                    "esquema_planilla": p.tipo_servicio.esquema_planilla(),
+                    "esquema_punto": p.tipo_servicio.esquema_planilla("punto"),
+                    "esquema_visita": p.tipo_servicio.esquema_planilla("visita"),
                     "visita_pendiente_propia": pendientes.get(p.id),
+                    "visita_abierta_propia": abiertas.get(p.id),
                 }
                 for p in proyectos
             ],
         }
         return Response(ResolverQRSerializer(datos).data)
+
+
+class IgnorarAccept(BaseContentNegotiation):
+    """Usa siempre el primer renderer: la imagen no depende del `Accept`."""
+
+    def select_parser(self, request, parsers):
+        return parsers[0] if parsers else None
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return renderers[0], renderers[0].media_type
+
+
+class PlanoImagenView(APIView):
+    """Sirve la imagen de un plano activo a quien tiene trabajo en su sitio."""
+
+    permission_classes = [EsEmpleado | EsAdministrador]
+    content_negotiation_class = IgnorarAccept
+
+    @extend_schema(
+        summary="Descargar la imagen de un plano",
+        description=(
+            "Administradores, o empleados con una visita propia pendiente o abierta "
+            "en un proyecto del sitio. Sin acceso, plano inactivo o inexistente: "
+            "el mismo 404."
+        ),
+        responses={
+            (200, "image/png"): OpenApiTypes.BINARY,
+            404: OpenApiResponse(description="El plano no existe o no es accesible."),
+        },
+    )
+    def get(self, request, pk):
+        plano = Plano.objects.filter(pk=pk, activo=True).first()
+        if plano is None:
+            raise NotFound("El plano no existe.")
+        if (
+            not request.user.es_administrador
+            and not Visita.objects.filter(
+                empleado=request.user,
+                estado__in=ESTADOS_CON_TRABAJO,
+                proyecto__sitio_id=plano.sitio_id,
+            ).exists()
+        ):
+            raise NotFound("El plano no existe.")
+        try:
+            archivo = plano.imagen.open("rb")
+        except FileNotFoundError:
+            raise NotFound("El plano no existe.")
+        respuesta = FileResponse(archivo, content_type="image/png")
+        respuesta["Cache-Control"] = "private, no-store"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta
+
+
+class MisPuntosView(APIView):
+    """Puntos activos de los sitios donde el empleado tiene visitas por hacer."""
+
+    permission_classes = [EsEmpleado]
+
+    @extend_schema(
+        summary="Mis puntos de control",
+        description=(
+            "Puntos activos, con coordenadas y estado, de los sitios activos (de "
+            "clientes activos) donde el empleado tiene visitas pendientes o "
+            "abiertas. `sitio` filtra por id; un sitio ajeno devuelve lista vacía."
+        ),
+        parameters=[
+            OpenApiParameter("sitio", OpenApiTypes.INT, description="Id del sitio.")
+        ],
+        responses={200: MiPuntoSerializer(many=True)},
+    )
+    def get(self, request):
+        sitio = request.query_params.get("sitio")
+        if sitio is not None and not sitio.isdigit():
+            raise ValidationError({"sitio": "Debe ser un número entero."})
+        sitios = Visita.objects.filter(
+            empleado=request.user,
+            estado__in=ESTADOS_CON_TRABAJO,
+            proyecto__sitio__activo=True,
+            proyecto__sitio__cliente__activo=True,
+        )
+        if sitio is not None:
+            sitios = sitios.filter(proyecto__sitio_id=int(sitio))
+        puntos = list(
+            PuntoControl.objects.filter(
+                activo=True, sitio_id__in=sitios.values("proyecto__sitio_id")
+            )
+            .select_related("sitio")
+            .order_by("sitio__nombre", "sitio_id", "orden", "id")
+        )
+        estados = estados_de_puntos(puntos)
+        for punto in puntos:
+            punto.estado = estados[punto.id]
+        return Response(MiPuntoSerializer(puntos, many=True).data)

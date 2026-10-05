@@ -95,7 +95,7 @@ class FlujoEmpleadoTests(TestCase):
         qr = api.post(f"/api/v1/qr/{self.punto.qr_codigo}/resolver/")
         self.assertEqual(qr.status_code, 200, qr.content)
         proyecto = qr.data["proyectos"][0]
-        self.assertEqual(proyecto["esquema_planilla"][0]["clave"], "cebos")
+        self.assertEqual(proyecto["esquema_punto"][0]["clave"], "cebos")
 
         catalogo = api.get("/api/v1/productos/")
         self.assertEqual(catalogo.status_code, 200, catalogo.content)
