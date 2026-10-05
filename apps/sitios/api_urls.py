@@ -12,4 +12,10 @@ urlpatterns = [
         api_views.ResolverQRView.as_view(),
         name="qr-resolver",
     ),
+    path(
+        "planos/<int:pk>/imagen/",
+        api_views.PlanoImagenView.as_view(),
+        name="plano-imagen",
+    ),
+    path("me/puntos/", api_views.MisPuntosView.as_view(), name="mis-puntos"),
 ]

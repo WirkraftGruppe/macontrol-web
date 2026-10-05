@@ -1,16 +1,30 @@
 import datetime
+import io
+import tempfile
 import uuid
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla, TipoServicio
-from apps.sitios.models import Sitio
+from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Visita
+
+MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="sitios-api-test-")
+
+
+def crear_plano(sitio, nombre="Planta baja", **extra):
+    """Plano con un PNG real de 40x20 px (el modelo lo procesa al guardar)."""
+    buffer = io.BytesIO()
+    Image.new("RGB", (40, 20), "white").save(buffer, "PNG")
+    archivo = SimpleUploadedFile("p.png", buffer.getvalue(), content_type="image/png")
+    return Plano.objects.create(sitio=sitio, nombre=nombre, imagen=archivo, **extra)
 
 
 class ResolverQRTests(TestCase):
@@ -90,8 +104,77 @@ class ResolverQRTests(TestCase):
             proyectos[0]["tipo_servicio"],
             {"id": self.tipo.id, "nombre": "Desratización"},
         )
-        self.assertEqual(proyectos[0]["esquema_planilla"], self.tipo.esquema_planilla())
+        self.assertEqual(proyectos[0]["esquema_punto"], self.tipo.esquema_planilla())
+        self.assertEqual(
+            proyectos[0]["esquema_visita"], self.tipo.esquema_planilla("visita")
+        )
         self.assertIsNone(proyectos[0]["visita_pendiente_propia"])
+        self.assertIsNone(proyectos[0]["visita_abierta_propia"])
+        self.assertEqual(
+            r.json()["punto"],
+            {"id": self.punto.id, "nombre": "General", "sector": "", "plano": None},
+        )
+
+    def test_devuelve_punto_plano_y_visita_abierta(self):
+        with override_settings(MEDIA_ROOT=MEDIA_TEMPORAL):
+            plano = crear_plano(self.sitio)
+        self.punto.plano = plano
+        self.punto.x, self.punto.y = "0.2500", "0.5000"
+        self.punto.save()
+        vecino = PuntoControl.objects.create(
+            sitio=self.sitio, nombre="Depósito", plano=plano, x="0.7500", y="0.1000"
+        )
+        PuntoControl.objects.create(  # sin coordenadas: no aparece en el plano
+            sitio=self.sitio, nombre="Sin ubicar", plano=plano
+        )
+        PuntoControl.objects.create(  # inactivo: no aparece
+            sitio=self.sitio, nombre="Baja", plano=plano, x="0.1", y="0.1", activo=False
+        )
+        abierta = self._visita(self.proyecto, self.empleado, 1)
+        abierta.estado = Visita.Estado.ABIERTA
+        abierta.abierta_en = "2026-01-02T10:00:00Z"
+        abierta.save()
+        pendiente = self._visita(self.proyecto, self.empleado, 5)
+        r = self._resolver()
+        self.assertEqual(r.status_code, 200)
+        cuerpo = r.json()
+        self.assertEqual(
+            cuerpo["punto"]["plano"],
+            {
+                "id": plano.id,
+                "nombre": "Planta baja",
+                "url": f"/api/v1/planos/{plano.id}/imagen/",
+                "ancho_px": 40,
+                "alto_px": 20,
+                "puntos": [
+                    {
+                        "id": self.punto.id,
+                        "nombre": "General",
+                        "x": 0.25,
+                        "y": 0.5,
+                        "estado": "sin_revisar",
+                    },
+                    {
+                        "id": vecino.id,
+                        "nombre": "Depósito",
+                        "x": 0.75,
+                        "y": 0.1,
+                        "estado": "sin_revisar",
+                    },
+                ],
+            },
+        )
+        proyecto = cuerpo["proyectos"][0]
+        self.assertEqual(proyecto["visita_abierta_propia"], abierta.id)
+        self.assertEqual(proyecto["visita_pendiente_propia"], pendiente.id)
+        self.assertNotIn("latitud", r.content.decode())
+
+    def test_plano_inactivo_no_se_devuelve(self):
+        with override_settings(MEDIA_ROOT=MEDIA_TEMPORAL):
+            plano = crear_plano(self.sitio, activo=False)
+        self.punto.plano = plano
+        self.punto.save()
+        self.assertIsNone(self._resolver().json()["punto"]["plano"])
 
     def test_qr_inactivo_da_404_igual_que_inexistente(self):
         self.sitio.activo = False
@@ -163,3 +246,164 @@ class ResolverQRTests(TestCase):
         otro = APIClient()
         otro.force_authenticate(self.otro)
         self.assertEqual(self._resolver(cliente=otro).status_code, 200)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class PlanoApiTests(TestCase):
+    def setUp(self):
+        cliente = Cliente.objects.create(razon_social="ACME")
+        self.sitio = Sitio.objects.create(cliente=cliente, nombre="Planta 1")
+        self.otro_sitio = Sitio.objects.create(cliente=cliente, nombre="Planta 2")
+        self.plano = crear_plano(self.sitio)
+        self.tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+        self.empleado = User.objects.create_user(
+            username="emp", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.ajeno = User.objects.create_user(
+            username="ajeno", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.admin = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.proyecto = self._proyecto(self.sitio)
+        self.url = f"/api/v1/planos/{self.plano.id}/imagen/"
+
+    def _proyecto(self, sitio):
+        return Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=self.tipo,
+            titulo="Control",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+
+    def _visita(self, proyecto, empleado, estado=Visita.Estado.PENDIENTE):
+        return Visita.objects.create(
+            proyecto=proyecto,
+            empleado=empleado,
+            origen=Visita.Origen.MANUAL,
+            estado=estado,
+            programada_para=datetime.date(2026, 1, 1),
+        )
+
+    def _get(self, usuario):
+        api = APIClient()
+        if usuario:
+            api.force_authenticate(usuario)
+        return api.get(self.url)
+
+    def test_imagen_solo_con_visita_en_el_sitio(self):
+        self.assertEqual(self._get(None).status_code, 401)
+        self.assertEqual(self._get(self.empleado).status_code, 404)  # sin visita
+        # visita propia en otro sitio, o ajena en este: sigue sin acceso
+        self._visita(self._proyecto(self.otro_sitio), self.empleado)
+        self._visita(self.proyecto, self.ajeno)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+        self._visita(self.proyecto, self.empleado, Visita.Estado.CANCELADA)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+
+        visita = self._visita(self.proyecto, self.empleado)
+        respuesta = self._get(self.empleado)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(respuesta["Content-Type"], "image/png")
+        self.assertEqual(respuesta["Cache-Control"], "private, no-store")
+        self.assertEqual(respuesta["X-Content-Type-Options"], "nosniff")
+        contenido = b"".join(respuesta.streaming_content)
+        self.assertTrue(contenido.startswith(b"\x89PNG"))
+
+        Visita.objects.filter(pk=visita.pk).update(estado=Visita.Estado.ABIERTA)
+        self.assertEqual(self._get(self.empleado).status_code, 200)
+        self.assertEqual(self._get(self.admin).status_code, 200)
+
+    def test_plano_inactivo_o_inexistente_da_404(self):
+        self._visita(self.proyecto, self.empleado)
+        Plano.objects.filter(pk=self.plano.pk).update(activo=False)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+        self.assertEqual(self._get(self.admin).status_code, 404)
+        api = APIClient()
+        api.force_authenticate(self.admin)
+        self.assertEqual(api.get("/api/v1/planos/99999/imagen/").status_code, 404)
+
+    def test_archivo_faltante_da_404(self):
+        self._visita(self.proyecto, self.empleado)
+        self.plano.imagen.storage.delete(self.plano.imagen.name)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+
+
+class MisPuntosTests(TestCase):
+    URL = "/api/v1/me/puntos/"
+
+    def setUp(self):
+        self.cliente = Cliente.objects.create(razon_social="ACME")
+        self.sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta 1")
+        self.sitio2 = Sitio.objects.create(cliente=self.cliente, nombre="Planta 2")
+        self.sitio3 = Sitio.objects.create(cliente=self.cliente, nombre="Planta 3")
+        self.tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+        self.empleado = User.objects.create_user(
+            username="emp", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.otro = User.objects.create_user(
+            username="otro", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.admin = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.api = APIClient()
+        self.api.force_authenticate(self.empleado)
+
+    def _visita(self, sitio, empleado, estado=Visita.Estado.PENDIENTE):
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=self.tipo,
+            titulo="Control",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        return Visita.objects.create(
+            proyecto=proyecto,
+            empleado=empleado,
+            origen=Visita.Origen.MANUAL,
+            estado=estado,
+            programada_para=datetime.date(2026, 1, 1),
+        )
+
+    def test_solo_sitios_con_visita_asignada_o_abierta(self):
+        self._visita(self.sitio, self.empleado)
+        self._visita(self.sitio2, self.empleado, Visita.Estado.ABIERTA)
+        self._visita(self.sitio3, self.otro)  # de otro empleado
+        extra = PuntoControl.objects.create(
+            sitio=self.sitio,
+            nombre="Techo",
+            sector="Norte",
+            latitud="-36.100000",
+            longitud="-57.800000",
+        )
+        PuntoControl.objects.create(sitio=self.sitio, nombre="Baja", activo=False)
+        r = self.api.get(self.URL)
+        self.assertEqual(r.status_code, 200)
+        nombres = {(p["sitio"]["nombre"], p["nombre"]) for p in r.json()}
+        self.assertEqual(
+            nombres,
+            {("Planta 1", "General"), ("Planta 1", "Techo"), ("Planta 2", "General")},
+        )
+        techo = next(p for p in r.json() if p["id"] == extra.id)
+        self.assertEqual(techo["latitud"], -36.1)
+        self.assertEqual(techo["longitud"], -57.8)
+        self.assertEqual(techo["estado"], "sin_revisar")
+        self.assertEqual(techo["sector"], "Norte")
+
+        filtrado = self.api.get(self.URL, {"sitio": self.sitio2.id}).json()
+        self.assertEqual([p["sitio"]["id"] for p in filtrado], [self.sitio2.id])
+        ajeno = self.api.get(self.URL, {"sitio": self.sitio3.id}).json()
+        self.assertEqual(ajeno, [])
+        self.assertEqual(self.api.get(self.URL, {"sitio": "x"}).status_code, 400)
+
+    def test_realizada_o_sitio_inactivo_no_cuentan_y_solo_empleados(self):
+        self._visita(self.sitio, self.empleado, Visita.Estado.REALIZADA)
+        self._visita(self.sitio2, self.empleado)
+        Sitio.objects.filter(pk=self.sitio2.pk).update(activo=False)
+        self.assertEqual(self.api.get(self.URL).json(), [])
+        admin = APIClient()
+        admin.force_authenticate(self.admin)
+        self.assertEqual(admin.get(self.URL).status_code, 403)
+        self.assertEqual(APIClient().get(self.URL).status_code, 401)
