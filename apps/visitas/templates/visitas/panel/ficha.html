@@ -1,0 +1,60 @@
+{% extends "panel/base.html" %}
+{% load panel_ui %}
+{% block panel_contenido %}
+  <h1>Visita {{ visita.pk }}</h1>
+  <p>
+    {% include "panel/partials/etiqueta_estado.html" with tono=visita.estado|tono_estado texto=visita.get_estado_display %}
+    {% if visita.incidencia %}{% include "panel/partials/etiqueta_estado.html" with tono="danger" texto="Incidencia" %}{% endif %}
+  </p>
+  <dl>
+    <dt>Proyecto</dt><dd><a href="{% url 'panel:proyectos:ficha' visita.proyecto.pk %}">{{ visita.proyecto.titulo }}</a> ({{ visita.proyecto.sitio.nombre }})</dd>
+    <dt>Empleado</dt><dd>{{ visita.empleado.get_full_name|default:visita.empleado.username }}</dd>
+    <dt>Origen</dt><dd>{{ visita.get_origen_display }}</dd>
+    {% if visita.motivo_manual %}<dt>Motivo</dt><dd>{{ visita.motivo_manual }}</dd>{% endif %}
+    <dt>Programada para</dt><dd>{{ visita.programada_para|date:"d/m/Y"|default:"—" }}</dd>
+    <dt>Asignada por</dt><dd>{% if visita.asignada_por %}{{ visita.asignada_por.get_full_name|default:visita.asignada_por.username }}{% else %}—{% endif %}</dd>
+    <dt>Realizada</dt><dd>{{ visita.realizada_en|date:"d/m/Y H:i"|default:"—" }}</dd>
+    {% if visita.observaciones %}<dt>Observaciones</dt><dd>{{ visita.observaciones|linebreaksbr }}</dd>{% endif %}
+  </dl>
+
+  {% if visita.incidencia %}
+    <h2>Incidencia</h2>
+    <p>{{ visita.incidencia_detalle|default:"Sin detalle." }}</p>
+    {% if visita.incidencia_revisada_en %}
+      <p>Revisada por {{ visita.incidencia_revisada_por.get_full_name|default:visita.incidencia_revisada_por.username }} el {{ visita.incidencia_revisada_en|date:"d/m/Y H:i" }}.</p>
+    {% else %}
+      <form method="post" action="{% url 'panel:visitas:revisar_incidencia' visita.pk %}">
+        {% csrf_token %}
+        <button class="boton boton-primario" type="submit">Marcar como revisada</button>
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% if filas %}
+    <h2>Planilla</h2>
+    <table class="tabla planilla">
+      <tbody>{% for etiqueta, valor in filas %}<tr><th scope="row">{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody>
+    </table>
+  {% endif %}
+
+  {% if visita.productos.all %}
+    <h2>Productos aplicados</h2>
+    <ul>{% for aplicado in visita.productos.all %}<li>{{ aplicado.producto }} · lote {{ aplicado.lote }} · {{ aplicado.dosis }} {{ aplicado.unidad }}{% if aplicado.cantidad %} · cantidad {{ aplicado.cantidad }}{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if visita.fotos.all %}
+    <h2>Fotos</h2>
+    <div class="fotos">
+      {% for foto in visita.fotos.all %}
+        <img src="{% url 'panel:visitas:foto' foto.codigo %}" alt="Foto {{ forloop.counter }} de la visita" loading="lazy">
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <h2>Historial</h2>
+  <ul>
+    {% for cambio in historial %}
+      <li>{{ cambio.fecha|date:"d/m/Y H:i" }} · {% if cambio.usuario %}{{ cambio.usuario.get_full_name|default:cambio.usuario.username }}{% else %}Sistema{% endif %} · {{ cambio.tipo }}{% if cambio.campos %}: {{ cambio.campos|join:", " }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+{% endblock %}
