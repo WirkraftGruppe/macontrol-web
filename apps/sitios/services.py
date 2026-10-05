@@ -48,22 +48,12 @@ def suprimir_sitios(sitios):
 def regenerar_qr(punto):
     """Genera un nuevo ``qr_codigo`` del punto (invalida la etiqueta impresa).
 
-    Deja el motivo en el historial. Transición hasta que ``apps/visitas`` deje de
-    comparar ``Sitio.qr_codigo``: si el punto era el espejo del QR de su sitio
-    (el General), el código nuevo también se copia al sitio.
+    Deja el motivo en el historial.
     """
-    with transaction.atomic():
-        sitio = punto.sitio
-        espejo = punto.qr_codigo == sitio.qr_codigo
-        punto.qr_codigo = uuid.uuid4()
-        punto.qr_impreso_el = None
-        punto._change_reason = "Regeneración de QR"
-        punto.save(update_fields=["qr_codigo", "qr_impreso_el"])
-        if espejo:
-            sitio.qr_codigo = punto.qr_codigo
-            sitio.qr_impreso_el = None
-            sitio._change_reason = "Regeneración de QR"
-            sitio.save(update_fields=["qr_codigo", "qr_impreso_el", "actualizado"])
+    punto.qr_codigo = uuid.uuid4()
+    punto.qr_impreso_el = None
+    punto._change_reason = "Regeneración de QR"
+    punto.save(update_fields=["qr_codigo", "qr_impreso_el"])
     return punto.qr_codigo
 
 

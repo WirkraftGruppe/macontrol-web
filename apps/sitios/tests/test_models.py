@@ -1,9 +1,24 @@
+import datetime
+
+from django.contrib.auth import get_user_model
 from django.core.exceptions import FieldDoesNotExist, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from apps.clientes.models import Cliente
+from apps.proyectos.models import UMBRAL_PROXIMA_DIAS, Proyecto
+from apps.servicios.models import TipoServicio
+from apps.sitios.estado import (
+    GRAVEDAD_PUNTO,
+    EstadoPunto,
+    estado_revision,
+    estados_de_puntos,
+    peor_estado_punto,
+)
 from apps.sitios.models import Plano, PuntoControl, Sitio
+from apps.visitas.models import Revision, Visita
 
 
 class SitioTests(TestCase):
@@ -13,18 +28,11 @@ class SitioTests(TestCase):
     def _sitio(self, nombre, **extra):
         return Sitio.objects.create(cliente=self.cliente, nombre=nombre, **extra)
 
-    def test_qr_codigo_se_genera_y_es_unico(self):
-        uno = self._sitio("Planta 1")
-        dos = self._sitio("Planta 2")
-        self.assertIsNotNone(uno.qr_codigo)
-        self.assertIsNotNone(dos.qr_codigo)
-        self.assertNotEqual(uno.qr_codigo, dos.qr_codigo)
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                self._sitio("Planta 3", qr_codigo=uno.qr_codigo)
-
-    def test_qr_codigo_no_es_editable(self):
-        self.assertIs(Sitio._meta.get_field("qr_codigo").editable, False)
+    def test_sitio_ya_no_tiene_qr_propio(self):
+        for campo in ("qr_codigo", "qr_impreso_el"):
+            for modelo in (Sitio, Sitio.history.model):
+                with self.assertRaises(FieldDoesNotExist):
+                    modelo._meta.get_field(campo)
 
     def test_historial_registra_cambios(self):
         sitio = self._sitio("Planta 1")
@@ -59,11 +67,12 @@ class PuntoControlTests(TestCase):
         self.assertFalse(self.sitio.puntos.filter(activo=True).exists())
         self.assertEqual(self.sitio.puntos.count(), 3)
 
-    def test_sitio_nuevo_recibe_punto_general_con_el_mismo_qr(self):
+    def test_sitio_nuevo_recibe_punto_general_con_qr_propio(self):
         general = self.sitio.puntos.get()
         self.assertEqual(general.nombre, "General")
         self.assertEqual(general.orden, 0)
-        self.assertEqual(general.qr_codigo, self.sitio.qr_codigo)
+        otro = Sitio.objects.create(cliente=self.cliente, nombre="Planta 2")
+        self.assertNotEqual(general.qr_codigo, otro.puntos.get().qr_codigo)
         self.sitio.nombre = "Planta Norte"
         self.sitio.save()
         self.assertEqual(self.sitio.puntos.count(), 1)
@@ -91,3 +100,135 @@ class PuntoControlTests(TestCase):
         punto.ubicacion_propuesta = {"lat": -36.1, "lng": -57.8}
         punto.save()
         self.assertEqual(punto.history.count(), 2)
+
+
+class EstadoRevisionTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        cliente = Cliente.objects.create(razon_social="ACME")
+        self.sitio = Sitio.objects.create(cliente=cliente, nombre="Planta 1")
+        self.punto = self.sitio.puntos.get()
+        self.empleado = User.objects.create_user(
+            "emp", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+        self.proyecto = self._proyecto("Control", frecuencia_dias=30)
+
+    def _proyecto(self, titulo, **extra):
+        return Proyecto.objects.create(
+            sitio=self.sitio,
+            tipo_servicio=self.tipo,
+            titulo=titulo,
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+            **extra,
+        )
+
+    def _revision(
+        self, proyecto, dias_atras, punto=None, estado=Visita.Estado.REALIZADA
+    ):
+        momento = timezone.now() - datetime.timedelta(days=dias_atras)
+        visita = Visita.objects.create(
+            proyecto=proyecto,
+            empleado=self.empleado,
+            origen=Visita.Origen.APP,
+            estado=estado,
+            abierta_en=momento,
+        )
+        return Revision.objects.create(
+            visita=visita,
+            punto=punto or self.punto,
+            realizada_en=momento,
+            recibida_en=momento,
+        )
+
+    def test_vencida_proxima_al_dia_sin_revisar(self):
+        self.assertEqual(
+            estado_revision(self.punto, self.proyecto), EstadoPunto.SIN_REVISAR
+        )
+        casos = [
+            (35, EstadoPunto.VENCIDA),
+            (30 - 3, EstadoPunto.PROXIMA),
+            (30 - UMBRAL_PROXIMA_DIAS, EstadoPunto.PROXIMA),
+            (10, EstadoPunto.AL_DIA),
+        ]
+        for dias, esperado in casos:
+            with self.subTest(dias=dias):
+                Revision.objects.all().delete()
+                self._revision(self.proyecto, dias)
+                self.assertEqual(estado_revision(self.punto, self.proyecto), esperado)
+        sin_frecuencia = self._proyecto("Sin frecuencia")
+        self.assertEqual(
+            estado_revision(self.punto, sin_frecuencia), EstadoPunto.SIN_REVISAR
+        )
+        self._revision(sin_frecuencia, 400)
+        self.assertEqual(
+            estado_revision(self.punto, sin_frecuencia), EstadoPunto.AL_DIA
+        )
+
+    def test_cuentan_abiertas_y_la_ultima_pero_no_canceladas(self):
+        self._revision(self.proyecto, 100, estado=Visita.Estado.CANCELADA)
+        self.assertEqual(
+            estado_revision(self.punto, self.proyecto), EstadoPunto.SIN_REVISAR
+        )
+        self._revision(self.proyecto, 100)
+        self._revision(self.proyecto, 1, estado=Visita.Estado.ABIERTA)
+        self._revision(self.proyecto, 0, estado=Visita.Estado.CANCELADA)
+        self.assertEqual(estado_revision(self.punto, self.proyecto), EstadoPunto.AL_DIA)
+        self.assertEqual(
+            estados_de_puntos([self.punto]), {self.punto.pk: EstadoPunto.AL_DIA}
+        )
+
+    def test_punto_toma_el_peor_estado_de_los_proyectos_activos(self):
+        self._revision(self.proyecto, 1)
+        self._proyecto("Pausado", estado=Proyecto.Estado.PAUSADO)
+        self.assertEqual(
+            estados_de_puntos([self.punto])[self.punto.pk], EstadoPunto.AL_DIA
+        )
+        self._proyecto("Nuevo", frecuencia_dias=10)
+        self.assertEqual(
+            estados_de_puntos([self.punto])[self.punto.pk], EstadoPunto.SIN_REVISAR
+        )
+
+    def test_sitio_sin_proyectos_activos_y_lista_vacia(self):
+        self.proyecto.estado = Proyecto.Estado.FINALIZADO
+        self.proyecto.save()
+        self.assertEqual(
+            estados_de_puntos([self.punto]), {self.punto.pk: EstadoPunto.AL_DIA}
+        )
+        self.assertEqual(estados_de_puntos([]), {})
+
+    def test_peor_estado_y_gravedad(self):
+        self.assertEqual(
+            sorted(GRAVEDAD_PUNTO, key=GRAVEDAD_PUNTO.get),
+            [
+                EstadoPunto.AL_DIA,
+                EstadoPunto.PROXIMA,
+                EstadoPunto.SIN_REVISAR,
+                EstadoPunto.VENCIDA,
+            ],
+        )
+        self.assertEqual(
+            peor_estado_punto(["al_dia", "sin_revisar", "proxima"]), "sin_revisar"
+        )
+        self.assertEqual(peor_estado_punto(["proxima", "vencida"]), "vencida")
+        self.assertEqual(peor_estado_punto([]), EstadoPunto.AL_DIA)
+
+    def test_estados_de_puntos_consultas_constantes(self):
+        def medir(cantidad):
+            for i in range(cantidad):
+                punto = PuntoControl.objects.create(
+                    sitio=self.sitio,
+                    nombre=f"P{self.sitio.puntos.count()}",
+                    orden=i + 1,
+                )
+                self._revision(self.proyecto, 5, punto=punto)
+            puntos = list(self.sitio.puntos.all())
+            with CaptureQueriesContext(connection) as consultas:
+                estados = estados_de_puntos(puntos)
+            return len(consultas), estados
+
+        pocas, _ = medir(1)
+        muchas, estados = medir(6)
+        self.assertEqual(pocas, muchas)
+        self.assertEqual(len(estados), 8)
