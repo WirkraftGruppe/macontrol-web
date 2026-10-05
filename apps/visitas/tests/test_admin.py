@@ -267,3 +267,44 @@ class FormVisitaTests(TestCase):
         self.assertEqual(
             set(FotoInlineForm._meta.fields), {"visita", "imagen", "tomada_en", "orden"}
         )
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class AdminPendienteTests(TestCase):
+    def test_post_forjado_con_foto_se_rechaza(self):
+        pendiente = crear_visita()
+        foto = Foto.objects.create(visita=pendiente, imagen=_imagen_real())
+        administrador = User.objects.create_superuser(
+            username="root-pend", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.client.force_login(administrador)
+        url = reverse("admin:visitas_visita_change", args=[pendiente.pk])
+        self.client.post(
+            url,
+            {
+                "estado": Visita.Estado.REALIZADA,
+                "realizada_en_0": "2026-10-01",
+                "realizada_en_1": "10:00:00",
+                "latitud": "-35.1",
+                "longitud": "-58.1",
+                "datos": '{"a": 1}',
+                "proyecto": pendiente.proyecto_id,
+                "empleado": pendiente.empleado_id,
+                "origen": Visita.Origen.APP,
+                "fotos-TOTAL_FORMS": 1,
+                "fotos-INITIAL_FORMS": 1,
+                "fotos-0-id": foto.pk,
+                "fotos-0-visita": pendiente.pk,
+                "fotos-0-orden": 5,
+                "productos-TOTAL_FORMS": 0,
+                "productos-INITIAL_FORMS": 0,
+            },
+        )
+        pendiente.refresh_from_db()
+        foto.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+        self.assertIsNone(pendiente.realizada_en)
+        self.assertIsNone(pendiente.latitud)
+        self.assertIsNone(pendiente.longitud)
+        self.assertEqual(pendiente.datos, {})
+        self.assertEqual(foto.orden, 0)

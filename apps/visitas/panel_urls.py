@@ -20,4 +20,9 @@ urlpatterns = [
         panel_views.AsignarVisita.as_view(),
         name="asignar",
     ),
+    path(
+        "proyectos/<int:proyecto_pk>/manual/",
+        panel_views.RegistrarVisitaManual.as_view(),
+        name="manual",
+    ),
 ]
