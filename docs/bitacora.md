@@ -1,19 +1,25 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-04-panel.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| panel | plan/panel | 4 (cerrada) | el usuario aprueba la FALLA de `congelado.sh` (contrato modificado `2cebc16`) y decide la fusión en `main`; decidir P-panel-17 | 2026-10-04/05 |
 
-Siguiente: fusión de `panel`. Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-05 — Fusión en `main` de `panel`
+Hecho:
+- El usuario aprobó `plan/panel` con la verificación TODO en FALLA 1/115: la única FALLA es `congelado.sh` por el contrato modificado `2cebc16`, que él mismo autorizó. Verificador y verificador-b coincidieron (HEAD `f21d709`).
+- `main` recibió `plan/panel` con `merge --no-ff`. Las 7 decisiones del plan se copiaron al final de `docs/decisiones.md`.
+- Etiquetas: P-panel-4, -5, -6 y -17 → `panel-cierre` (P-panel-17 se corrige pasando `geocodificar` a POST; el usuario no lo acepta como decisión). P-panel-8, -16 y -23 → `despliegue`.
+Pendiente: plan `panel-cierre`.
 
 ### 2026-10-05 — Plan `panel`: las cuatro olas integradas, verificación TODO 114/115
 Hecho:
