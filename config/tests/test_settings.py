@@ -28,6 +28,13 @@ def _correr(args, **entorno):
 
 
 class SettingsTests(SimpleTestCase):
+    def test_samesite_lax_fijado(self):
+        """SameSite y el tope de archivos se fijan explícitos en base.py."""
+        from config.settings import base
+
+        self.assertEqual(getattr(base, "SESSION_COOKIE_SAMESITE", None), "Lax")
+        self.assertEqual(getattr(base, "DATA_UPLOAD_MAX_NUMBER_FILES", None), 12)
+
     def test_dev_rechaza_hosts_publicos(self):
         r = _correr(
             ["check"], DJANGO_ENV="development", ALLOWED_HOSTS="macontrol.com.ar"
