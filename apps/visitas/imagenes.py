@@ -66,11 +66,13 @@ def procesar_imagen(archivo) -> ContentFile:
                 imagen.info = {}
                 salida = BytesIO()
                 imagen.save(salida, format="JPEG", quality=CALIDAD_JPEG)
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+        raise ValidationError(
+            "La imagen tiene una resolución demasiado alta; use una más chica."
+        ) from error
     except (
         UnidentifiedImageError,
         OSError,
-        Image.DecompressionBombError,
-        Image.DecompressionBombWarning,
         # Un zTXt/iTXt que descomprime más de MAX_TEXT_CHUNK lanza ValueError
         # en open() o en load(): es un archivo inválido, no un error del servidor.
         ValueError,

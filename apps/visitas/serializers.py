@@ -11,10 +11,9 @@ from rest_framework import serializers
 
 from .models import ProductoAplicado, Visita
 from .planillas import MAX_LARGO_TEXTO
+from .services import MAX_FOTOS, MAX_PRODUCTOS
 
-MAX_FOTOS = 10
 MAX_BYTES_FOTO = 8 * 1024 * 1024
-MAX_PRODUCTOS = 30
 MAX_CARACTERES_JSON = 50_000
 
 

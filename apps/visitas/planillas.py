@@ -4,14 +4,27 @@ import math
 from datetime import date
 
 MAX_LARGO_TEXTO = 2000
+MAX_DIGITOS_NUMERO = 15
 TIPOS = ("texto", "numero", "booleano", "opcion", "opcion_multiple", "fecha")
 
 
 def _es_numero(valor):
+    """Número finito, no booleano y con a lo sumo `MAX_DIGITOS_NUMERO` dígitos."""
     return (
         isinstance(valor, (int, float))
         and not isinstance(valor, bool)
         and (isinstance(valor, int) or math.isfinite(valor))
+        and abs(valor) < 10**MAX_DIGITOS_NUMERO
+    )
+
+
+def _es_opcion(valor, opciones):
+    """Pertenencia con tipo estricto: `True` no es la opción `1` ni `False` la `0`."""
+    if isinstance(valor, (dict, list)):
+        return False
+    return any(
+        isinstance(valor, bool) == isinstance(opcion, bool) and valor == opcion
+        for opcion in opciones
     )
 
 
@@ -43,13 +56,12 @@ def _errores_de_campo(campo, valor):
     if tipo == "fecha" and not _es_fecha_iso(valor):
         return ["Debe ser una fecha válida con formato AAAA-MM-DD."]
     if tipo == "opcion":
-        # `in` sobre una lista con un valor no hashable (dict, lista) no falla.
-        if isinstance(valor, (dict, list)) or valor not in opciones:
+        if not _es_opcion(valor, opciones):
             return ["Debe ser una de las opciones permitidas."]
     if tipo == "opcion_multiple":
         if not isinstance(valor, list):
             return ["Debe ser una lista de opciones."]
-        if any(isinstance(v, (dict, list)) or v not in opciones for v in valor):
+        if not all(_es_opcion(v, opciones) for v in valor):
             return ["Todos los valores deben ser opciones permitidas."]
         if len({repr(v) for v in valor}) != len(valor):
             return ["No puede repetir opciones."]

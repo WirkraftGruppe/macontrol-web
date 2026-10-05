@@ -4,11 +4,14 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from unittest import mock
 from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import OperationalError, connection, models
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from PIL import Image
 
@@ -18,6 +21,8 @@ from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla
 from apps.visitas.models import Foto, ProductoAplicado, Visita
 from apps.visitas.services import (
+    MAX_FOTOS,
+    MAX_PRODUCTOS,
     VisitaDuplicada,
     registrar_visita_desde_app,
     registrar_visita_realizada,
@@ -377,3 +382,81 @@ class RegistrarDesdeAppTests(TestCase):
         self.assertGreaterEqual(visita.recibida_en, antes)
         self.assertLessEqual(visita.recibida_en, timezone.now())
         self.assertLess(visita.realizada_en, visita.recibida_en)
+
+    def item_valido(self, producto=None):
+        return {
+            "producto": (producto or self.producto).pk,
+            "lote": "L1",
+            "dosis": "2.5",
+            "unidad": "ml/l",
+            "cantidad": None,
+        }
+
+    def test_mas_fotos_que_el_tope_se_rechaza(self):
+        fotos = [jpeg_chico() for _ in range(MAX_FOTOS + 1)]
+        with self.assertRaises(ValidationError) as contexto:
+            self.registrar(fotos=fotos)
+        self.assertIn("fotos", contexto.exception.message_dict)
+        self.assertNadaCreado()
+
+    def test_mas_productos_que_el_tope_se_rechaza(self):
+        item = self.item_valido()
+        with self.assertRaises(ValidationError) as contexto:
+            self.registrar(productos_aplicados=[item] * (MAX_PRODUCTOS + 1))
+        self.assertIn("productos_aplicados", contexto.exception.message_dict)
+        self.assertNadaCreado()
+
+    def test_productos_se_buscan_en_una_consulta(self):
+        otro = Producto.objects.create(nombre_comercial="Gel")
+        items = [self.item_valido(p) for p in (self.producto, otro, self.producto)]
+        with CaptureQueriesContext(connection) as consultas:
+            self.registrar(productos_aplicados=items)
+        sobre_productos = [
+            c["sql"] for c in consultas if 'FROM "productos_producto"' in c["sql"]
+        ]
+        self.assertEqual(len(sobre_productos), 1, sobre_productos)
+
+    def test_fallo_del_insert_de_foto_no_deja_archivo_huerfano(self):
+        guardar = models.Model.save_base
+
+        def falla_en_foto(instancia, *args, **kwargs):
+            if isinstance(instancia, Foto):
+                raise OperationalError("fallo simulado del INSERT")
+            return guardar(instancia, *args, **kwargs)
+
+        with mock.patch.object(models.Model, "save_base", falla_en_foto):
+            with self.assertRaises(OperationalError):
+                self.registrar()
+        self.assertNadaCreado()
+
+    def test_error_al_borrar_no_tapa_la_excepcion_original(self):
+        basura = SimpleUploadedFile("x.jpg", b"no es imagen", "image/jpeg")
+        with mock.patch(
+            "django.core.files.storage.FileSystemStorage.delete",
+            side_effect=OSError("no se pudo borrar"),
+        ):
+            with self.assertRaises(ValidationError) as contexto:
+                self.registrar(fotos=[jpeg_chico(), basura])
+        self.assertIn("fotos", contexto.exception.message_dict)
+
+    def test_cliente_uuid_obligatorio(self):
+        with self.assertRaises(ValidationError) as contexto:
+            self.registrar(cliente_uuid=None)
+        self.assertIn("cliente_uuid", contexto.exception.message_dict)
+        self.assertNadaCreado()
+
+    def test_latitud_fuera_de_rango_se_rechaza(self):
+        for valor in (Decimal("90.1"), Decimal("-91")):
+            with self.subTest(valor=valor):
+                with self.assertRaises(ValidationError) as contexto:
+                    self.registrar(latitud=valor)
+                self.assertIn("latitud", contexto.exception.message_dict)
+                self.assertNadaCreado()
+
+    def test_longitud_fuera_de_rango_se_rechaza(self):
+        for valor in (Decimal("180.1"), Decimal("-181")):
+            with self.subTest(valor=valor):
+                with self.assertRaises(ValidationError) as contexto:
+                    self.registrar(longitud=valor)
+                self.assertIn("longitud", contexto.exception.message_dict)
+                self.assertNadaCreado()
