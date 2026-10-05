@@ -173,7 +173,6 @@ Ninguna subtarea crea migraciones en paralelo con otra de la misma app. T5 y T6 
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_planos.PlanoTests.test_imagen_grande_se_reduce_a_4000_px --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_services.RegenerarQrPuntoTests.test_regenera_solo_el_punto_y_respeta_tope --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ResolverQRTests.test_qr_de_punto_inactivo_da_404 --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.PuntoControlTests.test_sitio_nuevo_recibe_punto_general_con_el_mismo_qr --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 1000 --subtarea T3`
@@ -260,6 +259,7 @@ Ninguna subtarea crea migraciones en paralelo con otra de la misma app. T5 y T6 
 - **Criterios**:
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.EstadoRevisionTests.test_vencida_proxima_al_dia_sin_revisar --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.EstadoRevisionTests.test_estados_de_puntos_consultas_constantes --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.PuntoControlTests.test_sitio_nuevo_recibe_punto_general_con_qr_propio --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py shell -c "import sys; from apps.sitios.models import Sitio; sys.exit(int(any(f.name in ('qr_codigo', 'qr_impreso_el') for f in Sitio._meta.get_fields()) or any(f.name in ('qr_codigo', 'qr_impreso_el') for f in Sitio.history.model._meta.get_fields())))"`
   - `[grep-0]` `grep -rn "sitio\.qr_codigo\|sitio__qr_codigo" apps --include=*.py --exclude-dir=migrations --exclude=test_migraciones.py`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
