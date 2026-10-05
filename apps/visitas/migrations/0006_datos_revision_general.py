@@ -9,7 +9,9 @@ def crear_revisiones_generales(apps, schema_editor):
     no genera. Por cada visita con evidencia (o realizada) crea una revisión en el
     punto ``orden=0`` del sitio con las coordenadas, el ``cliente_uuid``, las fechas
     y la planilla; reasigna sus fotos y productos; completa ``abierta_en`` y
-    ``cierre``, y deja ``datos`` y ``esquema_planilla`` de la visita vacíos.
+    ``cierre``, y deja ``datos`` y ``esquema_planilla`` de la visita vacíos. Una
+    visita no realizada con evidencia conserva su revisión pero queda con
+    ``incidencia`` marcada: la revisión heredada no sirve para cerrarla.
     """
     Visita = apps.get_model("visitas", "Visita")
     Revision = apps.get_model("visitas", "Revision")
@@ -55,6 +57,12 @@ def crear_revisiones_generales(apps, schema_editor):
         if visita.estado == "realizada":
             cambios["abierta_en"] = visita.cerrada_en
             cambios["cierre"] = "empleado" if visita.origen == "app" else "administrador"
+        else:
+            # La evidencia no se pierde, pero no cuenta para cerrar la visita.
+            cambios["incidencia"] = True
+            cambios["incidencia_detalle"] = (
+                "Evidencia migrada de una visita pendiente (plan puntos-control); revisar."
+            )
         Visita.objects.filter(pk=visita.pk).update(**cambios)
 
 
@@ -64,7 +72,8 @@ def devolver_evidencia_a_visitas(apps, schema_editor):
     Copia coordenadas, ``cliente_uuid``, ``recibida_en``, planilla, fotos y productos
     de la primera revisión a la visita. Si había varias revisiones, las demás se
     pierden al borrar la tabla: solo la revisión "General" migrada es reversible sin
-    pérdida.
+    pérdida. La marca de incidencia de las visitas no realizadas se deja, porque no
+    se distingue de una incidencia cargada a mano.
     """
     Visita = apps.get_model("visitas", "Visita")
     Revision = apps.get_model("visitas", "Revision")

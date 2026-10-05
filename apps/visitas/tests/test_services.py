@@ -91,6 +91,18 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         argumentos.update(extra)
         return registrar_revision(**argumentos)
 
+    def test_revision_sin_coordenadas_se_rechaza(self):
+        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        for campo in ("latitud", "longitud"):
+            with self.subTest(campo=campo):
+                with self.assertRaises(ValidationError) as contexto:
+                    self.revisar(visita, **{campo: None})
+                self.assertEqual(
+                    contexto.exception.message_dict[campo],
+                    ["Este campo es obligatorio."],
+                )
+        self.assertEqual(visita.revisiones.count(), 0)
+
     def test_abrir_revisar_cerrar_actualiza_proyecto(self):
         self.proyecto.frecuencia_dias = 30
         self.proyecto.save()
@@ -372,6 +384,39 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
         cerrar_visita(visita, quien=visita.empleado, cierre=Visita.Cierre.EMPLEADO)
         proyecto.refresh_from_db()
         self.assertEqual(proyecto.proxima_visita, date(2027, 1, 1))
+
+    def test_revisiones_anteriores_a_la_apertura_no_cuentan(self):
+        visita = abierta(abierta_en=self.ahora - timedelta(minutes=10))
+        crear_revision(
+            visita,
+            realizada_en=self.ahora - timedelta(days=3),
+            recibida_en=self.ahora - timedelta(days=3),
+        )
+        with self.assertRaises(ValidationError):
+            cerrar_visita(visita, quien=visita.empleado, cierre=Visita.Cierre.EMPLEADO)
+        sistema = cerrar_visita(visita, quien=None, cierre=Visita.Cierre.SISTEMA)
+        self.assertEqual(sistema.estado, Visita.Estado.CANCELADA)
+
+    def test_revision_diferida_recibida_en_la_jornada_cuenta(self):
+        punto = punto_de(crear_visita())
+        proyecto = punto.sitio.proyectos.get()
+        empleado = proyecto.encargado_actual
+        visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
+        registrar_revision(
+            visita=visita,
+            empleado=empleado,
+            qr_codigo=punto.qr_codigo,
+            cliente_uuid=uuid4(),
+            realizada_en=timezone.now() - timedelta(hours=2),
+            latitud=Decimal("-35.1"),
+            longitud=Decimal("-57.7"),
+            precision_m=None,
+            datos={},
+            productos_aplicados=[],
+            fotos=[jpeg_chico()],
+        )
+        cerrada = cerrar_visita(visita, quien=empleado, cierre=Visita.Cierre.EMPLEADO)
+        self.assertEqual(cerrada.estado, Visita.Estado.REALIZADA)
 
     def test_exige_al_menos_una_revision(self):
         visita = abierta()
