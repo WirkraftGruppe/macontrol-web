@@ -513,7 +513,7 @@ Ninguna subtarea crea migraciones en paralelo con otra de la misma app. T5 y T6 
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): puntos-control>
+commit_base: 4e2c496
 
 ### Estado de subtareas
 
@@ -549,5 +549,3 @@ commit_base: <hash del commit docs(plan): puntos-control>
 ### Decisiones
 
 ### Cierra
-
----
