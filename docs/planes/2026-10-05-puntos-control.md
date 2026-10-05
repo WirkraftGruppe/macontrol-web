@@ -526,7 +526,7 @@ commit_base: 4e2c496
 | T5 | hecha |
 | T6 | hecha |
 | T7 | hecha |
-| T8 | pendiente |
+| T8 | hecha |
 | T9 | pendiente |
 | T10 | pendiente |
 | T11 | pendiente |
@@ -547,6 +547,7 @@ commit_base: 4e2c496
 | 2026-10-05 | T6 | 5da9800 | PASA 7/7 | verificador en el worktree, antes del contrato modificado |
 | 2026-10-05 | T3, T5, T6, T7 | 917e580 | FALLA formal (0/32 criterios en FALLA) | verificador; la única FALLA es congelado.sh por el contrato modificado 50822be (decisión del usuario: el criterio del punto General pasa de T3 a T6) |
 | 2026-10-05 | T5 (con T5b) | 5401ad3 | FALLA formal (0/13 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad ola 1: sin bloqueantes; importantes 1 y 2 corregidos en T5b (04a54d0, 5401ad3) y cerrados en la re-auditoría |
+| 2026-10-05 | T8 | 735f76b | FALLA formal (0/5 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be |
 
 ## Pendientes que deja este plan
 
@@ -570,6 +571,7 @@ commit_base: 4e2c496
 - P-puntos-control-16 [observación] [despliegue] Antes de migrar en producción, contar las visitas no realizadas con evidencia (comando de la auditoría ola 1, hallazgo 1); la corrección T5b las marca con incidencia.
 - P-puntos-control-17 [menor] Re-auditoría T5b: la carga manual (`apps/visitas/panel_forms.py` selector `pendiente`, `registrar_visita_manual`) acepta una pendiente migrada con revisiones: absorbe la evidencia heredada (dos revisiones `orden=1`) y el formulario pisa `incidencia=True` de `visitas/0006` con `False`. Excluir las pendientes con revisiones del selector y del servicio (para T12).
 - P-puntos-control-18 [observación] [empresa] Las pendientes migradas con evidencia violan `Visita.clean()` (una pendiente no tiene revisiones): editarlas en el admin falla y `MisVisitasView` y el resolver se las siguen ofreciendo al empleado aunque `abrir_visita` no las use; si son de otro empleado, cada apertura del proyecto marca `incidencia_asignacion`. Decidir si se cancelan al migrar o las resuelve un administrador.
+- P-puntos-control-19 [observación] T8: un punto activo con plano pero sin `x`/`y` no aparece en `plano.puntos` del resolver (no hay dónde dibujar el marcador); el contrato no lo definía.
 
 ### Decisiones
 
