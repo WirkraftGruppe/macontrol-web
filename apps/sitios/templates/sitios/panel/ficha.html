@@ -1,0 +1,43 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ object.nombre }} · MAControl{% endblock %}
+{% block panel_contenido %}
+{% with sitio=object %}
+<h1>{{ sitio.nombre }}</h1>
+<p>
+  <a class="boton boton-secundario" href="{% url 'panel:sitios:editar' sitio.pk %}">Editar</a>
+  <a class="boton boton-secundario" href="{% url 'panel:sitios:listado' %}">Volver al listado</a>
+</p>
+<dl class="datos">
+  <dt>Cliente</dt><dd>{% url 'panel:clientes:ficha' sitio.cliente.pk as u %}{% if u %}<a href="{{ u }}">{{ sitio.cliente }}</a>{% else %}{{ sitio.cliente }}{% endif %}</dd>
+  <dt>Dirección</dt><dd>{{ sitio.direccion|default:"—" }}</dd>
+  <dt>Localidad</dt><dd>{{ sitio.localidad|default:"—" }}</dd>
+  <dt>Sector</dt><dd>{{ sitio.get_sector_display }}</dd>
+  <dt>Coordenadas</dt><dd>{% if sitio.latitud is not None and sitio.longitud is not None %}{{ sitio.latitud }}, {{ sitio.longitud }}{% else %}Sin cargar{% endif %}</dd>
+  <dt>Contacto en el sitio</dt><dd>{{ sitio.contacto_en_sitio|default:"—" }} {{ sitio.telefono_en_sitio }}</dd>
+  <dt>Horario de acceso</dt><dd>{{ sitio.horario_acceso|default:"—" }}</dd>
+  <dt>Notas</dt><dd>{{ sitio.notas|default:"—"|linebreaksbr }}</dd>
+  <dt>Estado</dt><dd>{% if sitio.activo %}Activo{% else %}Inactivo{% endif %}</dd>
+</dl>
+
+<section>
+  <h2>Código QR</h2>
+  <img src="{% url 'panel:sitios:qr_png' sitio.pk %}?inline=1" alt="Código QR de {{ sitio.nombre }}" width="260">
+  <p>Impreso el: {{ sitio.qr_impreso_el|date:"d/m/Y"|default:"sin imprimir" }}</p>
+  <p>
+    <a class="boton boton-primario" href="{% url 'panel:sitios:qr_png' sitio.pk %}">Descargar PNG</a>
+    <a class="boton boton-peligro" href="{% url 'panel:sitios:regenerar_qr' sitio.pk %}">Regenerar QR</a>
+  </p>
+</section>
+
+<section>
+  <h2>Proyectos</h2>
+  <ul>
+    {% for proyecto in proyectos %}
+    <li>{% url 'panel:proyectos:ficha' proyecto.pk as u %}{% if u %}<a href="{{ u }}">{{ proyecto.titulo }}</a>{% else %}{{ proyecto.titulo }}{% endif %} · {{ proyecto.tipo_servicio }} · {{ proyecto.get_estado_display }}</li>
+    {% empty %}
+    <li>Este sitio no tiene proyectos.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endwith %}
+{% endblock %}
