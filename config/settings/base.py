@@ -58,6 +58,10 @@ def leer_atraso_maximo_horas():
 # administrador como manual (P-api-movil-16).
 ATRASO_MAXIMO_HORAS = leer_atraso_maximo_horas()
 
+# Una visita abierta desde hace más horas la cierra `cerrar_visitas_abiertas` con
+# cierre "sistema" (plan puntos-control).
+VISITA_ABIERTA_MAXIMO_HORAS = 16
+
 
 INSTALLED_APPS = [
     "config.apps.AdminMAControlConfig",
