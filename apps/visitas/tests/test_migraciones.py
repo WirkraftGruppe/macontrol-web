@@ -143,6 +143,36 @@ class MigracionRevisionesTests(TransactionTestCase):
         self.assertEqual(pendiente.estado, "pendiente")
         self.assertIsNone(pendiente.abierta_en)
 
+    def test_pendiente_con_evidencia_queda_con_incidencia_y_no_se_cierra_sin_escaneo(
+        self,
+    ):
+        datos = self._datos_viejos()
+        apps = _migrar(_destino(ANTES))
+        apps.get_model("visitas", "Foto").objects.create(
+            visita_id=datos["pendiente"].pk, imagen="visitas/fotos/pendiente.jpg"
+        )
+        apps = _migrar(_destino(DESPUES))
+        Visita = apps.get_model("visitas", "Visita")
+        Revision = apps.get_model("visitas", "Revision")
+
+        pendiente = Visita.objects.get(pk=datos["pendiente"].pk)
+        self.assertEqual(pendiente.estado, "pendiente")
+        self.assertEqual(Revision.objects.filter(visita=pendiente).count(), 1)
+        self.assertTrue(pendiente.incidencia)
+        self.assertIn(
+            "Evidencia migrada de una visita pendiente", pendiente.incidencia_detalle
+        )
+
+        # Con los modelos reales: no se reutiliza y, si se abriera, no se cierra.
+        from apps.accounts.models import User
+        from apps.visitas.models import Visita as VisitaReal
+        from apps.visitas.services import abrir_visita
+
+        empleado = User.objects.get(pk=pendiente.empleado_id)
+        real = VisitaReal.objects.get(pk=pendiente.pk)
+        abierta, _ = abrir_visita(empleado=empleado, proyecto=real.proyecto)
+        self.assertNotEqual(abierta.pk, real.pk)
+
     def test_vuelta_atras_devuelve_la_evidencia_a_la_visita(self):
         datos = self._datos_viejos()
         _migrar(_destino(DESPUES))

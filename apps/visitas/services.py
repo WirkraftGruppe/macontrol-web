@@ -6,7 +6,7 @@ from uuid import UUID
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F, Q
+from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 from simple_history.utils import update_change_reason
 
@@ -132,13 +132,17 @@ def _armar_productos(productos_aplicados):
     return instancias, errores
 
 
-def _validar_coordenadas(latitud, longitud):
-    """Errores por campo si la latitud o la longitud están fuera de rango."""
+def _validar_coordenadas(latitud, longitud, obligatorias=False):
+    """Errores por campo si la latitud o la longitud faltan (si son obligatorias)
+    o están fuera de rango."""
     errores = {}
     for clave, valor, limite in (
         ("latitud", latitud, 90),
         ("longitud", longitud, 180),
     ):
+        if valor is None and obligatorias:
+            errores[clave] = ["Este campo es obligatorio."]
+            continue
         try:
             fuera = valor is not None and not -limite <= valor <= limite
         except TypeError:
@@ -189,9 +193,11 @@ def _pendiente_para(proyecto, empleado):
     pendientes = Visita.objects.filter(
         proyecto=proyecto, estado=Visita.Estado.PENDIENTE
     )
+    # Una pendiente con revisiones (evidencia migrada) no se reutiliza.
+    sin_revisiones = ~Exists(Revision.objects.filter(visita=OuterRef("pk")))
     propia = (
         pendientes.select_for_update()
-        .filter(empleado=empleado)
+        .filter(sin_revisiones, empleado=empleado)
         .order_by(F("programada_para").asc(nulls_last=True), "pk")
         .first()
     )
@@ -304,7 +310,7 @@ def _guardar_revision(
     """Valida y crea la revisión dentro de la transacción del llamador."""
     proyecto = _cargar_proyecto(visita.proyecto_id)
     punto = _resolver_punto(proyecto, qr_codigo)
-    errores = _validar_coordenadas(latitud, longitud)
+    errores = _validar_coordenadas(latitud, longitud, obligatorias=True)
     esquema = proyecto.tipo_servicio.esquema_planilla("punto")
     errores_evidencia, aplicados = _validar_evidencia(
         esquema, datos, productos_aplicados
@@ -483,7 +489,11 @@ def cerrar_visita(
             quien is not None and quien.es_administrador
         ):
             raise ValidationError("Solo un administrador puede cerrar de este modo.")
-        ultima = visita_bd.revisiones.order_by("-realizada_en", "-id").first()
+        revisiones = visita_bd.revisiones.all()
+        if cierre != Visita.Cierre.ADMINISTRADOR:
+            # Solo cuentan las tomadas durante esta jornada (no la evidencia heredada).
+            revisiones = revisiones.filter(realizada_en__gte=visita_bd.abierta_en)
+        ultima = revisiones.order_by("-realizada_en", "-id").first()
         if ultima is None:
             if cierre != Visita.Cierre.SISTEMA:
                 raise ValidationError("La visita necesita al menos una revisión.")
@@ -576,6 +586,10 @@ def registrar_visita_desde_app(
             # Los errores de QR salen antes de abrir nada.
             _resolver_punto(proyecto, qr_codigo)
             visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
+            if realizada_en < visita.abierta_en:
+                # La revisión viene de un envío diferido: la jornada empezó con ella.
+                visita.abierta_en = realizada_en
+                visita.save(update_fields=["abierta_en"])
             _guardar_revision(
                 visita=visita,
                 qr_codigo=qr_codigo,

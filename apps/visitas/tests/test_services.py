@@ -80,7 +80,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
             "empleado": self.empleado,
             "qr_codigo": self.punto.qr_codigo,
             "cliente_uuid": uuid4(),
-            "realizada_en": timezone.now() - timedelta(minutes=5),
+            "realizada_en": timezone.now(),
             "latitud": Decimal("-35.1"),
             "longitud": Decimal("-57.7"),
             "precision_m": Decimal("8.5"),
@@ -90,6 +90,18 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         }
         argumentos.update(extra)
         return registrar_revision(**argumentos)
+
+    def test_revision_sin_coordenadas_se_rechaza(self):
+        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        for campo in ("latitud", "longitud"):
+            with self.subTest(campo=campo):
+                with self.assertRaises(ValidationError) as contexto:
+                    self.revisar(visita, **{campo: None})
+                self.assertEqual(
+                    contexto.exception.message_dict[campo],
+                    ["Este campo es obligatorio."],
+                )
+        self.assertEqual(visita.revisiones.count(), 0)
 
     def test_abrir_revisar_cerrar_actualiza_proyecto(self):
         self.proyecto.frecuencia_dias = 30
@@ -212,6 +224,8 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
 
     def test_mismo_punto_dos_veces_la_ultima_manda(self):
         visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita.abierta_en = timezone.now() - timedelta(hours=3)
+        visita.save()
         primera = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=2))
         segunda = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=1))
         self.assertEqual((primera.orden, segunda.orden), (1, 2))
@@ -372,6 +386,20 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
         cerrar_visita(visita, quien=visita.empleado, cierre=Visita.Cierre.EMPLEADO)
         proyecto.refresh_from_db()
         self.assertEqual(proyecto.proxima_visita, date(2027, 1, 1))
+
+    def test_revisiones_anteriores_a_la_apertura_no_cuentan(self):
+        visita = abierta(abierta_en=self.ahora - timedelta(minutes=10))
+        crear_revision(visita, realizada_en=self.ahora - timedelta(days=3))
+        with self.assertRaises(ValidationError):
+            cerrar_visita(visita, quien=visita.empleado, cierre=Visita.Cierre.EMPLEADO)
+        sistema = cerrar_visita(visita, quien=None, cierre=Visita.Cierre.SISTEMA)
+        self.assertEqual(sistema.estado, Visita.Estado.CANCELADA)
+        otra = abierta(abierta_en=self.ahora - timedelta(minutes=10))
+        crear_revision(otra, realizada_en=self.ahora - timedelta(minutes=5))
+        cerrada = cerrar_visita(
+            otra, quien=otra.empleado, cierre=Visita.Cierre.EMPLEADO
+        )
+        self.assertEqual(cerrada.estado, Visita.Estado.REALIZADA)
 
     def test_exige_al_menos_una_revision(self):
         visita = abierta()
