@@ -9,6 +9,7 @@ app_name = "sitios"
 urlpatterns = [
     path("", vistas.SitioListado.as_view(), name="listado"),
     path("nuevo/", vistas.SitioAlta.as_view(), name="alta"),
+    path("geocodificar/", vistas.Geocodificar.as_view(), name="geocodificar"),
     path("<int:pk>/", vistas.SitioFicha.as_view(), name="ficha"),
     path("<int:pk>/editar/", vistas.SitioEdicion.as_view(), name="editar"),
     path("<int:pk>/qr.png", vistas.qr_png, name="qr_png"),
