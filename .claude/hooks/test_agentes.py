@@ -33,3 +33,14 @@ def test_frontmatter_de_agentes_es_yaml_valido(ruta):
     assert isinstance(descripcion, str) and descripcion.strip(), (
         f"{ruta.name}: description vacía"
     )
+
+
+def test_juez_plan_cubre_recuentos_absolutos():
+    """El juez de plan marca como bloqueante el recuento absoluto que el plan altera."""
+    texto = (DIR_AGENTES / "juez-plan.md").read_text(encoding="utf-8")
+    assert "recuento absoluto" in texto, "juez-plan.md no menciona el recuento absoluto"
+    inicio = texto.index("recuento absoluto")
+    contexto = texto[inicio : inicio + 800]
+    assert "bloqueante" in contexto, "el recuento absoluto no se marca como bloqueante"
+    assert "cierra exactamente" in contexto, "falta la forma relativa (cierra exactamente N)"
+    assert "plan sin código" in contexto, "falta la excepción del plan sin código"

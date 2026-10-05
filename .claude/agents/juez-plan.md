@@ -91,6 +91,11 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
   de integración que no sea `### T<n>` es hallazgo.
 - **Código en línea con backticks adentro**: el código en línea de un criterio no puede
   llevar backticks adentro, porque el parser corta en el primero.
+- **Recuento absoluto que el propio plan altera**: todo recuento absoluto sobre datos
+  que el plan cambia (por ejemplo `pendientes.py --json` con exactamente 12 abiertos, o
+  "quedan N") es `bloqueante`: pasa o falla según qué más cierre o agregue el plan. Tiene
+  que ser relativo ("cierra exactamente N") o ir al cierre global. Excepción:
+  un plan sin código, que no cambia esos datos.
 - **No ejecutable**: ruta inexistente, `cd` que falta, comando o flag que no existe,
   comillas desbalanceadas, comando de Django sin el prefijo canónico
   (`PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe`), tipo de
