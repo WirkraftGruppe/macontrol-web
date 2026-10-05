@@ -43,8 +43,11 @@ class AtrasoMaximoTests(BaseApiTests):
 
     def test_reintento_fuera_del_limite_responde_409(self):
         cliente_uuid = uuid4()
-        r = self._post_con_atraso(167, cliente_uuid)
+        with override_settings(ATRASO_MAXIMO_HORAS=168):
+            r = self._post_con_atraso(167, cliente_uuid)
         self.assertEqual(r.status_code, 201, r.content)
         with override_settings(ATRASO_MAXIMO_HORAS=1):
             r = self._post_con_atraso(167, cliente_uuid)
         self.assertEqual(r.status_code, 409, r.content)
+        self.assertEqual(Visita.objects.count(), 1)
+        self.assertEqual(r.data["visita"], Visita.objects.get().id)

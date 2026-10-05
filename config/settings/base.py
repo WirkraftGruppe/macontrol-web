@@ -150,6 +150,13 @@ LOGIN_URL = "/panel/ingresar/"
 LOGIN_REDIRECT_URL = "/panel/"
 LOGOUT_REDIRECT_URL = "/panel/ingresar/"
 
+# Explícito aunque coincide con el valor por defecto de Django: la vista de Swagger
+# (`?script` de drf-spectacular) incrusta el token CSRF y depende de esta política.
+SESSION_COOKIE_SAMESITE = "Lax"
+
+# Un POST de visita lleva como máximo MAX_FOTOS (10) archivos; 12 deja margen.
+DATA_UPLOAD_MAX_NUMBER_FILES = 12
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication"
@@ -168,6 +175,8 @@ REST_FRAMEWORK = {
     "NUM_PROXIES": NUM_PROXIES,
 }
 
+# `SpectacularSwaggerSplitView` con `?script` incrusta el token CSRF en JS; no es
+# explotable mientras `SESSION_COOKIE_SAMESITE` siga en "Lax" (ver arriba).
 SPECTACULAR_SETTINGS = {
     "TITLE": "API de MAControl",
     "DESCRIPTION": "API de la app móvil de los empleados de MAControl S.A.",

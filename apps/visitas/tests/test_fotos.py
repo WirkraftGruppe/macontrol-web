@@ -89,6 +89,18 @@ class FotoTests(TestCase):
             )
         self.assertEqual(Foto.objects.count(), 0)
 
+    def test_mensaje_de_resolucion_excesiva(self):
+        datos = _bytes(Image.new("L", (8000, 6000)), "PNG")
+        with self.assertRaises(ValidationError) as contexto:
+            Foto.objects.create(
+                visita=self.visita,
+                imagen=SimpleUploadedFile(
+                    "grande.png", datos, content_type="image/png"
+                ),
+            )
+        self.assertIn("resolución", contexto.exception.messages[0])
+        self.assertNotIn("no es una imagen", contexto.exception.messages[0])
+
     def test_quita_comentario_del_jpeg(self):
         datos = _bytes(Image.new("RGB", (100, 80), "green"), "JPEG", comment=b"SECRETO")
         self.assertIn(b"SECRETO", datos)

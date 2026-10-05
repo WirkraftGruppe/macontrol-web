@@ -3,6 +3,7 @@
 from django.core.exceptions import ValidationError
 
 PESOS_CUIT = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
+PREFIJOS_RESTO_10 = ("23", "33")
 
 
 def validar_cuit(valor):
@@ -18,6 +19,9 @@ def validar_cuit(valor):
     if resto == 11:
         esperado = 0
     elif resto == 10:
+        # Resto 10 (dígito 9) solo lo usan los prefijos 23 y 33 de AFIP.
+        if valor[:2] not in PREFIJOS_RESTO_10:
+            raise ValidationError("El dígito verificador del CUIT no es válido.")
         esperado = 9
     else:
         esperado = resto

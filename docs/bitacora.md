@@ -1,18 +1,28 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-04-saneamiento.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| saneamiento | plan/saneamiento | cerrado (TODO PASA) | merge a `main`, lo decide el usuario | 2026-10-04 |
 
 Siguiente: plan `panel` (diseño aprobado; usa `pendientes.py --etiqueta panel`). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo` (entre ellos P-contrato-app-9).
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Plan `saneamiento`: 16 de los 17 pendientes etiquetados, cerrados
+Hecho:
+- Regla nueva en `main` (`aab6553`): el principal no hace `cd` a los worktrees (CLAUDE.md § 5 e `implementador.md`).
+- Plan congelado (`cb7b8e3`) tras `juez-plan` (0 bloqueantes, 3 observaciones incorporadas). Ola 1 en paralelo: T1 visitas (230/400), T2 sitios/clientes/accounts/logs (65/250), T3 herramientas (17/80); verificador y verificador-b PASA 27/27. T4: settings (`SESSION_COOKIE_SAMESITE`, `DATA_UPLOAD_MAX_NUMBER_FILES = 12`), 16/40.
+- TODO en PASA 0/44 (verificador y verificador-b, HEAD `a5d1a74`); `auditor-seguridad`: 1 menor PLAUSIBLE y 5 observaciones, registrados como P-saneamiento-3 a -5 (plan aparte, decisión 2026-10-04).
+- `--etiqueta saneamiento` deja solo P-api-movil-21 (su parte de despliegue). Abiertos totales: 35.
+- Incidente: `docs/planes/2026-10-04-panel.md` (sin rastrear, de otra sesión) bloqueaba `worktree-integrar.sh`; con permiso del usuario se apartó al scratchpad y se restauró idéntico (SHA-256).
+Pendiente: merge de `plan/saneamiento` en `main` (decisión del usuario); después, plan `panel`.
 
 ### 2026-10-04 — Plan `triage`: 68 → 46 pendientes abiertos, todos con destino
 Hecho:

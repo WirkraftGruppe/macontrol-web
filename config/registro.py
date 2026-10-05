@@ -1,6 +1,7 @@
 """Filtro de logging que oculta datos personales y sensibles."""
 
 import logging
+import re
 from collections.abc import Mapping
 
 from django.db.models import Model
@@ -22,6 +23,8 @@ FRAGMENTOS_SENSIBLES = (
     "contacto",
 )
 OCULTO = "[oculto]"
+# Detalle de IntegrityError de PostgreSQL: "Key (cuit)=(2012…) already exists".
+_CLAVE_VALOR_DB = re.compile(r"Key \(([^)]*)\)=\(.*?\)(?= |$|\.)")
 PROFUNDIDAD_MAXIMA = 5
 _ESTANDAR = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",
@@ -59,6 +62,14 @@ class FiltroDatosPersonales(logging.Filter):
         if not isinstance(record.msg, str):
             record.msg = _limpiar(record.msg)
         record.args = _limpiar(record.args)
+        if record.exc_info and record.exc_info[0] is not None:
+            # Se formatea acá para poder limpiar el traceback antes de emitirlo.
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+            record.exc_info = None
+        if record.exc_text:
+            record.exc_text = _CLAVE_VALOR_DB.sub(
+                lambda m: f"Key ({m.group(1)})=({OCULTO})", record.exc_text
+            )
         for clave, valor in list(record.__dict__.items()):
             if clave in _ESTANDAR:
                 continue
