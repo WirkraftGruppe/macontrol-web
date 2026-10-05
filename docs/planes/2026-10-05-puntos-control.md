@@ -523,7 +523,7 @@ commit_base: 4e2c496
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
+| T5 | hecha |
 | T6 | pendiente |
 | T7 | pendiente |
 | T8 | pendiente |
@@ -543,10 +543,17 @@ commit_base: 4e2c496
 |---|---|---|---|---|
 | 2026-10-05 | T1, T2, T3 | 6e87fa5 (raíz) · ec9d395 (T2) · c875441 (T3) | PASA 20/20 | verificador; contrato intacto |
 | 2026-10-05 | T4 | 6e3faaf | PASA 2/2 | principal: criterios de integración; suite 393 OK en worktree-integrar |
+| 2026-10-05 | T5 | b48bf5e | PASA 13/13 | verificador; integrada en 6cd1966 (suite 425 OK) |
 
 ## Pendientes que deja este plan
 
 ### Problemas
+
+- P-puntos-control-1 [observación] T5 editó a mano `apps/visitas/migrations/0005_revision_y_jornada.py` para usar `RenameField` (`realizada_en` → `cerrada_en` en `visita` y `historicalvisita`): `makemigrations` no interactivo generaba quitar y agregar, y se perdían los datos. La convención solo admite a mano el `RunPython` justificado.
+- P-puntos-control-2 [observación] El `reverse_code` de `visitas/0006` devuelve a la visita solo su primera revisión: es reversible sin pérdida para las visitas migradas (una revisión "General"), no para jornadas con varias revisiones.
+- P-puntos-control-3 [observación] T5 quitó tests sin un reemplazo de nombre parecido porque el comportamiento ya no existe: pendiente con fotos o productos (`CrearVisitaTests.test_pendiente_con_*_crea_nueva_con_incidencia`, `ManualTests.test_pendiente_con_evidencia_se_rechaza`) y subida de fotos desde el admin (`test_foto_admin_*`, `test_imagen_invalida_da_error_de_formulario_no_500`). La actualización del proyecto la cubre `CicloVisitaTests.test_abrir_revisar_cerrar_actualiza_proyecto`.
+- P-puntos-control-4 [menor] `cerrar_visita` suma el kwarg `cerrada_en=None` y `registrar_visita_manual` suma `datos_visita=None`, fuera de las firmas del contrato (los usan la carga manual y la envoltura de `POST visitas/`).
+- P-puntos-control-5 [observación] `ubicacion_propuesta` guarda `{"latitud", "longitud", "precision_m", "revision"}` con decimales como texto; el panel (T11) lee esas claves.
 
 ### Decisiones
 
