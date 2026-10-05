@@ -1,0 +1,121 @@
+"""Vistas del panel de usuarios (solo administradores)."""
+
+from django.contrib import messages
+from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.forms import SetPasswordForm
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, FormView, TemplateView, UpdateView
+
+from apps.panel.listados import ListadoPanelMixin
+
+from .mixins import AdministradorRequeridoMixin
+from .panel_forms import UsuarioAltaForm, UsuarioEdicionForm
+
+User = get_user_model()
+URL_LISTADO = reverse_lazy("panel:usuarios:listado")
+
+
+class UsuarioListadoView(AdministradorRequeridoMixin, ListadoPanelMixin):
+    model = User
+    template_name = "accounts/panel/listado.html"
+    template_parcial = "accounts/panel/listado_parcial.html"
+    campos_busqueda = ("username", "first_name", "last_name", "email")
+    orden_permitido = ("username", "last_name", "rol", "is_active")
+    ordering = ("username",)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        rol = self.request.GET.get("rol", "")
+        if rol in User.Rol.values:
+            queryset = queryset.filter(rol=rol)
+        activo = self.request.GET.get("activo", "")
+        if activo in ("1", "0"):
+            queryset = queryset.filter(is_active=activo == "1")
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto["roles"] = User.Rol.choices
+        contexto["rol"] = self.request.GET.get("rol", "")
+        contexto["activo"] = self.request.GET.get("activo", "")
+        return contexto
+
+
+class UsuarioAltaView(AdministradorRequeridoMixin, CreateView):
+    model = User
+    form_class = UsuarioAltaForm
+    template_name = "accounts/panel/formulario.html"
+    success_url = URL_LISTADO
+    extra_context = {"titulo": "Nuevo usuario", "enviar": "Crear usuario"}
+
+    def form_valid(self, form):
+        messages.success(self.request, "Usuario creado.")
+        return super().form_valid(form)
+
+
+class UsuarioEditarView(AdministradorRequeridoMixin, UpdateView):
+    model = User
+    form_class = UsuarioEdicionForm
+    template_name = "accounts/panel/formulario.html"
+    success_url = URL_LISTADO
+    extra_context = {"titulo": "Editar usuario"}
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.object == self.request.user:
+            # Evita que el administrador se quite su propio rol.
+            form.fields["rol"].disabled = True
+        return form
+
+    def form_valid(self, form):
+        messages.success(self.request, "Usuario actualizado.")
+        return super().form_valid(form)
+
+
+class UsuarioDesactivarView(AdministradorRequeridoMixin, TemplateView):
+    """GET muestra la confirmación; POST desactiva (no borra)."""
+
+    template_name = "accounts/panel/desactivar.html"
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto["usuario"] = get_object_or_404(User, pk=self.kwargs["pk"])
+        return contexto
+
+    def post(self, request, *args, **kwargs):
+        usuario = get_object_or_404(User, pk=kwargs["pk"])
+        if usuario.pk == request.user.pk:
+            messages.error(request, "No podés desactivar tu propia cuenta.")
+        else:
+            usuario.is_active = False
+            usuario.save(update_fields=["is_active"])
+            messages.success(request, "Usuario desactivado.")
+        return redirect(URL_LISTADO)
+
+
+class UsuarioContrasenaView(AdministradorRequeridoMixin, FormView):
+    form_class = SetPasswordForm
+    template_name = "accounts/panel/formulario.html"
+    success_url = URL_LISTADO
+
+    def dispatch(self, request, *args, **kwargs):
+        self.usuario = get_object_or_404(User, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.usuario
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto["titulo"] = f"Cambiar contraseña de {self.usuario.username}"
+        return contexto
+
+    def form_valid(self, form):
+        form.save()
+        if self.usuario.pk == self.request.user.pk:
+            update_session_auth_hash(self.request, self.usuario)
+        messages.success(self.request, "Contraseña actualizada.")
+        return super().form_valid(form)
