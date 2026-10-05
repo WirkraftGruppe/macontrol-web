@@ -1,0 +1,6 @@
+{% extends "panel/base.html" %}
+{% block panel_contenido %}
+  {% url 'panel:usuarios:desactivar' usuario.pk as accion %}
+  {% url 'panel:usuarios:listado' as volver %}
+  {% include "panel/partials/confirmar.html" with titulo="Desactivar usuario" mensaje="El usuario no podrá ingresar, pero sus datos se conservan." accion_url=accion cancelar_url=volver enviar="Desactivar" %}
+{% endblock %}
