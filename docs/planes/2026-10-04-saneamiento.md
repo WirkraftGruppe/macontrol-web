@@ -159,7 +159,7 @@ commit_base: cb7b8e3
 | T1 | hecha |
 | T2 | hecha |
 | T3 | hecha |
-| T4 | pendiente |
+| T4 | hecha |
 
 ### Corridas
 
@@ -167,9 +167,9 @@ commit_base: cb7b8e3
 |---|---|---|---|---|
 | 2026-10-04 | T1–T3 (verificador) | T1 a930aee · T2 84ba784 · T3 ced8515 | PASA — 0 criterios en FALLA de 27 | en sus worktrees |
 | 2026-10-04 | T1–T3 (verificador-b) | T1 a930aee · T2 84ba784 · T3 ced8515 | PASA — 0 criterios en FALLA de 27 | en sus worktrees |
-| | T4 | | | |
-| | TODO | | | |
-| | auditor-seguridad | | | |
+| 2026-10-04 | TODO (verificador) | a5d1a74 | PASA — 0 criterios en FALLA de 44 | 275 tests Django; hooks 125 + 1 skip preexistente |
+| 2026-10-04 | TODO (verificador-b) | a5d1a74 | PASA — 0 criterios en FALLA de 44 | ídem |
+| 2026-10-04 | auditor-seguridad (`cb7b8e3..HEAD`) | a5d1a74 | 0 bloqueantes, 0 importantes, 1 menor (PLAUSIBLE), 5 observaciones | registrados como P-saneamiento-3 a -5 |
 
 ## Pendientes que deja este plan
 
@@ -177,6 +177,9 @@ commit_base: cb7b8e3
 
 - P-saneamiento-1 [observación] `test_mas_productos_que_el_tope_se_rechaza` y `test_productos_se_buscan_en_una_consulta` (T1) no tienen corrida roja limpia contra el código viejo: la primera roja falló por ítems de prueba inválidos y después de corregirlos no se volvió a correr contra `cb7b8e3` (informe de T1).
 - P-saneamiento-2 [menor] El criterio `compile(open(...))` de T3 deja un `ResourceWarning` por el archivo sin cerrar del propio comando; no cambia el exit, es ruido en la salida.
+- P-saneamiento-3 [menor] Auditoría (PLAUSIBLE): el enmascarado de `exc_text` (`config/registro.py:27`, `:69-72`) no cubre `DETAIL: Failing row contains (...)` de Postgres, que llevaría la fila entera (coordenadas, `datos`, CUIT) a los logs si falla un NOT NULL o un futuro CheckConstraint. Hoy no hay disparador concreto. Propuesta: segunda sustitución `Failing row contains \(.*?\)\.?$` (MULTILINE) y test con un NOT NULL de `Visita`. El caso `Key (cuit)=…` que motivó el control no puede darse: `Cliente.cuit` no es único.
+- P-saneamiento-4 [observación] Auditoría: `validar_datos` solo se llama desde `apps/visitas/services.py:216`; cuando el panel edite `Visita.datos` tiene que pasar por la misma validación, o vuelve el `OverflowError`. Además, `exc_info=None` en el filtro de logs hará perder el traceback si se suma Sentry (LoggingIntegration) o `AdminEmailHandler`, y el filtro no limpia `stack_info` ni una excepción pasada como argumento (`logger.error("x: %s", exc)`).
+- P-saneamiento-5 [observación] Auditoría: la `description` de `extend_schema` de `ResolverQRView` (`apps/sitios/api_views.py:28-31`) dice "QR inexistente o de un sitio inactivo" y no menciona el cliente inactivo (deriva de documentación del contrato).
 
 ### Decisiones
 
