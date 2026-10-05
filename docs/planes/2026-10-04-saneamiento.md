@@ -156,16 +156,17 @@ commit_base: cb7b8e3
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
 | T4 | pendiente |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1–T3 | | | |
+| 2026-10-04 | T1–T3 (verificador) | T1 a930aee · T2 84ba784 · T3 ced8515 | PASA — 0 criterios en FALLA de 27 | en sus worktrees |
+| 2026-10-04 | T1–T3 (verificador-b) | T1 a930aee · T2 84ba784 · T3 ced8515 | PASA — 0 criterios en FALLA de 27 | en sus worktrees |
 | | T4 | | | |
 | | TODO | | | |
 | | auditor-seguridad | | | |
@@ -174,6 +175,31 @@ commit_base: cb7b8e3
 
 ### Problemas
 
+- P-saneamiento-1 [observación] `test_mas_productos_que_el_tope_se_rechaza` y `test_productos_se_buscan_en_una_consulta` (T1) no tienen corrida roja limpia contra el código viejo: la primera roja falló por ítems de prueba inválidos y después de corregirlos no se volvió a correr contra `cb7b8e3` (informe de T1).
+- P-saneamiento-2 [menor] El criterio `compile(open(...))` de T3 deja un `ResourceWarning` por el archivo sin cerrar del propio comando; no cambia el exit, es ruido en la salida.
+
 ### Decisiones
 
+- 2026-10-04 — Un CUIT con resto 10 es válido solo con prefijo 23 o 33 y dígito 9; con otro prefijo da `ValidationError`; los CUIT ya cargados no se revalidan — AFIP nunca emite resto 10 con otro prefijo (P-pendientes-heredados-13) — reemplaza a: (nada)
+- 2026-10-04 — Se quitó el `# noqa: E501` de `apps/sitios/models.py` y la línea quedó con `ruff format`, aunque invalida el `[grep-1]` histórico de `docs/planes/2026-10-02-auditoria-dominio.md:66` — ese plan está fusionado y el hook no lo vuelve a correr — reemplaza a: (nada)
+- 2026-10-04 — `SESSION_COOKIE_SAMESITE = "Lax"` y `DATA_UPLOAD_MAX_NUMBER_FILES = 12` se fijan explícitos en `config/settings/base.py` — el CSRF incrustado por `?script` de drf-spectacular depende de Lax; 12 = MAX_FOTOS 10 + margen — reemplaza a: (nada)
+
 ### Cierra
+
+- cierra: P-api-movil-13 — opciones con tipo estricto y tope de 15 dígitos en `apps/visitas/planillas.py` (T1)
+- cierra: P-api-movil-17 — `MAX_FOTOS`/`MAX_PRODUCTOS` aplicados en `registrar_visita_desde_app` y productos en una sola consulta (T1)
+- cierra: P-api-movil-18 — `Foto.save` borra el archivo si falla el INSERT; el error de `storage.delete` no tapa la excepción original; docstring sobre `atomic` (T1)
+- cierra: P-api-movil-19 — `cliente_uuid` obligatorio y rango de latitud/longitud validado en el servicio (T1)
+- cierra: P-pendientes-heredados-5 — mensaje propio para `DecompressionBombError` en `apps/visitas/imagenes.py` (T1)
+- cierra: P-contrato-app-11 — `test_reintento_fuera_del_limite_responde_409` comprueba count e id y fija `ATRASO_MAXIMO_HORAS=168` (T1)
+- cierra: P-api-movil-14 — `ResolverQRView` filtra `cliente__activo=True` y responde el mismo 404 que un QR inexistente (T2)
+- cierra: P-api-movil-5 — `FiltroDatosPersonales` formatea `exc_info` en `exc_text` y enmascara `Key (campo)=(valor)` (T2)
+- cierra: P-pendientes-heredados-13 — regla CUIT resto 10 solo con prefijos 23/33 en `apps/clientes/validators.py` (T2)
+- cierra: P-pendientes-heredados-14 — `# noqa: E501` quitado de `apps/sitios/models.py` y línea formateada (T2)
+- cierra: P-pendientes-heredados-23 — `User.save` solo borra `skip_history_when_saving` si lo puso él (T2)
+- cierra: P-limites-ingreso-12 — `r"C:\Windows"` en `.claude/hooks/test_pendientes.py` (T3)
+- cierra: P-limites-ingreso-16 — patrón "recuento absoluto que el propio plan altera" en `juez-plan.md` § (b) (T3)
+- cierra: P-api-movil-3 — `SESSION_COOKIE_SAMESITE = "Lax"` explícito, comentado junto a `SPECTACULAR_SETTINGS`, y `test_samesite_lax_fijado` (T4)
+- cierra: P-limites-ingreso-13 — sin código: `ruff format --check apps config` pasa (T4); `test_services.py` ya no se marcaba y `sitios/models.py:60` lo resolvió T2
+- cierra: P-pendientes-heredados-29 — sin código: `apps/web/tests/test_base.py:17` y `:22` ya afirman `<html lang="es" data-tema="oscuro">`, distinto del selector de `:12`
+<!-- P-api-movil-21 no se cierra: este plan resolvió solo `DATA_UPLOAD_MAX_NUMBER_FILES = 12` (T4) y queda abierto por su parte de despliegue. -->
