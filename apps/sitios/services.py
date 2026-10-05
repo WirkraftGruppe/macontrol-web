@@ -1,4 +1,4 @@
-"""Servicios de Sitios: supresión de datos y regeneración del código QR."""
+"""Servicios de Sitios: supresión de datos y regeneración del QR de un punto."""
 
 import uuid
 
@@ -8,7 +8,7 @@ from django.db.models import ProtectedError
 
 from apps.proyectos.models import Proyecto
 
-from .models import Sitio
+from .models import Plano, PuntoControl, Sitio
 
 TOPE_REGENERAR_QR = 20
 
@@ -23,6 +23,8 @@ def suprimir_sitio(sitio):
         sitio.delete()
         Sitio.history.filter(id=pk).delete()
         Proyecto.history.filter(sitio_id=pk).delete()
+        PuntoControl.history.filter(sitio_id=pk).delete()
+        Plano.history.filter(sitio_id=pk).delete()
 
 
 def suprimir_sitios(sitios):
@@ -43,28 +45,39 @@ def suprimir_sitios(sitios):
     return suprimidos, con_proyectos
 
 
-def regenerar_qr(sitio):
-    """Genera un nuevo ``qr_codigo`` (invalida la etiqueta impresa).
+def regenerar_qr(punto):
+    """Genera un nuevo ``qr_codigo`` del punto (invalida la etiqueta impresa).
 
-    Deja el motivo en el historial.
+    Deja el motivo en el historial. Transición hasta que ``apps/visitas`` deje de
+    comparar ``Sitio.qr_codigo``: si el punto era el espejo del QR de su sitio
+    (el General), el código nuevo también se copia al sitio.
     """
-    sitio.qr_codigo = uuid.uuid4()
-    sitio.qr_impreso_el = None
-    sitio._change_reason = "Regeneración de QR"
-    sitio.save(update_fields=["qr_codigo", "qr_impreso_el", "actualizado"])
-    return sitio.qr_codigo
+    with transaction.atomic():
+        sitio = punto.sitio
+        espejo = punto.qr_codigo == sitio.qr_codigo
+        punto.qr_codigo = uuid.uuid4()
+        punto.qr_impreso_el = None
+        punto._change_reason = "Regeneración de QR"
+        punto.save(update_fields=["qr_codigo", "qr_impreso_el"])
+        if espejo:
+            sitio.qr_codigo = punto.qr_codigo
+            sitio.qr_impreso_el = None
+            sitio._change_reason = "Regeneración de QR"
+            sitio.save(update_fields=["qr_codigo", "qr_impreso_el", "actualizado"])
+    return punto.qr_codigo
 
 
-def regenerar_qr_lote(sitios):
-    """Regenera el QR de varios sitios; rechaza el lote si supera ``TOPE_REGENERAR_QR``.
+def regenerar_qr_lote(puntos):
+    """Regenera el QR de varios puntos; rechaza el lote si supera ``TOPE_REGENERAR_QR``.
 
-    Devuelve la cantidad de sitios regenerados.
+    Devuelve la cantidad de puntos regenerados.
     """
-    if len(sitios) > TOPE_REGENERAR_QR:
+    if len(puntos) > TOPE_REGENERAR_QR:
         raise ValidationError(
             f"No se pueden regenerar más de {TOPE_REGENERAR_QR} códigos QR a la vez "
-            f"(se seleccionaron {len(sitios)})."
+            f"(se seleccionaron {len(puntos)})."
         )
-    for sitio in sitios:
-        regenerar_qr(sitio)
-    return len(sitios)
+    with transaction.atomic():
+        for punto in puntos:
+            regenerar_qr(punto)
+    return len(puntos)

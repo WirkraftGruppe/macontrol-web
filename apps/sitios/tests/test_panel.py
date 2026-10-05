@@ -9,7 +9,7 @@ from PIL import Image
 
 from apps.clientes.models import Cliente
 from apps.sitios import qr
-from apps.sitios.models import Sitio
+from apps.sitios.models import PuntoControl, Sitio
 
 User = get_user_model()
 
@@ -44,17 +44,25 @@ class SitioPanelTests(TestCase):
             'attachment; filename="qr-planta-nandu-1.png"',
         )
         self.assertEqual(Image.open(BytesIO(r.content)).format, "PNG")
+        self.assertEqual(
+            r.content,
+            qr.png_qr(self.sitio.puntos.get()),
+            "El PNG es el del punto General",
+        )
 
     def test_regenerar_qr_invalida_el_anterior(self):
         url = reverse("panel:sitios:regenerar_qr", args=[self.sitio.pk])
-        anterior = self.sitio.qr_codigo
+        general = self.sitio.puntos.get()
+        anterior = general.qr_codigo
         self.assertEqual(self.client.get(url).status_code, 200)
-        self.sitio.refresh_from_db()
-        self.assertEqual(self.sitio.qr_codigo, anterior)
+        general.refresh_from_db()
+        self.assertEqual(general.qr_codigo, anterior)
         self.client.post(url)
+        general.refresh_from_db()
         self.sitio.refresh_from_db()
-        self.assertNotEqual(self.sitio.qr_codigo, anterior)
-        self.assertFalse(Sitio.objects.filter(qr_codigo=anterior).exists())
+        self.assertNotEqual(general.qr_codigo, anterior)
+        self.assertEqual(self.sitio.qr_codigo, general.qr_codigo)
+        self.assertFalse(PuntoControl.objects.filter(qr_codigo=anterior).exists())
 
     def test_alta_y_edicion_guardan_lat_lng(self):
         r = self.client.post(reverse("panel:sitios:alta"), self._datos())
@@ -73,9 +81,10 @@ class SitioPanelTests(TestCase):
 
     @override_settings(SITE_URL="https://ejemplo.test")
     def test_contenido_qr_usa_site_url(self):
+        general = self.sitio.puntos.get()
         self.assertEqual(
-            qr.contenido_qr(self.sitio),
-            f"https://ejemplo.test/q/{self.sitio.qr_codigo}/",
+            qr.contenido_qr(general),
+            f"https://ejemplo.test/q/{general.qr_codigo}/",
         )
 
     def test_listado_filtra_y_exige_administrador(self):

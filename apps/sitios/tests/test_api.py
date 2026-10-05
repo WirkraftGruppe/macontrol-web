@@ -29,6 +29,7 @@ class ResolverQRTests(TestCase):
             horario_acceso="8 a 12",
             notas="Nota interna",
         )
+        self.punto = self.sitio.puntos.get()
         self.tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
         CampoPlanilla.objects.create(
             tipo_servicio=self.tipo,
@@ -70,7 +71,7 @@ class ResolverQRTests(TestCase):
         )
 
     def _resolver(self, codigo=None, cliente=None):
-        codigo = codigo or self.sitio.qr_codigo
+        codigo = codigo or self.punto.qr_codigo
         return (cliente or self.cliente_api).post(f"/api/v1/qr/{codigo}/resolver/")
 
     def test_qr_valido_devuelve_proyectos_y_esquema(self):
@@ -100,6 +101,15 @@ class ResolverQRTests(TestCase):
         self.assertEqual(inactivo.status_code, 404)
         self.assertEqual(inexistente.status_code, 404)
         self.assertEqual(inactivo.json(), inexistente.json())
+
+    def test_qr_de_punto_inactivo_da_404(self):
+        self.punto.activo = False
+        self.punto.save()
+        inactivo = self._resolver()
+        inexistente = self._resolver(uuid.uuid4())
+        self.assertEqual(inactivo.status_code, 404)
+        self.assertEqual(inactivo.json(), inexistente.json())
+        self.assertEqual(self.sitio.puntos.filter(activo=True).count(), 0)
 
     def test_cliente_inactivo_da_404(self):
         self.cliente.activo = False

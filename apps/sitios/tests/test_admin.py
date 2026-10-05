@@ -6,7 +6,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.sitios import services
-from apps.sitios.models import Sitio
+from apps.sitios.models import PuntoControl, Sitio
 
 
 class SitioAdminTests(TestCase):
@@ -17,60 +17,6 @@ class SitioAdminTests(TestCase):
         self.cliente = Cliente.objects.create(razon_social="ACME")
         self.sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta 1")
         self.url = reverse("admin:sitios_sitio_changelist")
-
-    def test_accion_regenerar_qr_cambia_el_codigo(self):
-        self.client.force_login(self.administrador)
-        anterior = self.sitio.qr_codigo
-        respuesta = self.client.post(
-            self.url,
-            {
-                "action": "regenerar_qr",
-                "_selected_action": [self.sitio.pk],
-                "confirmado": "si",
-            },
-        )
-        self.assertEqual(respuesta.status_code, 302)
-        self.sitio.refresh_from_db()
-        self.assertNotEqual(self.sitio.qr_codigo, anterior)
-
-    def test_staff_sin_rol_administrador_no_ve_las_acciones(self):
-        usuario = User.objects.create_user(
-            username="staff", password="x", rol=User.Rol.EMPLEADO, is_staff=True
-        )
-        permisos = Permission.objects.filter(
-            content_type__app_label="sitios",
-            codename__in=["view_sitio", "change_sitio", "delete_sitio"],
-        )
-        usuario.user_permissions.add(*permisos)
-        request = RequestFactory().get(self.url)
-        request.user = User.objects.get(pk=usuario.pk)
-        acciones = admin.site._registry[Sitio].get_actions(request)
-        self.assertNotIn("regenerar_qr", acciones)
-        self.assertNotIn("suprimir_datos", acciones)
-
-        self.client.force_login(usuario)
-        anterior = self.sitio.qr_codigo
-        self.client.post(
-            self.url,
-            {
-                "action": "regenerar_qr",
-                "_selected_action": [self.sitio.pk],
-                "confirmado": "si",
-            },
-        )
-        self.sitio.refresh_from_db()
-        self.assertEqual(self.sitio.qr_codigo, anterior)
-
-    def test_regenerar_qr_pide_confirmacion(self):
-        self.client.force_login(self.administrador)
-        anterior = self.sitio.qr_codigo
-        respuesta = self.client.post(
-            self.url, {"action": "regenerar_qr", "_selected_action": [self.sitio.pk]}
-        )
-        self.assertEqual(respuesta.status_code, 200)
-        self.assertTemplateUsed(respuesta, "admin/sitios/sitio/confirmar_accion.html")
-        self.sitio.refresh_from_db()
-        self.assertEqual(self.sitio.qr_codigo, anterior)
 
     def test_suprimir_datos_pide_confirmacion(self):
         self.client.force_login(self.administrador)
@@ -94,17 +40,15 @@ class SitioAdminTests(TestCase):
 
     def test_revertir_sitio_desde_historial_esta_prohibido(self):
         self.client.force_login(self.administrador)
-        anterior = self.sitio.qr_codigo
-        nuevo = services.regenerar_qr(self.sitio)
+        self.sitio.nombre = "Planta Norte"
+        self.sitio.save()
         version_anterior = Sitio.history.filter(id=self.sitio.pk).order_by(
             "history_date", "history_id"
         )[0]
-        self.assertEqual(version_anterior.qr_codigo, anterior)
         url = reverse(
             "admin:sitios_sitio_simple_history",
             args=[self.sitio.pk, version_anterior.history_id],
         )
-
         respuesta = self.client.post(
             url,
             {
@@ -114,8 +58,87 @@ class SitioAdminTests(TestCase):
                 "activo": "on",
             },
         )
-
         self.assertEqual(respuesta.status_code, 403)
         self.sitio.refresh_from_db()
-        self.assertEqual(self.sitio.qr_codigo, nuevo)
+        self.assertEqual(self.sitio.nombre, "Planta Norte")
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_sitio_ya_no_ofrece_regenerar_qr(self):
+        request = RequestFactory().get(self.url)
+        request.user = self.administrador
+        acciones = admin.site._registry[Sitio].get_actions(request)
+        self.assertNotIn("regenerar_qr", acciones)
+
+
+class PuntoControlAdminTests(TestCase):
+    def setUp(self):
+        self.administrador = User.objects.create_superuser(
+            username="root", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        cliente = Cliente.objects.create(razon_social="ACME")
+        self.sitio = Sitio.objects.create(cliente=cliente, nombre="Planta 1")
+        self.punto = self.sitio.puntos.get()
+        self.url = reverse("admin:sitios_puntocontrol_changelist")
+
+    def _regenerar(self, **extra):
+        return self.client.post(
+            self.url,
+            {"action": "regenerar_qr", "_selected_action": [self.punto.pk], **extra},
+        )
+
+    def test_accion_regenerar_qr_cambia_el_codigo(self):
+        self.client.force_login(self.administrador)
+        anterior = self.punto.qr_codigo
+        respuesta = self._regenerar(confirmado="si")
+        self.assertEqual(respuesta.status_code, 302)
+        self.punto.refresh_from_db()
+        self.assertNotEqual(self.punto.qr_codigo, anterior)
+
+    def test_staff_sin_rol_administrador_no_ve_la_accion(self):
+        usuario = User.objects.create_user(
+            username="staff", password="x", rol=User.Rol.EMPLEADO, is_staff=True
+        )
+        permisos = Permission.objects.filter(
+            content_type__app_label="sitios",
+            codename__in=["view_puntocontrol", "change_puntocontrol"],
+        )
+        usuario.user_permissions.add(*permisos)
+        request = RequestFactory().get(self.url)
+        request.user = User.objects.get(pk=usuario.pk)
+        acciones = admin.site._registry[PuntoControl].get_actions(request)
+        self.assertNotIn("regenerar_qr", acciones)
+        self.client.force_login(usuario)
+        anterior = self.punto.qr_codigo
+        self._regenerar(confirmado="si")
+        self.punto.refresh_from_db()
+        self.assertEqual(self.punto.qr_codigo, anterior)
+
+    def test_regenerar_qr_pide_confirmacion(self):
+        self.client.force_login(self.administrador)
+        anterior = self.punto.qr_codigo
+        respuesta = self._regenerar()
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTemplateUsed(respuesta, "admin/sitios/sitio/confirmar_accion.html")
+        self.punto.refresh_from_db()
+        self.assertEqual(self.punto.qr_codigo, anterior)
+
+    def test_revertir_punto_desde_historial_esta_prohibido(self):
+        self.client.force_login(self.administrador)
+        anterior = self.punto.qr_codigo
+        nuevo = services.regenerar_qr(self.punto)
+        version_anterior = PuntoControl.history.filter(id=self.punto.pk).order_by(
+            "history_date", "history_id"
+        )[0]
+        self.assertEqual(version_anterior.qr_codigo, anterior)
+        url = reverse(
+            "admin:sitios_puntocontrol_simple_history",
+            args=[self.punto.pk, version_anterior.history_id],
+        )
+        respuesta = self.client.post(
+            url,
+            {"sitio": self.sitio.pk, "nombre": "General", "orden": 0, "activo": "on"},
+        )
+        self.assertEqual(respuesta.status_code, 403)
+        self.punto.refresh_from_db()
+        self.assertEqual(self.punto.qr_codigo, nuevo)
         self.assertEqual(self.client.get(url).status_code, 200)
