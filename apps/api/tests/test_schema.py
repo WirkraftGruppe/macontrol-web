@@ -13,9 +13,13 @@ RUTAS_DE_DOMINIO = (
     "/api/v1/productos/",
     "/api/v1/qr/{codigo}/resolver/",
     "/api/v1/me/visitas/",
-    "/api/v1/visitas/",
+    "/api/v1/visitas/abrir/",
+    "/api/v1/revisiones/",
+    "/api/v1/visitas/{id}/cerrar/",
     "/api/v1/me/historial/",
     "/api/v1/fotos/{codigo}/",
+    "/api/v1/planos/{id}/imagen/",
+    "/api/v1/me/puntos/",
 )
 
 
@@ -34,7 +38,7 @@ class SchemaTests(TestCase):
         self.addCleanup(cache.clear)
 
     def test_schema_requiere_auth_y_lista_endpoints(self):
-        """Anónimo recibe 401; con usuario, 200 y las seis rutas de dominio."""
+        """Anónimo recibe 401; con usuario, 200 y las rutas de dominio."""
         self.assertEqual(APIClient().get("/api/v1/schema/").status_code, 401)
 
         usuario = User.objects.create_user(

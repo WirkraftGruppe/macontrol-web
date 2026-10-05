@@ -1,4 +1,4 @@
-"""Vistas de la API de Visitas: pendientes, alta, historial y fotos."""
+"""Vistas de la API de Visitas: abrir, revisiones, cerrar, listados y fotos."""
 
 from django.core.exceptions import (
     RequestDataTooBig,
@@ -7,6 +7,7 @@ from django.core.exceptions import (
 )
 from django.db.models import F
 from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, serializers, status
@@ -23,14 +24,27 @@ from .models import Foto, Visita
 from .serializers import (
     MAX_BYTES_FOTO,
     MAX_FOTOS,
-    CrearVisitaSerializer,
-    VisitaPendienteSerializer,
+    AbrirVisitaSerializer,
+    CerrarVisitaSerializer,
+    CrearRevisionSerializer,
+    RevisionSerializer,
+    VisitaActivaSerializer,
     VisitaRealizadaSerializer,
 )
-from .services import VisitaDuplicada, registrar_visita_desde_app
+from .services import (
+    RevisionDuplicada,
+    abrir_visita,
+    cerrar_visita,
+    registrar_revision,
+)
 
-MENSAJE_DUPLICADA = "La visita ya fue registrada."
+MENSAJE_DUPLICADA = "La revisión ya fue registrada."
 MAX_BYTES_PEDIDO = MAX_FOTOS * MAX_BYTES_FOTO + 1024 * 1024
+PRECARGA_REVISIONES = (
+    "revisiones__punto",
+    "revisiones__fotos",
+    "revisiones__productos",
+)
 
 
 class PedidoDemasiadoGrande(APIException):
@@ -40,28 +54,62 @@ class PedidoDemasiadoGrande(APIException):
 
 
 class MisVisitasView(generics.ListAPIView):
-    """Visitas pendientes del empleado autenticado."""
+    """Visitas pendientes y abiertas del empleado autenticado."""
 
     permission_classes = [EsEmpleado]
-    serializer_class = VisitaPendienteSerializer
+    serializer_class = VisitaActivaSerializer
 
     def get_queryset(self):
         return (
             Visita.objects.filter(
-                empleado=self.request.user, estado=Visita.Estado.PENDIENTE
+                empleado=self.request.user,
+                estado__in=[Visita.Estado.ABIERTA, Visita.Estado.PENDIENTE],
             )
             .select_related("proyecto__sitio")
-            .order_by(F("programada_para").asc(nulls_last=True), "id")
+            .order_by("estado", F("programada_para").asc(nulls_last=True), "id")
         )
 
-    @extend_schema(summary="Mis visitas pendientes")
+    @extend_schema(summary="Mis visitas pendientes y abiertas")
     def get(self, request, *args, **kwargs):
-        """Lista paginada de las pendientes propias."""
+        """Lista paginada; las abiertas van primero y cada una trae su `estado`."""
         return super().get(request, *args, **kwargs)
 
 
-class CrearVisitaView(APIView):
-    """Registra una visita realizada desde la app (multipart)."""
+class AbrirVisitaView(APIView):
+    """Abre la jornada del empleado en un proyecto (idempotente)."""
+
+    permission_classes = [EsEmpleado]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "crear_visita"
+
+    @extend_schema(
+        summary="Abrir una visita",
+        description=(
+            "Abre la pendiente asignada o crea una visita nueva. Si el empleado ya "
+            "tiene una abierta en el proyecto la devuelve con 200."
+        ),
+        request=AbrirVisitaSerializer,
+        responses={
+            201: VisitaActivaSerializer,
+            200: VisitaActivaSerializer,
+            400: OpenApiResponse(description="Proyecto inexistente o no activo."),
+        },
+    )
+    def post(self, request):
+        """201 si crea o abre una pendiente, 200 si ya estaba abierta."""
+        entrada = AbrirVisitaSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        visita, creada = abrir_visita(
+            empleado=request.user, proyecto=entrada.validated_data["proyecto"]
+        )
+        return Response(
+            VisitaActivaSerializer(visita).data,
+            status=status.HTTP_201_CREATED if creada else status.HTTP_200_OK,
+        )
+
+
+class CrearRevisionView(APIView):
+    """Registra el escaneo de un punto en una visita abierta (multipart)."""
 
     permission_classes = [EsEmpleado]
     parser_classes = [MultiPartParser]
@@ -69,16 +117,26 @@ class CrearVisitaView(APIView):
     throttle_scope = "crear_visita"
 
     @extend_schema(
-        summary="Registrar una visita realizada",
+        summary="Registrar una revisión",
         description=(
-            "Multipart. `datos` y `productos_aplicados` son texto JSON; `fotos` se "
-            "repite de 1 a 10 veces (hasta 8 MB cada una). Un `cliente_uuid` ya "
-            "registrado responde 409; `visita` solo viene si es del mismo empleado."
+            "Multipart. `qr_codigo` es el del punto escaneado. `datos` y "
+            "`productos_aplicados` son texto JSON; `fotos` se repite de 1 a 10 veces "
+            "(hasta 8 MB cada una). Un `cliente_uuid` ya registrado responde 409; "
+            "`revision` y `visita` solo vienen si son del mismo empleado."
         ),
-        request={"multipart/form-data": CrearVisitaSerializer},
+        request={"multipart/form-data": CrearRevisionSerializer},
         responses={
-            201: VisitaRealizadaSerializer,
+            201: RevisionSerializer,
+            400: OpenApiResponse(
+                description=(
+                    "Validación: QR que no es de un punto del sitio, visita no "
+                    "abierta o ajena, coordenadas o foto faltantes, planilla "
+                    "inválida o revisión con más horas de atraso que el máximo "
+                    "(168 por defecto)."
+                )
+            ),
             409: OpenApiResponse(description="El `cliente_uuid` ya fue registrado."),
+            413: OpenApiResponse(description="El pedido supera el tamaño permitido."),
         },
     )
     def post(self, request):
@@ -94,20 +152,63 @@ class CrearVisitaView(APIView):
             datos_pedido = request.data
         except (RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent):
             raise PedidoDemasiadoGrande()
-        entrada = CrearVisitaSerializer(data=datos_pedido)
+        entrada = CrearRevisionSerializer(data=datos_pedido)
         entrada.is_valid(raise_exception=True)
         try:
-            visita = registrar_visita_desde_app(
+            revision = registrar_revision(
                 empleado=request.user, **entrada.validated_data
             )
-        except VisitaDuplicada as duplicada:
+        except RevisionDuplicada as duplicada:
             cuerpo = {"detalle": MENSAJE_DUPLICADA, "campos": {}}
-            if duplicada.visita.empleado_id == request.user.id:
-                cuerpo["visita"] = duplicada.visita.id
+            # Solo el dueño recibe los ids: no se expone lo de otro empleado.
+            if duplicada.revision.visita.empleado_id == request.user.id:
+                cuerpo["revision"] = duplicada.revision.id
+                cuerpo["visita"] = duplicada.revision.visita_id
             return Response(cuerpo, status=status.HTTP_409_CONFLICT)
         return Response(
-            VisitaRealizadaSerializer(visita).data, status=status.HTTP_201_CREATED
+            RevisionSerializer(revision).data, status=status.HTTP_201_CREATED
         )
+
+
+class CerrarVisitaView(APIView):
+    """Cierra una visita abierta propia, con al menos una revisión."""
+
+    permission_classes = [EsEmpleado]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "crear_visita"
+
+    @extend_schema(
+        summary="Cerrar una visita",
+        description="`datos` es la planilla de ámbito visita; todo es opcional.",
+        request=CerrarVisitaSerializer,
+        responses={
+            200: VisitaRealizadaSerializer,
+            400: OpenApiResponse(
+                description="No está abierta, no tiene revisiones o la planilla "
+                "es inválida."
+            ),
+            404: OpenApiResponse(
+                description="La visita no existe o es de otro empleado."
+            ),
+        },
+    )
+    def post(self, request, pk):
+        """Cierra con `cierre=empleado`; la visita de otro empleado da 404."""
+        visita = get_object_or_404(Visita, pk=pk, empleado=request.user)
+        entrada = CerrarVisitaSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        cerrada = cerrar_visita(
+            visita,
+            quien=request.user,
+            cierre=Visita.Cierre.EMPLEADO,
+            **entrada.validated_data,
+        )
+        cerrada = (
+            Visita.objects.select_related("proyecto__sitio")
+            .prefetch_related(*PRECARGA_REVISIONES)
+            .get(pk=cerrada.pk)
+        )
+        return Response(VisitaRealizadaSerializer(cerrada).data)
 
 
 class ParametrosHistorialSerializer(serializers.Serializer):
@@ -134,7 +235,7 @@ class HistorialView(generics.ListAPIView):
             consulta = consulta.filter(cerrada_en__date__lte=fechas["hasta"])
         return (
             consulta.select_related("proyecto__sitio")
-            .prefetch_related("revisiones__fotos", "revisiones__productos")
+            .prefetch_related(*PRECARGA_REVISIONES)
             .order_by("-cerrada_en", "-id")
         )
 
