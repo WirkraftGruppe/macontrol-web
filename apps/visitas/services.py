@@ -290,3 +290,21 @@ def registrar_visita_desde_app(
                 except Exception:  # noqa: BLE001
                     # No debe tapar la excepción original que se está propagando.
                     logger.exception("No se pudo borrar un archivo de foto.")
+
+
+def marcar_incidencia_revisada(visita, administrador):
+    """Registra quién y cuándo revisó la incidencia de una visita."""
+    if not visita.incidencia:
+        raise ValidationError("La visita no tiene incidencia para revisar.")
+    if visita.incidencia_revisada_en is not None:
+        raise ValidationError("La incidencia ya fue revisada.")
+    visita.incidencia_revisada_por = administrador
+    visita.incidencia_revisada_en = timezone.now()
+    visita.save(
+        update_fields=[
+            "incidencia_revisada_por",
+            "incidencia_revisada_en",
+            "actualizado",
+        ]
+    )
+    return visita

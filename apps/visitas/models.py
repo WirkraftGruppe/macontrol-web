@@ -74,6 +74,17 @@ class Visita(models.Model):
     incidencia_asignacion = models.BooleanField(
         "incidencia de asignación", default=False
     )
+    incidencia_revisada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="incidencia revisada por",
+    )
+    incidencia_revisada_en = models.DateTimeField(
+        "incidencia revisada en", null=True, blank=True
+    )
     cliente_uuid = models.UUIDField(
         "identificador del cliente", unique=True, null=True, blank=True
     )
