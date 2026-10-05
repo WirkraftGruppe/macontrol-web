@@ -18,13 +18,19 @@ class TipoServicio(models.Model):
     def __str__(self):
         return self.nombre
 
-    def esquema_planilla(self) -> list[dict]:
-        """Esquema de los campos activos ordenado por `orden`; lo consume la API.
+    def esquema_planilla(self, ambito: str = "punto") -> list[dict]:
+        """Esquema de los campos activos de un ámbito ordenado por `orden`.
+
+        Lo consume la API. `ambito` es `punto` o `visita`.
 
         Usa `self.campos.all()` para aprovechar un `prefetch_related("campos")`.
         """
         activos = sorted(
-            (campo for campo in self.campos.all() if campo.activo),
+            (
+                campo
+                for campo in self.campos.all()
+                if campo.activo and campo.ambito == ambito
+            ),
             key=lambda campo: campo.orden,
         )
         return [
@@ -52,6 +58,10 @@ class CampoPlanilla(models.Model):
         OPCION_MULTIPLE = "opcion_multiple", "Opción múltiple"
         FECHA = "fecha", "Fecha"
 
+    class Ambito(models.TextChoices):
+        PUNTO = "punto", "Punto de control"
+        VISITA = "visita", "Visita"
+
     tipo_servicio = models.ForeignKey(
         TipoServicio,
         on_delete=models.CASCADE,
@@ -62,6 +72,9 @@ class CampoPlanilla(models.Model):
     etiqueta = models.CharField("etiqueta", max_length=150)
     clave = models.SlugField("clave", max_length=100)
     tipo = models.CharField("tipo", max_length=20, choices=Tipo.choices)
+    ambito = models.CharField(
+        "ámbito", max_length=10, choices=Ambito.choices, default=Ambito.PUNTO
+    )
     opciones = models.JSONField("opciones", default=list, blank=True)
     obligatorio = models.BooleanField("obligatorio", default=False)
     ayuda = models.CharField("ayuda", max_length=255, blank=True)

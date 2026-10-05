@@ -45,6 +45,7 @@ class PlanillaPanelTests(TestCase):
                 "etiqueta": "Estado",
                 "clave": "estado",
                 "tipo": "opcion",
+                "ambito": "punto",
                 "opciones": "Bueno\n\nMalo\n",
             },
         )
@@ -111,6 +112,43 @@ class PlanillaPanelTests(TestCase):
         self.assertEqual(self.campo.tipo, "numero")
         self.assertEqual(self.campo.etiqueta, "Cebos nuevos")
         self.assertEqual(self.campo.orden, 5)
+
+    def test_ambito_fijo_si_una_visita_uso_la_clave(self):
+        url = reverse("panel:servicios:campo_editar", args=[self.campo.pk])
+        formulario = self.client.get(url).context["form"]
+        self.assertIn("ambito", formulario.fields)
+        self.assertFalse(formulario.fields["ambito"].disabled)
+
+        cliente = Cliente.objects.create(razon_social="ACME")
+        sitio = Sitio.objects.create(cliente=cliente, nombre="Planta")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=self.tipo,
+            titulo="P",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        Visita.objects.create(
+            proyecto=proyecto,
+            empleado=self.empleado,
+            origen=Visita.Origen.APP,
+            datos={"cebos": 3},
+        )
+        formulario = self.client.get(url).context["form"]
+        self.assertTrue(formulario.fields["ambito"].disabled)
+
+        self.client.post(
+            url,
+            {
+                "orden": 1,
+                "etiqueta": "Cebos",
+                "clave": "cebos",
+                "tipo": "numero",
+                "ambito": "visita",
+            },
+        )
+        self.campo.refresh_from_db()
+        self.assertEqual(self.campo.ambito, "punto")
 
     def test_no_hay_ruta_de_borrado(self):
         for nombre in ("campo_editar", "campo_desactivar"):

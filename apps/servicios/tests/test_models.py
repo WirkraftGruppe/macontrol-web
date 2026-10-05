@@ -55,3 +55,26 @@ class TipoServicioTests(TestCase):
         self.assertTrue(
             TipoServicio.objects.filter(nombre="Mantenimiento edilicio").exists()
         )
+
+
+class AmbitoTests(TestCase):
+    def test_esquema_filtra_por_ambito(self):
+        tipo = TipoServicio.objects.create(nombre="Ámbito", slug="ambito")
+        CampoPlanilla.objects.create(
+            tipo_servicio=tipo, orden=1, etiqueta="P", clave="p", tipo="texto"
+        )
+        CampoPlanilla.objects.create(
+            tipo_servicio=tipo,
+            orden=2,
+            etiqueta="V",
+            clave="v",
+            tipo="texto",
+            ambito=CampoPlanilla.Ambito.VISITA,
+        )
+        tipo = TipoServicio.objects.prefetch_related("campos").get(pk=tipo.pk)
+        with self.assertNumQueries(0):
+            claves_punto = [c["clave"] for c in tipo.esquema_planilla()]
+            claves_visita = [c["clave"] for c in tipo.esquema_planilla("visita")]
+        self.assertEqual(claves_punto, ["p"])
+        self.assertEqual(claves_visita, ["v"])
+        self.assertEqual(CampoPlanilla.objects.get(clave="p").ambito, "punto")
