@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Sitio(models.Model):
-    """Lugar físico de un cliente donde se realizan visitas; tiene un QR propio."""
+    """Lugar físico de un cliente donde se hacen visitas; los QR son de sus puntos."""
 
     class Sector(models.TextChoices):
         INDUSTRIA = "industria", "Industria"
@@ -60,8 +60,6 @@ class Sitio(models.Model):
     )
     horario_acceso = models.CharField("horario de acceso", max_length=200, blank=True)
     notas = models.TextField("notas", blank=True)
-    qr_codigo = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    qr_impreso_el = models.DateField("QR impreso el", null=True, blank=True)
     activo = models.BooleanField("activo", default=True)
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
@@ -84,18 +82,12 @@ class Sitio(models.Model):
         return f"{self.nombre} ({self.cliente})"
 
     def save(self, *args, **kwargs):
-        """Al crear suma el punto General (mismo QR); al desactivar apaga sus puntos."""
+        """Al crear suma el punto General; al desactivar apaga sus puntos."""
         creado = self._state.adding
         with transaction.atomic():
             super().save(*args, **kwargs)
             if creado:
-                PuntoControl.objects.create(
-                    sitio=self,
-                    nombre="General",
-                    orden=0,
-                    qr_codigo=self.qr_codigo,
-                    qr_impreso_el=self.qr_impreso_el,
-                )
+                PuntoControl.objects.create(sitio=self, nombre="General", orden=0)
             elif not self.activo:
                 for punto in self.puntos.filter(activo=True):
                     punto.activo = False

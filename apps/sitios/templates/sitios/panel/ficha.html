@@ -22,7 +22,6 @@
 <section>
   <h2>Código QR</h2>
   <img src="{% url 'panel:sitios:qr_png' sitio.pk %}?inline=1" alt="Código QR de {{ sitio.nombre }}" width="260">
-  <p>Impreso el: {{ sitio.qr_impreso_el|date:"d/m/Y"|default:"sin imprimir" }}</p>
   <p>
     <a class="boton boton-primario" href="{% url 'panel:sitios:qr_png' sitio.pk %}">Descargar PNG</a>
     <a class="boton boton-peligro" href="{% url 'panel:sitios:regenerar_qr' sitio.pk %}">Regenerar QR</a>

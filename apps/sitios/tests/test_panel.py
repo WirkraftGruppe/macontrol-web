@@ -59,9 +59,7 @@ class SitioPanelTests(TestCase):
         self.assertEqual(general.qr_codigo, anterior)
         self.client.post(url)
         general.refresh_from_db()
-        self.sitio.refresh_from_db()
         self.assertNotEqual(general.qr_codigo, anterior)
-        self.assertEqual(self.sitio.qr_codigo, general.qr_codigo)
         self.assertFalse(PuntoControl.objects.filter(qr_codigo=anterior).exists())
 
     def test_alta_y_edicion_guardan_lat_lng(self):
@@ -72,12 +70,11 @@ class SitioPanelTests(TestCase):
         self.assertEqual(nuevo.longitud, Decimal("-57.654321"))
         self.client.post(
             reverse("panel:sitios:editar", args=[nuevo.pk]),
-            self._datos(latitud="-36.5", longitud="-58.25", qr_impreso_el="2026-10-01"),
+            self._datos(latitud="-36.5", longitud="-58.25"),
         )
         nuevo.refresh_from_db()
         self.assertEqual(nuevo.latitud, Decimal("-36.5"))
         self.assertEqual(nuevo.longitud, Decimal("-58.25"))
-        self.assertEqual(str(nuevo.qr_impreso_el), "2026-10-01")
 
     @override_settings(SITE_URL="https://ejemplo.test")
     def test_contenido_qr_usa_site_url(self):

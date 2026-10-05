@@ -22,10 +22,8 @@ class SitioForm(forms.ModelForm):
             "telefono_en_sitio",
             "horario_acceso",
             "notas",
-            "qr_impreso_el",
             "activo",
         ]
         widgets = {
-            "qr_impreso_el": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "notas": forms.Textarea(attrs={"rows": 3}),
         }

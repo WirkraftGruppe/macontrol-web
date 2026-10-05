@@ -119,22 +119,23 @@ class RegenerarQrPuntoTests(_BaseSitio):
             self.general.history.first().history_change_reason, "Regeneración de QR"
         )
 
-    def test_regenerar_el_general_copia_el_codigo_al_sitio(self):
-        nuevo = services.regenerar_qr(self.general)
+    def test_regenerar_el_general_no_toca_el_sitio(self):
+        actualizado = self.sitio.actualizado
+        historial = self.sitio.history.count()
+        services.regenerar_qr(self.general)
         self.sitio.refresh_from_db()
-        self.assertEqual(self.sitio.qr_codigo, nuevo)
+        self.assertEqual(self.sitio.actualizado, actualizado)
+        self.assertEqual(self.sitio.history.count(), historial)
 
     def test_regenera_solo_el_punto_y_respeta_tope(self):
         otro = PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
         codigo_general = self.general.qr_codigo
         nuevo = services.regenerar_qr(otro)
         self.general.refresh_from_db()
-        self.sitio.refresh_from_db()
         otro.refresh_from_db()
         self.assertEqual(otro.qr_codigo, nuevo)
         self.assertNotEqual(nuevo, codigo_general)
         self.assertEqual(self.general.qr_codigo, codigo_general)
-        self.assertEqual(self.sitio.qr_codigo, codigo_general)
         puntos = [
             PuntoControl.objects.create(sitio=self.sitio, nombre=f"P{i}", orden=i + 2)
             for i in range(services.TOPE_REGENERAR_QR + 1)
