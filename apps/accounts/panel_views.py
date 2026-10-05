@@ -86,7 +86,7 @@ class UsuarioDesactivarView(AdministradorRequeridoMixin, TemplateView):
     def post(self, request, *args, **kwargs):
         usuario = get_object_or_404(User, pk=kwargs["pk"])
         if usuario.pk == request.user.pk:
-            messages.error(request, "No podés desactivar tu propia cuenta.")
+            messages.error(request, "No es posible desactivar la propia cuenta.")
         else:
             usuario.is_active = False
             usuario.save(update_fields=["is_active"])
