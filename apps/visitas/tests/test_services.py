@@ -80,7 +80,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
             "empleado": self.empleado,
             "qr_codigo": self.punto.qr_codigo,
             "cliente_uuid": uuid4(),
-            "realizada_en": timezone.now(),
+            "realizada_en": timezone.now() - timedelta(minutes=5),
             "latitud": Decimal("-35.1"),
             "longitud": Decimal("-57.7"),
             "precision_m": Decimal("8.5"),
@@ -224,8 +224,6 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
 
     def test_mismo_punto_dos_veces_la_ultima_manda(self):
         visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
-        visita.abierta_en = timezone.now() - timedelta(hours=3)
-        visita.save()
         primera = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=2))
         segunda = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=1))
         self.assertEqual((primera.orden, segunda.orden), (1, 2))
@@ -389,16 +387,35 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
 
     def test_revisiones_anteriores_a_la_apertura_no_cuentan(self):
         visita = abierta(abierta_en=self.ahora - timedelta(minutes=10))
-        crear_revision(visita, realizada_en=self.ahora - timedelta(days=3))
+        crear_revision(
+            visita,
+            realizada_en=self.ahora - timedelta(days=3),
+            recibida_en=self.ahora - timedelta(days=3),
+        )
         with self.assertRaises(ValidationError):
             cerrar_visita(visita, quien=visita.empleado, cierre=Visita.Cierre.EMPLEADO)
         sistema = cerrar_visita(visita, quien=None, cierre=Visita.Cierre.SISTEMA)
         self.assertEqual(sistema.estado, Visita.Estado.CANCELADA)
-        otra = abierta(abierta_en=self.ahora - timedelta(minutes=10))
-        crear_revision(otra, realizada_en=self.ahora - timedelta(minutes=5))
-        cerrada = cerrar_visita(
-            otra, quien=otra.empleado, cierre=Visita.Cierre.EMPLEADO
+
+    def test_revision_diferida_recibida_en_la_jornada_cuenta(self):
+        punto = punto_de(crear_visita())
+        proyecto = punto.sitio.proyectos.get()
+        empleado = proyecto.encargado_actual
+        visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
+        registrar_revision(
+            visita=visita,
+            empleado=empleado,
+            qr_codigo=punto.qr_codigo,
+            cliente_uuid=uuid4(),
+            realizada_en=timezone.now() - timedelta(hours=2),
+            latitud=Decimal("-35.1"),
+            longitud=Decimal("-57.7"),
+            precision_m=None,
+            datos={},
+            productos_aplicados=[],
+            fotos=[jpeg_chico()],
         )
+        cerrada = cerrar_visita(visita, quien=empleado, cierre=Visita.Cierre.EMPLEADO)
         self.assertEqual(cerrada.estado, Visita.Estado.REALIZADA)
 
     def test_exige_al_menos_una_revision(self):

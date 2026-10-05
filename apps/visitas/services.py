@@ -491,8 +491,9 @@ def cerrar_visita(
             raise ValidationError("Solo un administrador puede cerrar de este modo.")
         revisiones = visita_bd.revisiones.all()
         if cierre != Visita.Cierre.ADMINISTRADOR:
-            # Solo cuentan las tomadas durante esta jornada (no la evidencia heredada).
-            revisiones = revisiones.filter(realizada_en__gte=visita_bd.abierta_en)
+            # Cuentan las recibidas durante esta jornada (hora del servidor, no la
+            # del teléfono): la evidencia heredada de una migración no.
+            revisiones = revisiones.filter(recibida_en__gte=visita_bd.abierta_en)
         ultima = revisiones.order_by("-realizada_en", "-id").first()
         if ultima is None:
             if cierre != Visita.Cierre.SISTEMA:
@@ -586,10 +587,6 @@ def registrar_visita_desde_app(
             # Los errores de QR salen antes de abrir nada.
             _resolver_punto(proyecto, qr_codigo)
             visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
-            if realizada_en < visita.abierta_en:
-                # La revisión viene de un envío diferido: la jornada empezó con ella.
-                visita.abierta_en = realizada_en
-                visita.save(update_fields=["abierta_en"])
             _guardar_revision(
                 visita=visita,
                 qr_codigo=qr_codigo,
