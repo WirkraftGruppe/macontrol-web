@@ -524,7 +524,7 @@ commit_base: 4e2c496
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | pendiente |
+| T6 | hecha |
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
@@ -544,6 +544,8 @@ commit_base: 4e2c496
 | 2026-10-05 | T1, T2, T3 | 6e87fa5 (raíz) · ec9d395 (T2) · c875441 (T3) | PASA 20/20 | verificador; contrato intacto |
 | 2026-10-05 | T4 | 6e3faaf | PASA 2/2 | principal: criterios de integración; suite 393 OK en worktree-integrar |
 | 2026-10-05 | T5 | b48bf5e | PASA 13/13 | verificador; integrada en 6cd1966 (suite 425 OK) |
+| 2026-10-05 | T6 | 5da9800 | PASA 7/7 | verificador en el worktree, antes del contrato modificado |
+| 2026-10-05 | T3, T5, T6, T7 | 917e580 | FALLA formal (0/32 criterios en FALLA) | verificador; la única FALLA es congelado.sh por el contrato modificado 50822be (decisión del usuario: el criterio del punto General pasa de T3 a T6) |
 
 ## Pendientes que deja este plan
 
