@@ -1,0 +1,38 @@
+{% extends "panel/base.html" %}
+{% load static %}
+{% block title %}Mapa · MAControl{% endblock %}
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+{% endblock %}
+{% block panel_contenido %}
+<style nonce="{{ request.csp_nonce }}">
+  .mapa-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .mapa-filtros .campo { margin-bottom: 0; }
+  #mapa { height: 70vh; min-height: 360px; border: 1px solid var(--border); border-radius: 8px; }
+  .mapa-popup h3 { margin: 0 0 4px; font-size: 18px; }
+  .mapa-popup ul { margin: 4px 0; padding-left: 18px; }
+</style>
+<h1>Mapa de sitios</h1>
+<form class="mapa-filtros" id="mapa-filtros">
+  <div class="campo">
+    <label for="filtro-servicio">Servicio</label>
+    <select id="filtro-servicio" name="servicio">
+      <option value="">Todos</option>
+      {% for servicio in servicios %}<option value="{{ servicio.pk }}">{{ servicio.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label for="filtro-estado">Estado</label>
+    <select id="filtro-estado" name="estado">
+      <option value="">Todos</option>
+      {% for valor, nombre in estados %}<option value="{{ valor }}">{{ nombre }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+<div id="mapa" data-url="{% url 'panel:mapa_datos' %}"></div>
+{% endblock %}
+{% block scripts %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'panel/mapa.js' %}"></script>
+{% endblock %}
