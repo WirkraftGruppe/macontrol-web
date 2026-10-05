@@ -99,7 +99,8 @@ class MapaTests(TestCase):
                 empleado=self.empleado,
                 origen=Visita.Origen.MANUAL,
                 estado=Visita.Estado.REALIZADA,
-                realizada_en=momento,
+                abierta_en=momento,
+                cerrada_en=momento,
             )
         Visita.objects.create(
             proyecto=proyecto, empleado=self.empleado, origen=Visita.Origen.MANUAL

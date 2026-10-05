@@ -108,11 +108,19 @@ class FichaProyecto(AdministradorRequeridoMixin, DetailView):
         proyecto = contexto["proyecto"]
         visitas = list(
             proyecto.visitas.select_related("empleado")
-            .prefetch_related("fotos", "productos__producto")
+            .prefetch_related(
+                "revisiones__punto",
+                "revisiones__fotos",
+                "revisiones__productos__producto",
+            )
             .order_by("-creado")
         )
         for visita in visitas:
             visita.filas = filas_planilla(visita.esquema_planilla, visita.datos)
+            for revision in visita.revisiones.all():
+                revision.filas = filas_planilla(
+                    revision.esquema_planilla, revision.datos
+                )
         contexto["visitas"] = visitas
         contexto["etiqueta_visita"] = EstadoVisita(proyecto.estado_visita).label
         return contexto

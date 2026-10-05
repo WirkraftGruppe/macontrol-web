@@ -74,6 +74,7 @@ class FlujoEmpleadoTests(TestCase):
             encargado_actual=self.empleado,
         )
         Producto.objects.create(nombre_comercial="Cebo X")
+        self.punto = self.sitio.puntos.get(orden=0)
 
     def _cliente_con_token(self, usuario):
         """Cliente que se autentica solo con el JWT obtenido del endpoint real."""
@@ -91,7 +92,7 @@ class FlujoEmpleadoTests(TestCase):
         """Escanear el QR, registrar la visita y ver historial y foto, con JWT real."""
         api = self._cliente_con_token("emp")
 
-        qr = api.post(f"/api/v1/qr/{self.sitio.qr_codigo}/resolver/")
+        qr = api.post(f"/api/v1/qr/{self.punto.qr_codigo}/resolver/")
         self.assertEqual(qr.status_code, 200, qr.content)
         proyecto = qr.data["proyectos"][0]
         self.assertEqual(proyecto["esquema_planilla"][0]["clave"], "cebos")
@@ -110,7 +111,7 @@ class FlujoEmpleadoTests(TestCase):
             }
         ]
         cuerpo = {
-            "qr_codigo": str(self.sitio.qr_codigo),
+            "qr_codigo": str(self.punto.qr_codigo),
             "proyecto": proyecto["id"],
             "cliente_uuid": str(uuid4()),
             "realizada_en": timezone.now().isoformat(),
@@ -130,7 +131,9 @@ class FlujoEmpleadoTests(TestCase):
             [v["id"] for v in historial.data["results"]], [creada.data["id"]]
         )
         visita = Visita.objects.get(pk=creada.data["id"])
-        self.assertEqual(ProductoAplicado.objects.filter(visita=visita).count(), 1)
+        self.assertEqual(
+            ProductoAplicado.objects.filter(revision__visita=visita).count(), 1
+        )
         urls = historial.data["results"][0]["fotos"]
         self.assertEqual(len(urls), 2)
 

@@ -19,7 +19,7 @@ from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla, TipoServicio
 from apps.sitios.models import Sitio
-from apps.visitas.models import Foto, ProductoAplicado, Visita
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 
 MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="visitas-api-test-")
 
@@ -66,6 +66,7 @@ class BaseApiTests(TestCase):
             encargado_inicial=self.empleado,
             encargado_actual=self.empleado,
         )
+        self.punto = self.sitio.puntos.get(orden=0)
         self.api = self._api(self.empleado)
 
     def _usuario(self, nombre, rol):
@@ -81,11 +82,24 @@ class BaseApiTests(TestCase):
         extra.setdefault("motivo_manual", "Carga")
         return Visita.objects.create(proyecto=self.proyecto, empleado=empleado, **extra)
 
+    def _revision(self, visita, **extra):
+        extra.setdefault("realizada_en", timezone.now())
+        extra.setdefault("recibida_en", extra["realizada_en"])
+        extra.setdefault("orden", visita.revisiones.count() + 1)
+        return Revision.objects.create(visita=visita, punto=self.punto, **extra)
+
     def _realizada(self, empleado, dia):
-        realizada = timezone.make_aware(datetime(2026, 9, dia, 12, 0))
-        return self._visita(
-            empleado, estado=Visita.Estado.REALIZADA, realizada_en=realizada
+        """Visita realizada ese día de septiembre, con su revisión General."""
+        cerrada = timezone.make_aware(datetime(2026, 9, dia, 12, 0))
+        visita = self._visita(
+            empleado,
+            estado=Visita.Estado.REALIZADA,
+            abierta_en=cerrada,
+            cerrada_en=cerrada,
+            cierre=Visita.Cierre.EMPLEADO,
         )
+        self._revision(visita, realizada_en=cerrada)
+        return visita
 
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
@@ -96,7 +110,7 @@ class CrearVisitaTests(BaseApiTests):
 
     def _cuerpo(self, **cambios):
         cuerpo = {
-            "qr_codigo": str(self.sitio.qr_codigo),
+            "qr_codigo": str(self.punto.qr_codigo),
             "proyecto": self.proyecto.id,
             "cliente_uuid": str(uuid4()),
             "realizada_en": (timezone.now() - timedelta(minutes=1)).isoformat(),
@@ -133,8 +147,10 @@ class CrearVisitaTests(BaseApiTests):
         visita = Visita.objects.get(pk=r.data["id"])
         self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
         self.assertEqual(visita.origen, Visita.Origen.APP)
-        self.assertEqual(visita.fotos.count(), 2)
-        self.assertEqual(ProductoAplicado.objects.filter(visita=visita).count(), 1)
+        self.assertEqual(Foto.objects.filter(revision__visita=visita).count(), 2)
+        self.assertEqual(
+            ProductoAplicado.objects.filter(revision__visita=visita).count(), 1
+        )
         self.assertEqual(len(r.data["fotos"]), 2)
         self.assertNotIn("latitud", r.data)
 
@@ -169,35 +185,25 @@ class CrearVisitaTests(BaseApiTests):
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(r.data["id"], pendiente.id)
         self.assertEqual(Visita.objects.count(), 1)
-
-    def test_pendiente_con_fotos_crea_nueva_con_incidencia(self):
-        pendiente = self._visita(self.empleado, programada_para=date(2026, 9, 1))
-        Foto.objects.create(visita=pendiente, imagen=jpeg_chico())
-        r = self._post()
-        self.assertEqual(r.status_code, 201, r.content)
-        nueva = Visita.objects.get(pk=r.data["id"])
-        self.assertNotEqual(nueva.id, pendiente.id)
-        self.assertTrue(nueva.incidencia_asignacion)
-        self.assertEqual(nueva.estado, Visita.Estado.REALIZADA)
         pendiente.refresh_from_db()
-        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
-        self.assertEqual(pendiente.fotos.count(), 1)
-        self.assertEqual(nueva.fotos.count(), 1)
+        self.assertEqual(pendiente.estado, Visita.Estado.REALIZADA)
 
-    def test_pendiente_con_productos_crea_nueva_con_incidencia(self):
-        pendiente = self._visita(self.empleado, programada_para=date(2026, 9, 1))
-        ProductoAplicado.objects.create(
-            visita=pendiente, producto=self.producto, lote="L0", dosis=1, unidad="ml"
+    def test_con_visita_abierta_propia_agrega_la_revision_y_la_cierra(self):
+        abierta = self._visita(
+            self.empleado,
+            origen=Visita.Origen.APP,
+            motivo_manual="",
+            estado=Visita.Estado.ABIERTA,
+            abierta_en=timezone.now() - timedelta(hours=1),
         )
+        self._revision(abierta, realizada_en=timezone.now() - timedelta(minutes=30))
         r = self._post()
         self.assertEqual(r.status_code, 201, r.content)
-        nueva = Visita.objects.get(pk=r.data["id"])
-        self.assertNotEqual(nueva.id, pendiente.id)
-        self.assertTrue(nueva.incidencia_asignacion)
-        pendiente.refresh_from_db()
-        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
-        self.assertEqual(pendiente.productos.count(), 1)
-        self.assertEqual(nueva.productos.count(), 0)
+        self.assertEqual(r.data["id"], abierta.id)
+        self.assertEqual(Visita.objects.count(), 1)
+        self.assertEqual(abierta.revisiones.count(), 2)
+        abierta.refresh_from_db()
+        self.assertEqual(abierta.estado, Visita.Estado.REALIZADA)
 
     def test_pendiente_de_otro_marca_incidencia_asignacion(self):
         ajena = self._visita(self.otro, programada_para=date(2026, 9, 1))
@@ -318,7 +324,7 @@ class MisVisitasTests(BaseApiTests):
 class HistorialTests(BaseApiTests):
     def test_solo_visitas_propias(self):
         propia = self._realizada(self.empleado, 2)
-        Foto.objects.create(visita=propia, imagen=jpeg_chico())
+        Foto.objects.create(revision=propia.revisiones.get(), imagen=jpeg_chico())
         self._realizada(self.otro, 2)
         self._visita(self.empleado)
         r = self.api.get("/api/v1/me/historial/")
@@ -327,7 +333,7 @@ class HistorialTests(BaseApiTests):
         item = r.data["results"][0]
         self.assertNotIn("latitud", item)
         self.assertNotIn("longitud", item)
-        codigo = propia.fotos.get().codigo
+        codigo = Foto.objects.get(revision__visita=propia).codigo
         self.assertEqual(item["fotos"], [f"/api/v1/fotos/{codigo}/"])
 
     def test_rango_de_fechas_filtra(self):
@@ -353,7 +359,9 @@ class FotoTests(BaseApiTests):
     def setUp(self):
         super().setUp()
         self.visita = self._realizada(self.empleado, 2)
-        self.foto = Foto.objects.create(visita=self.visita, imagen=jpeg_chico())
+        self.foto = Foto.objects.create(
+            revision=self.visita.revisiones.get(), imagen=jpeg_chico()
+        )
         self.url = f"/api/v1/fotos/{self.foto.codigo}/"
 
     def test_foto_se_sirve_al_dueno_y_403_a_otro(self):

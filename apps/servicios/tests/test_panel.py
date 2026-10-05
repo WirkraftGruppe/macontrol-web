@@ -2,13 +2,14 @@
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla, TipoServicio
 from apps.sitios.models import Sitio
-from apps.visitas.models import Visita
+from apps.visitas.models import Revision, Visita
 
 
 class PlanillaPanelTests(TestCase):
@@ -112,6 +113,35 @@ class PlanillaPanelTests(TestCase):
         self.assertEqual(self.campo.tipo, "numero")
         self.assertEqual(self.campo.etiqueta, "Cebos nuevos")
         self.assertEqual(self.campo.orden, 5)
+
+    def test_clave_fija_si_una_revision_la_uso(self):
+        url = reverse("panel:servicios:campo_editar", args=[self.campo.pk])
+        sitio = Sitio.objects.create(
+            cliente=Cliente.objects.create(razon_social="ACME"), nombre="P"
+        )
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=self.tipo,
+            titulo="P",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        visita = Visita.objects.create(
+            proyecto=proyecto, empleado=self.empleado, origen=Visita.Origen.APP
+        )
+        formulario = self.client.get(url).context["form"]
+        self.assertFalse(formulario.fields["clave"].disabled)
+        Revision.objects.create(
+            visita=visita,
+            punto=sitio.puntos.get(orden=0),
+            orden=1,
+            realizada_en=timezone.now(),
+            recibida_en=timezone.now(),
+            datos={"cebos": 3},
+        )
+        formulario = self.client.get(url).context["form"]
+        for nombre in ("clave", "tipo", "ambito"):
+            self.assertTrue(formulario.fields[nombre].disabled, nombre)
 
     def test_ambito_fijo_si_una_visita_uso_la_clave(self):
         url = reverse("panel:servicios:campo_editar", args=[self.campo.pk])

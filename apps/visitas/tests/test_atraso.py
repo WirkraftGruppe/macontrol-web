@@ -13,7 +13,7 @@ from apps.visitas.tests.test_api import MEDIA_TEMPORAL, BaseApiTests, jpeg_chico
 class AtrasoMaximoTests(BaseApiTests):
     def _post_con_atraso(self, horas, cliente_uuid=None):
         cuerpo = {
-            "qr_codigo": str(self.sitio.qr_codigo),
+            "qr_codigo": str(self.punto.qr_codigo),
             "proyecto": self.proyecto.id,
             "cliente_uuid": str(cliente_uuid or uuid4()),
             "realizada_en": (timezone.now() - timedelta(hours=horas)).isoformat(),

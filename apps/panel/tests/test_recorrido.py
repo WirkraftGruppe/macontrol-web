@@ -19,7 +19,7 @@ from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
-from apps.visitas.models import Visita
+from apps.visitas.models import Foto, Visita
 
 MEDIA_RECORRIDO = tempfile.mkdtemp(prefix="macontrol-recorrido-test-")
 
@@ -110,6 +110,7 @@ class RecorridoTests(TestCase):
             url_manual,
             {
                 "empleado": self.empleado.pk,
+                "puntos": [self.sitio.puntos.get(orden=0).pk],
                 "pendiente": pendiente.pk,
                 "motivo": "El empleado no tenía conexión",
                 "realizada_en": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
@@ -135,6 +136,6 @@ class RecorridoTests(TestCase):
         self.assertEqual(pendiente.origen, Visita.Origen.MANUAL)
         self.assertEqual(pendiente.asignada_por, self.admin)
         self._get_200(url_visita)
-        foto = pendiente.fotos.get()
+        foto = Foto.objects.get(revision__visita=pendiente)
         self._get_200(reverse("panel:visitas:foto", args=[foto.codigo]))
         self._get_200(url_proyecto)
