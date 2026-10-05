@@ -15,7 +15,7 @@ def clave_en_uso(tipo_servicio, clave) -> bool:
 
 
 class CampoPlanillaForm(forms.ModelForm):
-    """Alta y edición de un campo; `clave` y `tipo` se fijan si ya hay datos."""
+    """Alta y edición de un campo; `clave`, `tipo` y `ambito` se fijan con datos."""
 
     opciones = forms.CharField(
         label="Opciones",
@@ -31,6 +31,7 @@ class CampoPlanillaForm(forms.ModelForm):
             "etiqueta",
             "clave",
             "tipo",
+            "ambito",
             "opciones",
             "obligatorio",
             "ayuda",
@@ -42,7 +43,7 @@ class CampoPlanillaForm(forms.ModelForm):
         if self.instance.pk:
             self.initial["opciones"] = "\n".join(self.instance.opciones)
             if clave_en_uso(tipo_servicio, self.instance.clave):
-                for nombre in ("clave", "tipo"):
+                for nombre in ("clave", "tipo", "ambito"):
                     self.fields[nombre].disabled = True
                     self.fields[
                         nombre

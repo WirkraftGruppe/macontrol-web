@@ -10,7 +10,7 @@
     <thead>
       <tr>
         <th scope="col">Orden</th><th scope="col">Etiqueta</th><th scope="col">Clave</th>
-        <th scope="col">Tipo</th><th scope="col">Obligatorio</th><th scope="col">Estado</th>
+        <th scope="col">Tipo</th><th scope="col">Ámbito</th><th scope="col">Obligatorio</th><th scope="col">Estado</th>
         <th scope="col"><span class="visually-hidden">Acciones</span></th>
       </tr>
     </thead>
@@ -21,6 +21,7 @@
           <td>{{ campo.etiqueta }}</td>
           <td>{{ campo.clave }}</td>
           <td>{{ campo.get_tipo_display }}</td>
+          <td>{{ campo.get_ambito_display }}</td>
           <td>{{ campo.obligatorio|yesno:"Sí,No" }}</td>
           <td>{% if campo.activo %}{% include "panel/partials/etiqueta_estado.html" with tono="ok" texto="Activo" %}{% else %}{% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Inactivo" %}{% endif %}</td>
           <td>
@@ -29,7 +30,7 @@
           </td>
         </tr>
       {% empty %}
-        <tr><td colspan="7">Este servicio todavía no tiene campos.</td></tr>
+        <tr><td colspan="8">Este servicio todavía no tiene campos.</td></tr>
       {% endfor %}
     </tbody>
   </table>
