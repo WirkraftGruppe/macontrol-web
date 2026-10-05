@@ -519,10 +519,10 @@ commit_base: 4e2c496
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -541,6 +541,8 @@ commit_base: 4e2c496
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-05 | T1, T2, T3 | 6e87fa5 (raíz) · ec9d395 (T2) · c875441 (T3) | PASA 20/20 | verificador; contrato intacto |
+| 2026-10-05 | T4 | 6e3faaf | PASA 2/2 | principal: criterios de integración; suite 393 OK en worktree-integrar |
 
 ## Pendientes que deja este plan
 
