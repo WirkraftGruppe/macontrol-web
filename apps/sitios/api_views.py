@@ -34,7 +34,7 @@ class ResolverQRView(APIView):
     def post(self, request, codigo):
         sitio = (
             Sitio.objects.select_related("cliente")
-            .filter(qr_codigo=codigo, activo=True)
+            .filter(qr_codigo=codigo, activo=True, cliente__activo=True)
             .first()
         )
         if sitio is None:

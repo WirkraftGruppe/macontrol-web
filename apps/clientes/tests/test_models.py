@@ -30,6 +30,18 @@ class ClienteTests(TestCase):
                     with self.assertRaises(ValidationError):
                         validar_cuit(f"2012345678{x}")
 
+    def test_cuit_resto_10_solo_prefijos_afip(self):
+        # Con resto 10 el dígito es 9 y solo es válido con prefijo 23 o 33.
+        for cuit in ("23000000069", "33000000099"):
+            with self.subTest(cuit=cuit):
+                validar_cuit(cuit)
+        for cuit in ("20000000019", "27000000099"):
+            with self.subTest(cuit=cuit):
+                with self.assertRaises(ValidationError):
+                    validar_cuit(cuit)
+                with self.assertRaises(ValidationError):
+                    Cliente(razon_social="ACME", cuit=cuit).full_clean()
+
     def test_cuit_es_opcional(self):
         cliente = Cliente(razon_social="ACME")
         cliente.full_clean()

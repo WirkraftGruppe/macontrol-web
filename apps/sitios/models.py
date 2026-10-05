@@ -57,7 +57,9 @@ class Sitio(models.Model):
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
-    history = HistoricalRecords(excluded_fields=["contacto_en_sitio", "telefono_en_sitio"])  # noqa: E501
+    history = HistoricalRecords(
+        excluded_fields=["contacto_en_sitio", "telefono_en_sitio"]
+    )
 
     class Meta:
         verbose_name = "sitio"

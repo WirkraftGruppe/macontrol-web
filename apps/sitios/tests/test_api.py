@@ -101,6 +101,14 @@ class ResolverQRTests(TestCase):
         self.assertEqual(inexistente.status_code, 404)
         self.assertEqual(inactivo.json(), inexistente.json())
 
+    def test_cliente_inactivo_da_404(self):
+        self.cliente.activo = False
+        self.cliente.save()
+        inactivo = self._resolver()
+        inexistente = self._resolver(uuid.uuid4())
+        self.assertEqual(inactivo.status_code, 404)
+        self.assertEqual(inactivo.json(), inexistente.json())
+
     def test_administrador_no_resuelve_qr(self):
         cliente = APIClient()
         cliente.force_authenticate(self.admin)

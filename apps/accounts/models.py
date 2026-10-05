@@ -35,10 +35,12 @@ class User(AbstractUser):
         solo_last_login = update_fields is not None and set(update_fields) == {
             "last_login"
         }
-        if solo_last_login:
+        # Solo se borra la marca si la puso este método, no el llamador.
+        puso_marca = solo_last_login and not hasattr(self, "skip_history_when_saving")
+        if puso_marca:
             self.skip_history_when_saving = True
         try:
             super().save(*args, **kwargs)
         finally:
-            if solo_last_login:
+            if puso_marca:
                 del self.skip_history_when_saving
