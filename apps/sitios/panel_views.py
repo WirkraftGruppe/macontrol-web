@@ -1,9 +1,11 @@
 """Vistas del panel de Sitios (solo administradores)."""
 
+from csp.decorators import csp_update
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.text import slugify
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
@@ -11,8 +13,9 @@ from django.views.generic import CreateView, DetailView, UpdateView
 from apps.accounts.mixins import AdministradorRequeridoMixin
 from apps.clientes.models import Cliente
 from apps.panel.listados import ListadoPanelMixin
+from apps.panel.mapa import ORIGEN_TESELAS
 
-from . import qr, services
+from . import geocodificacion, qr, services
 from .models import Sitio
 from .panel_forms import SitioForm
 
@@ -42,6 +45,7 @@ class SitioListado(AdministradorRequeridoMixin, ListadoPanelMixin):
         return contexto
 
 
+@method_decorator(csp_update({"img-src": ORIGEN_TESELAS}), name="dispatch")
 class SitioAlta(AdministradorRequeridoMixin, CreateView):
     model = Sitio
     form_class = SitioForm
@@ -52,6 +56,7 @@ class SitioAlta(AdministradorRequeridoMixin, CreateView):
         return reverse("panel:sitios:ficha", args=[self.object.pk])
 
 
+@method_decorator(csp_update({"img-src": ORIGEN_TESELAS}), name="dispatch")
 class SitioEdicion(AdministradorRequeridoMixin, UpdateView):
     model = Sitio
     form_class = SitioForm
@@ -108,3 +113,20 @@ class RegenerarQR(AdministradorRequeridoMixin, DetailView):
             request, "Se generó un nuevo QR; la etiqueta anterior ya no sirve."
         )
         return redirect("panel:sitios:ficha", pk=sitio.pk)
+
+
+class Geocodificar(AdministradorRequeridoMixin, View):
+    """Candidatos de Nominatim para ``?q=``; solo se envía el texto de dirección."""
+
+    def get(self, request):
+        try:
+            candidatos = geocodificacion.buscar(request.GET.get("q", ""))
+        except geocodificacion.TextoInvalido:
+            return JsonResponse(
+                {"error": "Escriba una dirección de hasta 200 caracteres."}, status=400
+            )
+        except geocodificacion.GeocodificacionError:
+            return JsonResponse(
+                {"error": geocodificacion.MENSAJE_CARGA_MANUAL}, status=503
+            )
+        return JsonResponse({"resultados": candidatos})
