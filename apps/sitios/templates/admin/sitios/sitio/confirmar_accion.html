@@ -3,18 +3,18 @@
 {% block content %}
 <p>{{ consecuencia }}</p>
 <ul>
-  {% for sitio in sitios %}
-  <li>{{ sitio }}</li>
+  {% for objeto in objetos %}
+  <li>{{ objeto }}</li>
   {% endfor %}
 </ul>
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="action" value="{{ accion }}">
-  {% for sitio in sitios %}
-  <input type="hidden" name="{{ action_checkbox_name }}" value="{{ sitio.pk }}">
+  {% for objeto in objetos %}
+  <input type="hidden" name="{{ action_checkbox_name }}" value="{{ objeto.pk }}">
   {% endfor %}
   <input type="hidden" name="confirmado" value="si">
   <input type="submit" value="Confirmar">
-  <a href="{% url 'admin:sitios_sitio_changelist' %}">Volver al listado</a>
+  <a href="{{ url_listado }}">Volver al listado</a>
 </form>
 {% endblock %}

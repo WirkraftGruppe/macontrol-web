@@ -2,7 +2,7 @@
 
 from csp.decorators import csp_update
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -16,7 +16,7 @@ from apps.panel.listados import ListadoPanelMixin
 from apps.panel.mapa import ORIGEN_TESELAS
 
 from . import geocodificacion, qr, services
-from .models import Sitio
+from .models import PuntoControl, Sitio
 from .panel_forms import SitioForm
 
 
@@ -84,13 +84,26 @@ class SitioFicha(AdministradorRequeridoMixin, DetailView):
         return contexto
 
 
+def _punto_general(sitio_pk):
+    """Punto General del sitio (el de menor orden); 404 si el sitio no existe."""
+    punto = (
+        PuntoControl.objects.select_related("sitio")
+        .filter(sitio_id=sitio_pk)
+        .order_by("orden", "id")
+        .first()
+    )
+    if punto is None:
+        raise Http404
+    return punto
+
+
 class QRPng(AdministradorRequeridoMixin, View):
     """PNG del QR: descarga por defecto, o inline con ``?inline=1`` para la ficha."""
 
     def get(self, request, pk):
-        sitio = get_object_or_404(Sitio, pk=pk)
-        respuesta = HttpResponse(qr.png_qr(sitio), content_type="image/png")
-        nombre = slugify(sitio.nombre) or "sitio"
+        punto = _punto_general(pk)
+        respuesta = HttpResponse(qr.png_qr(punto), content_type="image/png")
+        nombre = slugify(punto.sitio.nombre) or "sitio"
         modo = "inline" if request.GET.get("inline") else "attachment"
         respuesta["Content-Disposition"] = f'{modo}; filename="qr-{nombre}.png"'
         respuesta["Cache-Control"] = "private, no-store"
@@ -108,7 +121,7 @@ class RegenerarQR(AdministradorRequeridoMixin, DetailView):
 
     def post(self, request, pk):
         sitio = get_object_or_404(Sitio, pk=pk)
-        services.regenerar_qr(sitio)
+        services.regenerar_qr(_punto_general(pk))
         messages.success(
             request, "Se generó un nuevo QR; la etiqueta anterior ya no sirve."
         )

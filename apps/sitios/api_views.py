@@ -11,7 +11,7 @@ from apps.accounts.permisos import EsEmpleado
 from apps.proyectos.models import Proyecto
 from apps.visitas.models import Visita
 
-from .models import Sitio
+from .models import PuntoControl
 from .serializers import ResolverQRSerializer
 
 
@@ -32,13 +32,19 @@ class ResolverQRView(APIView):
         ),
     )
     def post(self, request, codigo):
-        sitio = (
-            Sitio.objects.select_related("cliente")
-            .filter(qr_codigo=codigo, activo=True, cliente__activo=True)
+        punto = (
+            PuntoControl.objects.select_related("sitio__cliente")
+            .filter(
+                qr_codigo=codigo,
+                activo=True,
+                sitio__activo=True,
+                sitio__cliente__activo=True,
+            )
             .first()
         )
-        if sitio is None:
+        if punto is None:
             raise NotFound("El código QR no corresponde a un sitio activo.")
+        sitio = punto.sitio
 
         proyectos = list(
             Proyecto.objects.filter(sitio=sitio, estado=Proyecto.Estado.ACTIVO)
