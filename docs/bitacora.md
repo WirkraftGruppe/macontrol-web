@@ -1,19 +1,25 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-04-saneamiento.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| saneamiento | plan/saneamiento | cerrado (TODO PASA) | merge a `main`, lo decide el usuario | 2026-10-04 |
 
-Siguiente: plan `panel` (diseño aprobado; usa `pendientes.py --etiqueta panel`). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo` (entre ellos P-contrato-app-9).
+Siguiente: plan `panel` (diseño aprobado; `docs/planes/2026-10-04-panel.md` está sin rastrear, lo escribió otra sesión; usa `pendientes.py --etiqueta panel`). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-04 — Fusión en `main` de `saneamiento`
+Hecho:
+- `main` recibió `plan/saneamiento` con `merge --no-ff`, con la verificación TODO en PASA 0/44 (verificador y verificador-b, HEAD `a5d1a74`) y `auditor-seguridad` sin bloqueantes.
+- Las 3 decisiones del plan se copiaron al final de `docs/decisiones.md` (CUIT resto 10; `noqa` quitado; SameSite y tope de archivos explícitos).
+- Rama `plan/saneamiento` borrada. Pendientes abiertos: 35.
+Pendiente: plan `panel`.
 
 ### 2026-10-04 — Plan `saneamiento`: 16 de los 17 pendientes etiquetados, cerrados
 Hecho:
