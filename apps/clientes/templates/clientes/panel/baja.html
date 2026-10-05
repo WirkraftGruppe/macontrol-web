@@ -1,0 +1,7 @@
+{% extends "panel/base.html" %}
+{% block title %}Dar de baja cliente · MAControl{% endblock %}
+{% block panel_contenido %}
+  {% url 'panel:clientes:baja' cliente.pk as accion_url %}
+  {% url 'panel:clientes:ficha' cliente.pk as ficha_url %}
+  {% include "panel/partials/confirmar.html" with titulo="Dar de baja cliente" mensaje="El cliente quedará inactivo. No se borra ningún dato." accion_url=accion_url cancelar_url=ficha_url enviar="Dar de baja" %}
+{% endblock %}

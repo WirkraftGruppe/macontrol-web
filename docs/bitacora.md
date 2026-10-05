@@ -1,18 +1,29 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-04-panel.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| panel | plan/panel | 4 (cerrada) | el usuario aprueba la FALLA de `congelado.sh` (contrato modificado `2cebc16`) y decide la fusión en `main`; decidir P-panel-17 | 2026-10-04/05 |
 
-Siguiente: plan `panel` (diseño aprobado; `docs/planes/2026-10-04-panel.md` está sin rastrear, lo escribió otra sesión; usa `pendientes.py --etiqueta panel`). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: fusión de `panel`. Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-05 — Plan `panel`: las cuatro olas integradas, verificación TODO 114/115
+Hecho:
+- Plan congelado (`5155082`) con los ajustes del usuario; contrato modificado una vez (`2cebc16`, decisión del usuario): `test_acceso` pasó de T5 (677/650 líneas) a la integración T11.
+- Ola 1 (T1 vendor HTMX 2.0.11 y Leaflet 1.9.4, T2 diseño, T3 revisión de incidencias), ola 2 (T5 tablero y mapa, T6 clientes, T7 sitios y QR, T8 proyectos, T9 productos y planillas, T10 usuarios), ola 3 (T12 visitas, T13 geocodificación con Nominatim) y ola 4 (T15 carga manual, T16 recorrido), todas en worktrees e integradas en `plan/panel`.
+- auditor-seguridad por ola: un bloqueante en T10 (un administrador gestionaba superusuarios y podía entrar a `/admin/`), corregido en `8a96aa6` y cerrado en la re-auditoría; el resto, menores y observaciones (P-panel-15 a -27).
+- Verificación TODO en `f21d709`: verificador y verificador-b, 114/115 PASA; la única FALLA es `congelado.sh` por el contrato modificado. Suite 374 OK.
+- Cierra P-pendientes-heredados-10, P-api-movil-10, P-contrato-app-1, P-contrato-app-8 y P-panel-1. Pendientes nuevos: P-panel-2 a -27.
+- Incidentes: un `cd` del principal a un worktree (corregido, sin daños) y el renombre `form.html` → `formulario.html` quedó en el commit de T4 (P-panel-13).
+Pendiente: aprobación del usuario de la FALLA de `congelado.sh`, decisión de P-panel-17 y fusión en `main`.
 
 ### 2026-10-04 — Fusión en `main` de `saneamiento`
 Hecho:

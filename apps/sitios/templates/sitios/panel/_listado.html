@@ -1,0 +1,28 @@
+{% load panel_ui %}
+<div id="listado">
+  <table class="tabla">
+    <thead>
+      <tr>
+        {% include "panel/partials/th_orden.html" with campo="nombre" etiqueta="Nombre" %}
+        {% include "panel/partials/th_orden.html" with campo="cliente__razon_social" etiqueta="Cliente" %}
+        {% include "panel/partials/th_orden.html" with campo="localidad" etiqueta="Localidad" %}
+        {% include "panel/partials/th_orden.html" with campo="sector" etiqueta="Sector" %}
+        <th scope="col">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sitio in object_list %}
+      <tr>
+        <td><a href="{% url 'panel:sitios:ficha' sitio.pk %}">{{ sitio.nombre }}</a></td>
+        <td>{{ sitio.cliente }}</td>
+        <td>{{ sitio.localidad }}</td>
+        <td>{{ sitio.get_sector_display }}</td>
+        <td>{% if sitio.activo %}{% include "panel/partials/etiqueta_estado.html" with tono="ok" texto="Activo" %}{% else %}{% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Inactivo" %}{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No hay sitios que coincidan.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "panel/partials/paginacion.html" %}
+</div>

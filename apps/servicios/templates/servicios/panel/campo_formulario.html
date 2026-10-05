@@ -1,0 +1,7 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ view.titulo }} · MAControl{% endblock %}
+{% block panel_contenido %}
+  <h1>{{ view.titulo }} · {{ tipo.nombre }}</h1>
+  {% url 'panel:servicios:campos' tipo.pk as campos_url %}
+  {% include "panel/partials/formulario.html" with cancelar_url=campos_url %}
+{% endblock %}

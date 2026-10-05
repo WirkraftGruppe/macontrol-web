@@ -1,13 +1,18 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block title %}Ingresar · MAControl{% endblock %}
 {% block contenido %}
+<div class="ingreso">
+  <img class="ingreso-logo" src="{% static 'img/logo.png' %}" alt="MAControl">
   <h1>Ingresar al panel</h1>
-  <form method="post">
+  {% include "panel/partials/mensajes.html" %}
+  <form class="formulario" method="post">
     {% csrf_token %}
-    {{ form.non_field_errors }}
-    <p>{{ form.username.label_tag }} {{ form.username }}</p>
-    <p>{{ form.password.label_tag }} {{ form.password }}</p>
+    {% if form.non_field_errors %}<div class="errores">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="campo">{{ form.username.label_tag }} {{ form.username }}</div>
+    <div class="campo">{{ form.password.label_tag }} {{ form.password }}</div>
     {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-    <button type="submit">Ingresar</button>
+    <div class="acciones"><button class="boton boton-primario" type="submit">Ingresar</button></div>
   </form>
+</div>
 {% endblock %}

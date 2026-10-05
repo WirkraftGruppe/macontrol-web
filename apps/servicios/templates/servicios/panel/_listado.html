@@ -1,0 +1,23 @@
+<div id="listado">
+  <table class="tabla">
+    <thead>
+      <tr>
+        {% include "panel/partials/th_orden.html" with campo="nombre" etiqueta="Servicio" %}
+        {% include "panel/partials/th_orden.html" with campo="activo" etiqueta="Estado" %}
+        <th scope="col"><span class="visually-hidden">Acciones</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tipo in object_list %}
+        <tr>
+          <td>{{ tipo.nombre }}</td>
+          <td>{% if tipo.activo %}{% include "panel/partials/etiqueta_estado.html" with tono="ok" texto="Activo" %}{% else %}{% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Inactivo" %}{% endif %}</td>
+          <td><a href="{% url 'panel:servicios:campos' tipo.pk %}">Planilla</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3">No hay servicios para mostrar.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "panel/partials/paginacion.html" %}
+</div>

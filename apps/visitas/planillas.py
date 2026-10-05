@@ -92,3 +92,22 @@ def validar_datos(esquema, datos) -> dict[str, list[str]]:
         if clave not in claves:
             errores[clave] = ["Campo desconocido en esta planilla."]
     return errores
+
+
+def _valor_legible(campo, valor):
+    if valor is None or valor == "" or valor == []:
+        return "—"
+    if campo["tipo"] == "booleano":
+        return "Sí" if valor else "No"
+    if campo["tipo"] == "opcion_multiple":
+        return ", ".join(str(v) for v in valor)
+    return str(valor)
+
+
+def filas_planilla(esquema, datos):
+    """Filas `(etiqueta, valor legible)` en el orden del esquema copiado."""
+    datos = datos or {}
+    return [
+        (campo["etiqueta"], _valor_legible(campo, datos.get(campo["clave"])))
+        for campo in esquema
+    ]

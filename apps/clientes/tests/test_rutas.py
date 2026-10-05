@@ -19,4 +19,4 @@ class RutasClientesTests(SimpleTestCase):
 
         # Verificar panel_urls
         self.assertEqual(panel_urls.app_name, "clientes")
-        self.assertEqual(panel_urls.urlpatterns, [])
+        self.assertTrue(panel_urls.urlpatterns)

@@ -8,6 +8,8 @@ app_name = "panel"
 
 urlpatterns = [
     path("", views.InicioView.as_view(), name="inicio"),
+    path("mapa/", views.MapaView.as_view(), name="mapa"),
+    path("mapa/datos/", views.MapaDatosView.as_view(), name="mapa_datos"),
     path("ingresar/", views.IngresarView.as_view(), name="ingresar"),
     path("salir/", views.SalirView.as_view(), name="salir"),
     path("sitios/", include("apps.sitios.panel_urls")),
@@ -18,4 +20,5 @@ urlpatterns = [
     path("visitas/", include("apps.visitas.panel_urls")),
     path("informes/", include("apps.informes.panel_urls")),
     path("web/", include("apps.web.panel_urls")),
+    path("usuarios/", include("apps.accounts.panel_urls")),
 ]

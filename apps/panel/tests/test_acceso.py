@@ -1,9 +1,13 @@
 """Acceso al panel: login, roles y salida."""
 
+import re
+
 from django.core.cache import cache
 from django.test import TestCase
+from django.urls import URLResolver, get_resolver
 
 from apps.accounts.models import User
+from apps.panel import urls
 
 CLAVE = "clave-segura-123"
 
@@ -71,3 +75,54 @@ class AccesoPanelTests(TestCase):
         respuesta = self._ingresar("emp", CLAVE)
         self.assertEqual(respuesta.status_code, 429)
         self.assertNotContains(respuesta, "no tiene acceso", status_code=429)
+
+
+def _rutas_del_panel(patrones, prefijo="", pk="1"):
+    """Recorre los patrones del namespace `panel` y arma una URL de ejemplo por ruta."""
+    for patron in patrones:
+        texto = prefijo + str(patron.pattern)
+        if isinstance(patron, URLResolver):
+            yield from _rutas_del_panel(patron.url_patterns, texto, pk)
+        else:
+            ruta = re.sub(
+                r"<(?:uuid:)\w+>",
+                "00000000-0000-0000-0000-000000000001",
+                texto,
+            )
+            yield "/panel/" + re.sub(r"<(?:\w+:)?\w+>", pk, ruta)
+
+
+def _rutas_protegidas(pk="1"):
+    """Todas las rutas del panel salvo ingresar y salir, con `pk` en los parámetros."""
+    return [
+        ruta
+        for ruta in _rutas_del_panel(get_resolver(urls).url_patterns, pk=pk)
+        if ruta not in ("/panel/ingresar/", "/panel/salir/")
+    ]
+
+
+class AccesoTests(TestCase):
+    def test_empleado_no_ve_ninguna_ruta_del_panel(self):
+        User.objects.create_user("emp", password=CLAVE)
+        self.client.login(username="emp", password=CLAVE)
+        rutas = _rutas_protegidas()
+
+        self.assertIn("/panel/", rutas)
+        self.assertIn("/panel/mapa/", rutas)
+        self.assertIn("/panel/mapa/datos/", rutas)
+        for app in ("sitios", "clientes", "servicios", "proyectos", "productos"):
+            self.assertIn(f"/panel/{app}/", rutas)
+        self.assertIn("/panel/usuarios/", rutas)
+        # GET y POST, con un pk existente y con uno inexistente: el rol se comprueba
+        # antes de buscar el objeto, así la respuesta no revela qué ids existen.
+        for ruta in rutas + _rutas_protegidas(pk="999999"):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.get(ruta).status_code, 403)
+                self.assertEqual(self.client.post(ruta).status_code, 403)
+
+    def test_anonimo_va_al_login_en_todas_las_rutas(self):
+        for ruta in _rutas_protegidas() + _rutas_protegidas(pk="999999"):
+            with self.subTest(ruta=ruta):
+                respuesta = self.client.get(ruta)
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertTrue(respuesta["Location"].startswith("/panel/ingresar/"))

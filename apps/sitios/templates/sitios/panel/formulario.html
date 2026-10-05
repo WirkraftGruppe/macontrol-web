@@ -1,0 +1,41 @@
+{% extends "panel/base.html" %}
+{% load static %}
+{% block title %}{{ titulo }} · MAControl{% endblock %}
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+{% endblock %}
+{% block panel_contenido %}
+<style nonce="{{ request.csp_nonce }}">
+  .sitio-ubicacion { margin-bottom: 16px; }
+  .sitio-ubicacion[hidden] { display: none; }
+  #sitio-mapa { height: 320px; border: 1px solid var(--border); border-radius: 8px; }
+  .sitio-buscador { display: flex; gap: 8px; margin: 8px 0; }
+  .sitio-buscador input { flex: 1; }
+  .sitio-resultados { margin: 4px 0; padding-left: 18px; }
+  .sitio-resultados button { background: none; border: 0; padding: 0; color: inherit; text-align: left; text-decoration: underline; cursor: pointer; }
+</style>
+{# El mapa y el buscador son una ayuda: sin JS, se cargan lat y lng a mano. #}
+<section class="sitio-ubicacion" id="sitio-ubicacion" hidden
+         data-url-buscar="{% url 'panel:sitios:geocodificar' %}"
+         data-campo-lat="{{ form.latitud.id_for_label }}"
+         data-campo-lng="{{ form.longitud.id_for_label }}"
+         data-campo-direccion="{{ form.direccion.id_for_label }}"
+         data-campo-localidad="{{ form.localidad.id_for_label }}">
+  <h2>Ubicación en el mapa</h2>
+  <p class="ayuda">Busque una dirección o haga clic en el mapa para fijar latitud y longitud. También puede cargarlas a mano en los campos. Solo se envía a OpenStreetMap el texto que escriba en el buscador.</p>
+  <div class="sitio-buscador">
+    <input type="search" id="sitio-buscar" maxlength="200" aria-label="Buscar dirección">
+    <button type="button" class="boton boton-secundario" id="sitio-buscar-boton">Buscar</button>
+  </div>
+  <p id="sitio-mensaje" role="status"></p>
+  <ul class="sitio-resultados" id="sitio-resultados"></ul>
+  <div id="sitio-mapa"></div>
+</section>
+{% url 'panel:sitios:listado' as listado_url %}
+{% include "panel/partials/formulario.html" with cancelar_url=listado_url %}
+{% endblock %}
+{% block scripts %}
+  <script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>
+  <script src="{% static 'sitios/sitio_mapa.js' %}"></script>
+{% endblock %}

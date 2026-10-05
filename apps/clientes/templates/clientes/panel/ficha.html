@@ -1,0 +1,39 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ object.razon_social }} · MAControl{% endblock %}
+{% block panel_contenido %}
+  <header class="encabezado-pagina">
+    <h1>{{ object.razon_social }}</h1>
+    {% if object.activo %}
+      {% include "panel/partials/etiqueta_estado.html" with tono="ok" texto="Activo" %}
+    {% else %}
+      {% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Inactivo" %}
+    {% endif %}
+    <a class="boton boton-secundario" href="{% url 'panel:clientes:editar' object.pk %}">Editar</a>
+    {% if object.activo %}
+      <a class="boton boton-peligro" href="{% url 'panel:clientes:baja' object.pk %}">Dar de baja</a>
+    {% endif %}
+  </header>
+  {% include "panel/partials/mensajes.html" %}
+  <dl class="datos">
+    <dt>CUIT</dt><dd>{{ object.cuit|default:"—" }}</dd>
+    <dt>Contacto</dt><dd>{{ object.contacto_nombre|default:"—" }}</dd>
+    <dt>Teléfono</dt><dd>{{ object.contacto_telefono|default:"—" }}</dd>
+    <dt>Email</dt><dd>{{ object.contacto_email|default:"—" }}</dd>
+    <dt>Notas</dt><dd>{{ object.notas|default:"—"|linebreaksbr }}</dd>
+  </dl>
+  <h2>Sitios</h2>
+  {% if sitios %}
+    <ul class="lista-sitios">
+      {% for sitio in sitios %}
+        <li>
+          {% url 'panel:sitios:ficha' sitio.pk as sitio_url %}
+          {% if sitio_url %}<a href="{{ sitio_url }}">{{ sitio.nombre }}</a>{% else %}{{ sitio.nombre }}{% endif %}
+          {% if sitio.localidad %}· {{ sitio.localidad }}{% endif %}
+          {% if not sitio.activo %}{% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Inactivo" %}{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vacio">Este cliente aún no tiene sitios.</p>
+  {% endif %}
+{% endblock %}

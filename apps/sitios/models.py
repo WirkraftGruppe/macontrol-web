@@ -58,7 +58,12 @@ class Sitio(models.Model):
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
     history = HistoricalRecords(
-        excluded_fields=["contacto_en_sitio", "telefono_en_sitio"]
+        excluded_fields=[
+            "contacto_en_sitio",
+            "telefono_en_sitio",
+            "notas",
+            "horario_acceso",
+        ]
     )
 
     class Meta:

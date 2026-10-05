@@ -1,10 +1,12 @@
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils import timezone
+from simple_history.utils import update_change_reason
 
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
@@ -157,6 +159,37 @@ def _validar_coordenadas(latitud, longitud):
     return errores
 
 
+def _validar_evidencia(esquema, datos, productos_aplicados):
+    """Valida planilla y productos; devuelve (errores por campo, productos armados)."""
+    errores = {}
+    errores_datos = validar_datos(esquema, datos)
+    if errores_datos:
+        errores["datos"] = [
+            mensaje if clave == "datos" else f"{clave}: {mensaje}"
+            for clave, mensajes in errores_datos.items()
+            for mensaje in mensajes
+        ]
+    if len(productos_aplicados) > MAX_PRODUCTOS:
+        errores["productos_aplicados"] = [
+            f"Se permiten hasta {MAX_PRODUCTOS} productos por visita."
+        ]
+        return errores, []
+    aplicados, errores_productos = _armar_productos(productos_aplicados)
+    if errores_productos:
+        errores["productos_aplicados"] = errores_productos
+    return errores, aplicados
+
+
+def _borrar_archivos(fotos):
+    """Borra del almacenamiento los archivos de fotos de una operación fallida."""
+    for foto in fotos:
+        try:
+            foto.imagen.storage.delete(foto.imagen.name)
+        except Exception:  # noqa: BLE001
+            # No debe tapar la excepción original que se está propagando.
+            logger.exception("No se pudo borrar un archivo de foto.")
+
+
 def _pendiente_para(proyecto, empleado):
     """Pendiente propia bloqueada (la más antigua) y si hay una de otro empleado."""
     pendientes = Visita.objects.filter(
@@ -212,23 +245,10 @@ def registrar_visita_desde_app(
             proyecto = _validar_proyecto_y_qr(proyecto, qr_codigo)
 
             errores = _validar_coordenadas(latitud, longitud)
-            esquema = proyecto.tipo_servicio.esquema_planilla()
-            errores_datos = validar_datos(esquema, datos)
-            if errores_datos:
-                errores["datos"] = [
-                    mensaje if clave == "datos" else f"{clave}: {mensaje}"
-                    for clave, mensajes in errores_datos.items()
-                    for mensaje in mensajes
-                ]
-            if len(productos_aplicados) > MAX_PRODUCTOS:
-                errores["productos_aplicados"] = [
-                    f"Se permiten hasta {MAX_PRODUCTOS} productos por visita."
-                ]
-                aplicados, errores_productos = [], []
-            else:
-                aplicados, errores_productos = _armar_productos(productos_aplicados)
-            if errores_productos:
-                errores["productos_aplicados"] = errores_productos
+            errores_evidencia, aplicados = _validar_evidencia(
+                proyecto.tipo_servicio.esquema_planilla(), datos, productos_aplicados
+            )
+            errores.update(errores_evidencia)
             if not fotos:
                 errores["fotos"] = ["Se requiere al menos una foto."]
             elif len(fotos) > MAX_FOTOS:
@@ -284,9 +304,124 @@ def registrar_visita_desde_app(
     finally:
         if not confirmada:
             # La transacción revierte la base, no los archivos ya escritos.
-            for foto in guardadas:
+            _borrar_archivos(guardadas)
+
+
+def registrar_visita_manual(
+    *,
+    proyecto,
+    empleado,
+    administrador,
+    motivo,
+    realizada_en,
+    datos,
+    productos_aplicados,
+    fotos,
+    pendiente=None,
+    confirmar_atraso=False,
+    observaciones="",
+    incidencia=False,
+    incidencia_detalle="",
+):
+    """Registra una visita cargada a mano por un administrador y la devuelve.
+
+    Crea la visita, o completa `pendiente` si no tiene fotos ni productos, con
+    `origen=manual`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige
+    `confirmar_atraso` y deja la confirmación en el historial. Todo ocurre en una
+    transacción; si algo falla no queda nada, tampoco los archivos. Levanta
+    `ValidationError` con errores por campo. No debe llamarse dentro de otro `atomic`.
+    """
+    guardadas, confirmada = [], False
+    try:
+        with transaction.atomic():
+            errores = {}
+            if not (motivo or "").strip():
+                errores["motivo"] = ["El motivo de la carga manual es obligatorio."]
+            if proyecto.estado != Proyecto.Estado.ACTIVO:
+                errores["proyecto"] = ["El proyecto no está activo."]
+            if not (empleado.is_active and empleado.es_empleado):
+                errores["empleado"] = ["Debe ser un empleado activo."]
+            horas = settings.ATRASO_MAXIMO_HORAS
+            atrasada = realizada_en < timezone.now() - timedelta(hours=horas)
+            if atrasada and not confirmar_atraso:
+                errores["confirmar_atraso"] = [
+                    f"La visita tiene más de {horas} horas de atraso: "
+                    "confirme la carga para continuar."
+                ]
+            errores_evidencia, aplicados = _validar_evidencia(
+                proyecto.tipo_servicio.esquema_planilla(), datos, productos_aplicados
+            )
+            errores.update(errores_evidencia)
+            if len(fotos) > MAX_FOTOS:
+                errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por visita."]
+            visita = None
+            if pendiente is not None:
+                visita = Visita.objects.select_for_update().get(pk=pendiente.pk)
+                if (
+                    visita.proyecto_id != proyecto.pk
+                    or visita.estado != Visita.Estado.PENDIENTE
+                ):
+                    errores["pendiente"] = [
+                        "La visita no es una pendiente del proyecto."
+                    ]
+                elif visita.fotos.exists() or visita.productos.exists():
+                    errores["pendiente"] = [
+                        "La visita pendiente ya tiene fotos o productos: "
+                        "no se puede completar a mano."
+                    ]
+            if errores:
+                raise ValidationError(errores)
+
+            if visita is None:
+                visita = Visita(proyecto=proyecto)
+            visita.empleado = empleado
+            visita.origen = Visita.Origen.MANUAL
+            visita.motivo_manual = motivo.strip()
+            visita.asignada_por = administrador
+            visita.datos = datos
+            visita.observaciones = observaciones
+            visita.incidencia = incidencia
+            visita.incidencia_detalle = incidencia_detalle
+            visita.recibida_en = timezone.now()
+            visita.save()
+
+            for orden, archivo in enumerate(fotos):
+                foto = Foto(visita=visita, imagen=archivo, orden=orden)
                 try:
-                    foto.imagen.storage.delete(foto.imagen.name)
-                except Exception:  # noqa: BLE001
-                    # No debe tapar la excepción original que se está propagando.
-                    logger.exception("No se pudo borrar un archivo de foto.")
+                    foto.save()
+                except ValidationError as error:
+                    raise ValidationError({"fotos": error.messages})
+                guardadas.append(foto)
+            for aplicado in aplicados:
+                aplicado.visita = visita
+                aplicado.save()
+            resultado = registrar_visita_realizada(visita, empleado, realizada_en)
+            if atrasada:
+                update_change_reason(
+                    resultado,
+                    "Carga manual atrasada confirmada por "
+                    f"{administrador.get_username()}",
+                )
+        confirmada = True
+        return resultado
+    finally:
+        if not confirmada:
+            _borrar_archivos(guardadas)
+
+
+def marcar_incidencia_revisada(visita, administrador):
+    """Registra quién y cuándo revisó la incidencia de una visita."""
+    if not visita.incidencia:
+        raise ValidationError("La visita no tiene incidencia para revisar.")
+    if visita.incidencia_revisada_en is not None:
+        raise ValidationError("La incidencia ya fue revisada.")
+    visita.incidencia_revisada_por = administrador
+    visita.incidencia_revisada_en = timezone.now()
+    visita.save(
+        update_fields=[
+            "incidencia_revisada_por",
+            "incidencia_revisada_en",
+            "actualizado",
+        ]
+    )
+    return visita

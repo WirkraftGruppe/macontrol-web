@@ -148,6 +148,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "/panel/ingresar/"
 LOGIN_REDIRECT_URL = "/panel/"
+
+# Origen público del sitio; arma el contenido de los QR (`SITE_URL` + `/q/<uuid>/`).
+# Un `SITE_URL=` vacío (como en `.env.example`) también cae al valor por defecto: un QR
+# con ruta relativa no lo abre ningún teléfono.
+SITE_URL = env("SITE_URL", default="") or "https://macontrol.com.ar"
+SITE_URL = SITE_URL.rstrip("/")
 LOGOUT_REDIRECT_URL = "/panel/ingresar/"
 
 # Explícito aunque coincide con el valor por defecto de Django: la vista de Swagger

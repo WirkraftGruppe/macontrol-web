@@ -19,7 +19,14 @@ class TipoServicio(models.Model):
         return self.nombre
 
     def esquema_planilla(self) -> list[dict]:
-        """Esquema de la planilla ordenado por `orden`; lo consume la API."""
+        """Esquema de los campos activos ordenado por `orden`; lo consume la API.
+
+        Usa `self.campos.all()` para aprovechar un `prefetch_related("campos")`.
+        """
+        activos = sorted(
+            (campo for campo in self.campos.all() if campo.activo),
+            key=lambda campo: campo.orden,
+        )
         return [
             {
                 "clave": campo.clave,
@@ -30,7 +37,7 @@ class TipoServicio(models.Model):
                 "ayuda": campo.ayuda,
                 "orden": campo.orden,
             }
-            for campo in self.campos.order_by("orden")
+            for campo in activos
         ]
 
 
@@ -58,6 +65,7 @@ class CampoPlanilla(models.Model):
     opciones = models.JSONField("opciones", default=list, blank=True)
     obligatorio = models.BooleanField("obligatorio", default=False)
     ayuda = models.CharField("ayuda", max_length=255, blank=True)
+    activo = models.BooleanField("activo", default=True)
 
     class Meta:
         verbose_name = "campo de planilla"

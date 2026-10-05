@@ -23,27 +23,34 @@ CAMPOS_EVIDENCIA = (
 
 CAMPOS_PLANIFICACION = ("programada_para", "asignada_por")
 
+# Los fija el servicio de revisión de incidencias, nunca se editan a mano.
+CAMPOS_REVISION = ("incidencia_revisada_por", "incidencia_revisada_en")
+
 # Campos que llena la API al recibir la visita: nunca se editan a mano.
 CAMPOS_DE_LA_APP = ("incidencia_asignacion", "cliente_uuid", "recibida_en")
 
 CAMPOS_VISITA = (
-    "proyecto",
-    "empleado",
-    "origen",
-    "motivo_manual",
-    "programada_para",
-    "asignada_por",
-    "realizada_en",
-    "estado",
-    "latitud",
-    "longitud",
-    "precision_m",
-    "datos",
-    "esquema_planilla",
-    "observaciones",
-    "incidencia",
-    "incidencia_detalle",
-) + CAMPOS_DE_LA_APP
+    (
+        "proyecto",
+        "empleado",
+        "origen",
+        "motivo_manual",
+        "programada_para",
+        "asignada_por",
+        "realizada_en",
+        "estado",
+        "latitud",
+        "longitud",
+        "precision_m",
+        "datos",
+        "esquema_planilla",
+        "observaciones",
+        "incidencia",
+        "incidencia_detalle",
+    )
+    + CAMPOS_DE_LA_APP
+    + CAMPOS_REVISION
+)
 
 
 # Registro de la app: en el alta y en pendientes no se cargan a mano.
@@ -121,7 +128,11 @@ class VisitaAdmin(SimpleHistoryAdmin):
     search_fields = ("proyecto__titulo", "empleado__username")
     raw_id_fields = ("proyecto",)
     fields = CAMPOS_VISITA
-    readonly_fields = ("estado", "realizada_en", "esquema_planilla") + CAMPOS_DE_LA_APP
+    readonly_fields = (
+        ("estado", "realizada_en", "esquema_planilla")
+        + CAMPOS_DE_LA_APP
+        + CAMPOS_REVISION
+    )
     inlines = (FotoInline, ProductoAplicadoInline)
 
     def get_inlines(self, request, obj):
@@ -132,7 +143,12 @@ class VisitaAdmin(SimpleHistoryAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         if _visita_cerrada(obj):
-            return CAMPOS_EVIDENCIA + CAMPOS_PLANIFICACION + CAMPOS_DE_LA_APP
+            return (
+                CAMPOS_EVIDENCIA
+                + CAMPOS_PLANIFICACION
+                + CAMPOS_DE_LA_APP
+                + CAMPOS_REVISION
+            )
         base = super().get_readonly_fields(request, obj)
         if obj is None or obj.estado == Visita.Estado.PENDIENTE:
             return base + CAMPOS_REGISTRO_APP

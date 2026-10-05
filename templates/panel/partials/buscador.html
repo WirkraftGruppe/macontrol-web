@@ -1,0 +1,9 @@
+{# Buscador del listado. Uso: include con placeholder opcional; el contexto trae q y orden. #}
+<form class="buscador" method="get" role="search"
+      hx-get="." hx-target="#listado" hx-swap="outerHTML" hx-push-url="true"
+      hx-trigger="submit, input changed delay:400ms from:#campo-q">
+  <label class="visually-hidden" for="campo-q">Buscar</label>
+  <input id="campo-q" type="search" name="q" value="{{ q|default:'' }}" placeholder="{{ placeholder|default:'Buscar…' }}">
+  {% if orden %}<input type="hidden" name="orden" value="{{ orden }}">{% endif %}
+  <button class="boton boton-secundario" type="submit">Buscar</button>
+</form>
