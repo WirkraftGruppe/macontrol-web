@@ -5,8 +5,11 @@ import tempfile
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
+from unittest import mock
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -14,8 +17,11 @@ from django.utils import timezone
 from PIL import Image
 
 from apps.accounts.models import User
+from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
+from apps.servicios.models import CampoPlanilla
 from apps.visitas.models import Foto, Visita
+from apps.visitas.services import registrar_visita_manual
 
 from .test_models import crear_visita
 
@@ -251,3 +257,179 @@ class AsignarTests(BaseTests):
 
     def test_proyecto_inexistente_da_404(self):
         self.assertEqual(self.client.get(self._url(999999)).status_code, 404)
+
+
+MEDIA_MANUAL = tempfile.mkdtemp(prefix="macontrol-manual-test-")
+
+
+@override_settings(MEDIA_ROOT=MEDIA_MANUAL)
+class ManualTests(BaseTests):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(MEDIA_MANUAL, ignore_errors=True)
+
+    def setUp(self):
+        super().setUp()
+        self.url = reverse("panel:visitas:manual", args=[self.proyecto.pk])
+        self.producto = Producto.objects.create(nombre_comercial="Cebo")
+
+    def _archivos(self):
+        return list(Path(MEDIA_MANUAL).rglob("*.jpg"))
+
+    def _datos(self, **extra):
+        datos = {
+            "empleado": self.empleado.pk,
+            "motivo": "La app no tenía señal",
+            "realizada_en": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+            "productos-TOTAL_FORMS": 1,
+            "productos-INITIAL_FORMS": 0,
+            "productos-MIN_NUM_FORMS": 0,
+            "productos-MAX_NUM_FORMS": 30,
+            "productos-0-producto": self.producto.pk,
+            "productos-0-lote": "L1",
+            "productos-0-dosis": "2.5",
+            "productos-0-unidad": "ml/l",
+        }
+        datos.update(extra)
+        return datos
+
+    def _foto(self):
+        return SimpleUploadedFile("f.jpg", _jpeg(), content_type="image/jpeg")
+
+    def _pendiente(self, proyecto=None):
+        return Visita.objects.create(
+            proyecto=proyecto or self.proyecto,
+            empleado=self.empleado,
+            origen=Visita.Origen.APP,
+            programada_para=timezone.localdate(),
+        )
+
+    def _llamar_servicio(self, **extra):
+        datos = {
+            "proyecto": self.proyecto,
+            "empleado": self.empleado,
+            "administrador": self.admin,
+            "motivo": "x",
+            "realizada_en": timezone.now(),
+            "datos": {},
+            "productos_aplicados": [],
+            "fotos": [],
+        }
+        datos.update(extra)
+        return registrar_visita_manual(**datos)
+
+    def test_exige_motivo_y_pasa_por_el_servicio(self):
+        respuesta = self.client.post(self.url, self._datos(motivo=" "))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("motivo", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), 1)
+        with mock.patch(
+            "apps.visitas.panel_views.registrar_visita_manual",
+            wraps=registrar_visita_manual,
+        ) as servicio:
+            respuesta = self.client.post(
+                self.url, self._datos(fotos=[self._foto(), self._foto()])
+            )
+        servicio.assert_called_once()
+        visita = Visita.objects.exclude(pk=self.visita.pk).get()
+        self.assertRedirects(
+            respuesta, reverse("panel:visitas:ficha", args=[visita.pk])
+        )
+        self.assertEqual(visita.origen, Visita.Origen.MANUAL)
+        self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
+        self.assertEqual(visita.asignada_por, self.admin)
+        self.assertEqual(visita.motivo_manual, "La app no tenía señal")
+        self.assertEqual(visita.fotos.count(), 2)
+        self.assertEqual(visita.productos.get().producto, self.producto)
+        with self.assertRaises(ValidationError) as ctx:
+            self._llamar_servicio(motivo="")
+        self.assertIn("motivo", ctx.exception.message_dict)
+
+    def test_completa_una_pendiente_del_proyecto(self):
+        pendiente = self._pendiente()
+        self.client.post(self.url, self._datos(pendiente=pendiente.pk))
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.REALIZADA)
+        self.assertEqual(pendiente.origen, Visita.Origen.MANUAL)
+        self.assertEqual(pendiente.asignada_por, self.admin)
+
+    def test_pendiente_con_evidencia_se_rechaza(self):
+        pendiente = self._pendiente()
+        Foto.objects.create(visita=pendiente, imagen=self._foto())
+        respuesta = self.client.post(self.url, self._datos(pendiente=pendiente.pk))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn(
+            "ya tiene fotos o productos", str(respuesta.context["form"].errors)
+        )
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+        self.assertEqual(pendiente.fotos.count(), 1)
+        with self.assertRaises(ValidationError):
+            self._llamar_servicio(pendiente=pendiente)
+
+    def test_pendiente_de_otro_proyecto_se_rechaza(self):
+        otro = Proyecto.objects.create(
+            sitio=self.proyecto.sitio,
+            tipo_servicio=self.proyecto.tipo_servicio,
+            titulo="Otro",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        ajena = self._pendiente(otro)
+        respuesta = self.client.post(self.url, self._datos(pendiente=ajena.pk))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("pendiente", respuesta.context["form"].errors)
+        ajena.refresh_from_db()
+        self.assertEqual(ajena.estado, Visita.Estado.PENDIENTE)
+
+    def test_atraso_exige_confirmacion_y_queda_anotado(self):
+        vieja = (timezone.localtime() - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M")
+        respuesta = self.client.post(self.url, self._datos(realizada_en=vieja))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("confirmar_atraso", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), 1)
+        self.client.post(
+            self.url, self._datos(realizada_en=vieja, confirmar_atraso="on")
+        )
+        visita = Visita.objects.exclude(pk=self.visita.pk).get()
+        self.assertEqual(
+            visita.history.first().history_change_reason,
+            "Carga manual atrasada confirmada por adm-pv",
+        )
+
+    def test_planilla_invalida_muestra_errores(self):
+        CampoPlanilla.objects.create(
+            tipo_servicio=self.proyecto.tipo_servicio,
+            orden=1,
+            etiqueta="Cebos colocados",
+            clave="cebos",
+            tipo=CampoPlanilla.Tipo.NUMERO,
+            obligatorio=True,
+        )
+        respuesta = self.client.post(self.url, self._datos(datos_cebos="abc"))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("datos_cebos", respuesta.context["form"].errors)
+        self.assertContains(respuesta, "Cebos colocados")
+        self.assertContains(respuesta, 'class="error"')
+        respuesta = self.client.post(self.url, self._datos())
+        self.assertIn("datos_cebos", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), 1)
+        self.client.post(self.url, self._datos(datos_cebos="4"))
+        visita = Visita.objects.exclude(pk=self.visita.pk).get()
+        self.assertEqual(visita.datos, {"cebos": 4})
+
+    def test_foto_invalida_no_deja_visita_ni_archivos(self):
+        antes = self._archivos()
+        falsa = SimpleUploadedFile("f.jpg", b"no es imagen", content_type="image/jpeg")
+        respuesta = self.client.post(self.url, self._datos(fotos=[self._foto(), falsa]))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("fotos", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), 1)
+        self.assertEqual(self._archivos(), antes)
+
+    def test_ficha_de_proyecto_ofrece_la_carga_manual(self):
+        ficha = reverse("panel:proyectos:ficha", args=[self.proyecto.pk])
+        respuesta = self.client.get(ficha)
+        self.assertContains(respuesta, f'href="{self.url}"')
+        self.assertContains(respuesta, "Registrar visita manual")
