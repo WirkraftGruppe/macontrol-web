@@ -1,0 +1,110 @@
+/* Mapa de sitios: marcadores con los colores del semáforo (docs/02-diseno.md). */
+(function () {
+  "use strict";
+
+  var COLORES = {
+    vencida: "#d9463e",
+    proxima: "#ffc600",
+    al_dia: "#2e9e5b",
+    sin_programar: "#7f8890",
+  };
+  var ETIQUETAS = {
+    vencida: "Vencida",
+    proxima: "Próxima a vencer",
+    al_dia: "Al día",
+    sin_programar: "Sin programar",
+  };
+
+  var contenedor = document.getElementById("mapa");
+  var filtros = document.getElementById("mapa-filtros");
+  if (!contenedor) {
+    return;
+  }
+
+  var mapa = L.map(contenedor).setView([-36.1, -57.8], 8);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; colaboradores de OpenStreetMap",
+  }).addTo(mapa);
+  var capa = L.layerGroup().addTo(mapa);
+
+  function fecha(iso) {
+    if (!iso) {
+      return "sin registro";
+    }
+    var d = new Date(iso);
+    return d.toLocaleDateString("es-AR");
+  }
+
+  function elemento(etiqueta, texto) {
+    var el = document.createElement(etiqueta);
+    el.textContent = texto;
+    return el;
+  }
+
+  // El popup se arma con textContent: los nombres vienen de la base de datos.
+  function popup(sitio) {
+    var caja = document.createElement("div");
+    caja.className = "mapa-popup";
+    caja.appendChild(elemento("h3", sitio.nombre));
+    caja.appendChild(elemento("div", sitio.cliente));
+    caja.appendChild(
+      elemento("div", "Última visita: " + fecha(sitio.ultima_visita))
+    );
+    var lista = document.createElement("ul");
+    sitio.proyectos.forEach(function (p) {
+      lista.appendChild(
+        elemento(
+          "li",
+          p.titulo + " (" + p.servicio + ") · " + ETIQUETAS[p.estado] +
+            " · encargado: " + p.encargado
+        )
+      );
+    });
+    caja.appendChild(lista);
+    if (sitio.url_ficha) {
+      var enlace = elemento("a", "Ver ficha del sitio");
+      enlace.href = sitio.url_ficha;
+      caja.appendChild(enlace);
+    }
+    return caja;
+  }
+
+  function cargar() {
+    var parametros = new URLSearchParams(new FormData(filtros));
+    for (var clave of Array.from(parametros.keys())) {
+      if (!parametros.get(clave)) {
+        parametros.delete(clave);
+      }
+    }
+    fetch(contenedor.dataset.url + "?" + parametros.toString(), {
+      credentials: "same-origin",
+    })
+      .then(function (respuesta) {
+        return respuesta.json();
+      })
+      .then(function (datos) {
+        capa.clearLayers();
+        var puntos = [];
+        datos.sitios.forEach(function (sitio) {
+          var color = COLORES[sitio.estado] || COLORES.sin_programar;
+          L.circleMarker([sitio.lat, sitio.lng], {
+            radius: 9,
+            color: "#1b1f23",
+            weight: 1,
+            fillColor: color,
+            fillOpacity: 0.9,
+          })
+            .bindPopup(popup(sitio))
+            .addTo(capa);
+          puntos.push([sitio.lat, sitio.lng]);
+        });
+        if (puntos.length) {
+          mapa.fitBounds(puntos, { padding: [30, 30], maxZoom: 14 });
+        }
+      });
+  }
+
+  filtros.addEventListener("change", cargar);
+  cargar();
+})();
