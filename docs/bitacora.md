@@ -1,18 +1,28 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: puntos-control
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| puntos-control | plan/puntos-control | 2 (T8 integrada; T9 implementada en worktrees/puntos-control-T9, commit f678582, sin verificar) | verificador sobre T9 en su worktree → integrar T9 (`apps/visitas apps/api/tests`) → T10: regenerar openapi, auditor-seguridad ola 2 → ola 3 | sesión 2026-10-05 cerrada |
 
-Siguiente: plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: terminar `puntos-control` (olas 2 a 4). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-05 — Plan `puntos-control`: ola 1 integrada, T8 integrada, T9 implementada
+Hecho:
+- Plan congelado (`4e2c496`) tras `juez-plan` (10 bloqueantes, corregidos o aprobados por el usuario como excepciones de propiedad). Contrato modificado una vez (`50822be`, decisión del usuario): el criterio del punto General pasa de T3 a T6; desde ahí `congelado.sh` da CONTRATO MODIFICADO y los veredictos salen FALLA formal.
+- Ola 1: T1 (pypdfium2, `VISITA_ABIERTA_MAXIMO_HORAS`), T2 (ámbito de planilla), T3 (PuntoControl, Plano, QR por punto), T5 (visita como jornada, Revision, migración de datos), T6 (sin QR en Sitio, estado por punto). auditor-seguridad: sin bloqueantes; dos importantes corregidos en T5b (cierre por `recibida_en`, coordenadas obligatorias) y cerrados en la re-auditoría.
+- Ola 2: T8 (resolver por punto, imagen del plano, `me/puntos/`) verificada e integrada. T9 (abrir, revisiones, cerrar; sin `POST visitas/`) implementada en su worktree (`f678582`, suite 442 OK según el informe; control del principal OK), sin verificador.
+- Pendientes nuevos: P-puntos-control-1 a -23.
+- Incidente: el principal hizo `cd` a un worktree (T2) para un control; corregido con `git status` en raíz y worktrees, sin daños.
+Pendiente: verificador sobre T9, integrarla, T10 (openapi + auditoría ola 2), olas 3 y 4.
 
 ### 2026-10-05 — Fusión en `main` de `panel`
 Hecho:

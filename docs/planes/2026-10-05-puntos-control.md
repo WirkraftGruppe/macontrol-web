@@ -527,7 +527,7 @@ commit_base: 4e2c496
 | T6 | hecha |
 | T7 | hecha |
 | T8 | hecha |
-| T9 | pendiente |
+| T9 | en curso |
 | T10 | pendiente |
 | T11 | pendiente |
 | T12 | pendiente |
@@ -572,6 +572,10 @@ commit_base: 4e2c496
 - P-puntos-control-17 [menor] Re-auditoría T5b: la carga manual (`apps/visitas/panel_forms.py` selector `pendiente`, `registrar_visita_manual`) acepta una pendiente migrada con revisiones: absorbe la evidencia heredada (dos revisiones `orden=1`) y el formulario pisa `incidencia=True` de `visitas/0006` con `False`. Excluir las pendientes con revisiones del selector y del servicio (para T12).
 - P-puntos-control-18 [observación] [empresa] Las pendientes migradas con evidencia violan `Visita.clean()` (una pendiente no tiene revisiones): editarlas en el admin falla y `MisVisitasView` y el resolver se las siguen ofreciendo al empleado aunque `abrir_visita` no las use; si son de otro empleado, cada apertura del proyecto marca `incidencia_asignacion`. Decidir si se cancelan al migrar o las resuelve un administrador.
 - P-puntos-control-19 [observación] T8: un punto activo con plano pero sin `x`/`y` no aparece en `plano.puntos` del resolver (no hay dónde dibujar el marcador); el contrato no lo definía.
+- P-puntos-control-20 [menor] T9: `POST revisiones/` distingue "La visita no existe" de "La visita no está abierta o no es suya" (mensajes de `registrar_revision`): con ids secuenciales revela si existe una visita de otro empleado. Unificar el mensaje en `apps/visitas/services.py`.
+- P-puntos-control-21 [observación] [expo] `POST visitas/<id>/cerrar/` no es idempotente: un reintento tras perder la respuesta da 400 ("Solo se puede cerrar una visita abierta"). Decidir antes de que la app consuma el contrato si responde 200 con la visita ya cerrada por el mismo empleado.
+- P-puntos-control-22 [observación] T9 quitó el chequeo de atraso del serializer: lo hace solo `registrar_revision`, después del chequeo de `cliente_uuid` (el reintento tardío recibe 409). Cambia el lugar de la decisión 2026-10-04 (atraso en `CrearVisitaSerializer.validate()`); registrar como decisión al cerrar el plan si se acepta.
+- P-puntos-control-23 [observación] El implementador de T9 no corrió los tests nuevos en rojo antes de implementar, y la adaptación de `apps/api/tests/test_flujo.py` no tiene corrida roja.
 
 ### Decisiones
 
