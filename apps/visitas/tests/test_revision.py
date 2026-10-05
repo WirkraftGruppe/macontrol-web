@@ -18,7 +18,7 @@ class RevisionTests(TestCase):
     def visita_realizada(self, **extra):
         return crear_visita(
             estado=Visita.Estado.REALIZADA,
-            realizada_en=timezone.now(),
+            cerrada_en=timezone.now(),
             origen=Visita.Origen.MANUAL,
             motivo_manual="Carga",
             **extra,

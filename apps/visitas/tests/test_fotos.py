@@ -12,7 +12,7 @@ from PIL import Image
 
 from apps.visitas.models import Foto
 
-from .test_models import crear_visita
+from .test_models import crear_revision, crear_visita
 
 MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="macontrol-test-")
 
@@ -27,7 +27,7 @@ def _bytes(imagen, formato, **opciones):
 class FotoTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.visita = crear_visita()
+        cls.revision = crear_revision(crear_visita())
 
     @classmethod
     def tearDownClass(cls):
@@ -41,7 +41,7 @@ class FotoTests(TestCase):
         datos = _bytes(Image.new("RGB", (3000, 2000), "red"), "JPEG", exif=exif)
         self.assertTrue(Image.open(BytesIO(datos)).getexif())
         foto = Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile("foto.jpg", datos, content_type="image/jpeg"),
         )
         with Image.open(foto.imagen.path) as guardada:
@@ -57,7 +57,7 @@ class FotoTests(TestCase):
                     side_effect=error,
                 ):
                     foto = Foto.objects.create(
-                        visita=self.visita,
+                        revision=self.revision,
                         imagen=SimpleUploadedFile(
                             "foto.jpg", datos, content_type="image/jpeg"
                         ),
@@ -69,7 +69,7 @@ class FotoTests(TestCase):
     def test_png_se_guarda_como_jpeg(self):
         datos = _bytes(Image.new("RGBA", (100, 80), "blue"), "PNG")
         foto = Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile(
                 "casa de Perez.png", datos, content_type="image/png"
             ),
@@ -82,7 +82,7 @@ class FotoTests(TestCase):
         datos = _bytes(Image.new("L", (8000, 6000)), "PNG")
         with self.assertRaises(ValidationError):
             Foto.objects.create(
-                visita=self.visita,
+                revision=self.revision,
                 imagen=SimpleUploadedFile(
                     "grande.png", datos, content_type="image/png"
                 ),
@@ -93,7 +93,7 @@ class FotoTests(TestCase):
         datos = _bytes(Image.new("L", (8000, 6000)), "PNG")
         with self.assertRaises(ValidationError) as contexto:
             Foto.objects.create(
-                visita=self.visita,
+                revision=self.revision,
                 imagen=SimpleUploadedFile(
                     "grande.png", datos, content_type="image/png"
                 ),
@@ -105,7 +105,7 @@ class FotoTests(TestCase):
         datos = _bytes(Image.new("RGB", (100, 80), "green"), "JPEG", comment=b"SECRETO")
         self.assertIn(b"SECRETO", datos)
         foto = Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile("foto.jpg", datos, content_type="image/jpeg"),
         )
         with open(foto.imagen.path, "rb") as guardada:
@@ -114,7 +114,7 @@ class FotoTests(TestCase):
     def test_archivo_que_no_es_imagen_lanza_validation_error(self):
         with self.assertRaises(ValidationError):
             Foto.objects.create(
-                visita=self.visita,
+                revision=self.revision,
                 imagen=SimpleUploadedFile(
                     "falso.jpg", b"esto no es una imagen", content_type="image/jpeg"
                 ),
@@ -140,7 +140,7 @@ class FotoTests(TestCase):
                 datos = self._png_con_idat_corrupto(recalcular_crc)
                 with self.assertRaises(ValidationError):
                     Foto.objects.create(
-                        visita=self.visita,
+                        revision=self.revision,
                         imagen=SimpleUploadedFile(
                             "roto.png", datos, content_type="image/png"
                         ),
@@ -152,7 +152,7 @@ class FotoTests(TestCase):
         datos = _bytes(Image.new("L", (8000, 4900)), "WEBP", lossless=True)
         with self.assertRaises(ValidationError):
             Foto.objects.create(
-                visita=self.visita,
+                revision=self.revision,
                 imagen=SimpleUploadedFile(
                     "enorme.webp", datos, content_type="image/webp"
                 ),
@@ -165,14 +165,14 @@ class FotoTests(TestCase):
                 datos = _bytes(Image.new("RGB", (128, 128), "red"), formato)
                 with self.assertRaises(ValidationError):
                     Foto.objects.create(
-                        visita=self.visita,
+                        revision=self.revision,
                         imagen=SimpleUploadedFile("foto." + formato.lower(), datos),
                     )
                 self.assertEqual(Foto.objects.count(), 0)
 
     def _crear(self, nombre, datos, tipo):
         return Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile(nombre, datos, content_type=tipo),
         )
 
@@ -230,11 +230,11 @@ class MemoriaImagenTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.visita = crear_visita()
+        cls.revision = crear_revision(crear_visita())
 
     def _crear(self, datos):
         return Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile("foto.jpg", datos, content_type="image/jpeg"),
         )
 

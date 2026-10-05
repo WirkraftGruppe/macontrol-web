@@ -2,16 +2,22 @@
 
 from django import forms
 
-from apps.visitas.models import Visita
+from apps.visitas.models import Revision, Visita
 
 from .models import CampoPlanilla
 
 
 def clave_en_uso(tipo_servicio, clave) -> bool:
-    """Indica si alguna visita del servicio guardó datos con esa clave."""
-    return Visita.objects.filter(
-        proyecto__tipo_servicio=tipo_servicio, datos__has_key=clave
-    ).exists()
+    """Indica si alguna visita o revisión del servicio guardó datos con esa clave."""
+    visita = {"proyecto__tipo_servicio": tipo_servicio, "datos__has_key": clave}
+    revision = {
+        "visita__proyecto__tipo_servicio": tipo_servicio,
+        "datos__has_key": clave,
+    }
+    return (
+        Visita.objects.filter(**visita).exists()
+        or Revision.objects.filter(**revision).exists()
+    )
 
 
 class CampoPlanillaForm(forms.ModelForm):

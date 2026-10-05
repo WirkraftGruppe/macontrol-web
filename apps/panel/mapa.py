@@ -43,7 +43,7 @@ def sitios_para_mapa(cliente=None, servicio=None, estado=None):
         proyectos = proyectos.filter(tipo_servicio_id=servicio)
     proyectos = proyectos.select_related("tipo_servicio", "encargado_actual").annotate(
         ultima_visita=Max(
-            "visitas__realizada_en", filter=Q(visitas__estado=Visita.Estado.REALIZADA)
+            "visitas__cerrada_en", filter=Q(visitas__estado=Visita.Estado.REALIZADA)
         )
     )
     sitios = (

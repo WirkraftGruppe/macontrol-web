@@ -1,0 +1,36 @@
+"""Cierra por sistema las visitas abiertas hace más de VISITA_ABIERTA_MAXIMO_HORAS."""
+
+import logging
+from datetime import timedelta
+
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.management.base import BaseCommand
+from django.utils import timezone
+
+from apps.visitas.models import Visita
+from apps.visitas.services import cerrar_visita
+
+logger = logging.getLogger(__name__)
+
+
+class Command(BaseCommand):
+    help = (
+        "Cierra con cierre=sistema las visitas abiertas hace más de "
+        "VISITA_ABIERTA_MAXIMO_HORAS (pensado para un cron diario)."
+    )
+
+    def handle(self, *args, **options):
+        limite = timezone.now() - timedelta(hours=settings.VISITA_ABIERTA_MAXIMO_HORAS)
+        abiertas = Visita.objects.filter(
+            estado=Visita.Estado.ABIERTA, abierta_en__lt=limite
+        ).order_by("abierta_en", "pk")
+        cerradas = 0
+        for visita in abiertas:
+            try:
+                cerrar_visita(visita, quien=None, cierre=Visita.Cierre.SISTEMA)
+            except ValidationError:
+                logger.exception("No se pudo cerrar la visita %s.", visita.pk)
+                continue
+            cerradas += 1
+        self.stdout.write(f"Visitas cerradas por sistema: {cerradas}")

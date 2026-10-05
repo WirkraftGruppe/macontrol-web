@@ -147,7 +147,7 @@ class ResolverQRTests(TestCase):
         self._visita(tercero, self.otro, 1)  # de otro empleado: no aparece
         realizada = self._visita(segundo, self.empleado, 1)
         realizada.estado = Visita.Estado.REALIZADA
-        realizada.realizada_en = "2026-01-02T10:00:00Z"
+        realizada.abierta_en = realizada.cerrada_en = "2026-01-02T10:00:00Z"
         realizada.save()
         por_id = {p["id"]: p for p in self._resolver().json()["proyectos"]}
         self.assertEqual(

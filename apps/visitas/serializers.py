@@ -7,9 +7,10 @@ from decimal import Decimal
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import ProductoAplicado, Visita
+from .models import ProductoAplicado, Revision, Visita
 from .planillas import MAX_LARGO_TEXTO
 from .services import MAX_FOTOS, MAX_PRODUCTOS
 
@@ -98,7 +99,7 @@ class CrearVisitaSerializer(serializers.Serializer):
         """
         horas = settings.ATRASO_MAXIMO_HORAS
         if attrs["realizada_en"] < timezone.now() - timedelta(hours=horas):
-            if not Visita.objects.filter(cliente_uuid=attrs["cliente_uuid"]).exists():
+            if not Revision.objects.filter(cliente_uuid=attrs["cliente_uuid"]).exists():
                 raise serializers.ValidationError(
                     {
                         "realizada_en": [
@@ -154,7 +155,10 @@ class VisitaRealizadaSerializer(serializers.ModelSerializer):
 
     proyecto = ProyectoResumenSerializer(read_only=True)
     sitio = SitioResumenSerializer(source="proyecto.sitio", read_only=True)
-    productos = ProductoAplicadoSerializer(many=True, read_only=True)
+    realizada_en = serializers.DateTimeField(source="cerrada_en", read_only=True)
+    cliente_uuid = serializers.SerializerMethodField()
+    datos = serializers.SerializerMethodField()
+    productos = serializers.SerializerMethodField()
     fotos = serializers.SerializerMethodField()
 
     class Meta:
@@ -174,8 +178,26 @@ class VisitaRealizadaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def _primera(self, visita):
+        revisiones = list(visita.revisiones.all())
+        return revisiones[0] if revisiones else None
+
+    def get_cliente_uuid(self, visita) -> str | None:
+        primera = self._primera(visita)
+        return str(primera.cliente_uuid) if primera and primera.cliente_uuid else None
+
+    def get_datos(self, visita) -> dict:
+        primera = self._primera(visita)
+        return primera.datos if primera else {}
+
+    @extend_schema_field(ProductoAplicadoSerializer(many=True))
+    def get_productos(self, visita):
+        productos = [p for r in visita.revisiones.all() for p in r.productos.all()]
+        return ProductoAplicadoSerializer(productos, many=True).data
+
     def get_fotos(self, visita) -> list[str]:
         return [
             reverse("api:visitas:foto", args=[foto.codigo])
-            for foto in visita.fotos.all()
+            for revision in visita.revisiones.all()
+            for foto in revision.fotos.all()
         ]

@@ -129,13 +129,13 @@ class HistorialView(generics.ListAPIView):
             empleado=self.request.user, estado=Visita.Estado.REALIZADA
         )
         if "desde" in fechas:
-            consulta = consulta.filter(realizada_en__date__gte=fechas["desde"])
+            consulta = consulta.filter(cerrada_en__date__gte=fechas["desde"])
         if "hasta" in fechas:
-            consulta = consulta.filter(realizada_en__date__lte=fechas["hasta"])
+            consulta = consulta.filter(cerrada_en__date__lte=fechas["hasta"])
         return (
             consulta.select_related("proyecto__sitio")
-            .prefetch_related("fotos", "productos")
-            .order_by("-realizada_en", "-id")
+            .prefetch_related("revisiones__fotos", "revisiones__productos")
+            .order_by("-cerrada_en", "-id")
         )
 
     @extend_schema(
@@ -176,11 +176,16 @@ class FotoView(APIView):
     )
     def get(self, request, codigo):
         """Devuelve el JPEG; 404 si no existe y 403 si no corresponde."""
-        foto = Foto.objects.select_related("visita").filter(codigo=codigo).first()
+        foto = (
+            Foto.objects.select_related("revision__visita")
+            .filter(codigo=codigo)
+            .first()
+        )
         if foto is None:
             raise NotFound("La foto no existe.")
         if not (
-            request.user.es_administrador or foto.visita.empleado_id == request.user.id
+            request.user.es_administrador
+            or foto.revision.visita.empleado_id == request.user.id
         ):
             raise PermissionDenied("No tiene acceso a esta foto.")
         try:

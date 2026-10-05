@@ -15,7 +15,7 @@ from apps.proyectos.consultas import filtrar_por_estado_visita
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
-from apps.visitas.models import Foto, ProductoAplicado, Visita
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 
 ESQUEMA = [
     {"clave": "cebaderos", "etiqueta": "Cebaderos revisados", "tipo": "numero"},
@@ -127,20 +127,29 @@ class ProyectoPanelTests(TestCase):
         self.assertEqual((proyecto.titulo, proyecto.estado), ("cambiado", "pausado"))
 
     def _visita(self, proyecto, producto, **extra):
+        ahora = timezone.now()
         visita = Visita.objects.create(
             proyecto=proyecto,
             empleado=self.empleado,
             origen=Visita.Origen.APP,
             estado=Visita.Estado.REALIZADA,
-            realizada_en=timezone.now(),
-            esquema_planilla=ESQUEMA,
-            datos={"cebaderos": 12, "hubo_consumo": True},
+            abierta_en=ahora,
+            cerrada_en=ahora,
             **extra,
         )
-        Foto.objects.create(visita=visita, imagen="visitas/fotos/x.jpg")
-        Foto.objects.create(visita=visita, imagen="visitas/fotos/y.jpg")
+        revision = Revision.objects.create(
+            visita=visita,
+            punto=proyecto.sitio.puntos.get(orden=0),
+            orden=1,
+            realizada_en=ahora,
+            recibida_en=ahora,
+            esquema_planilla=ESQUEMA,
+            datos={"cebaderos": 12, "hubo_consumo": True},
+        )
+        Foto.objects.create(revision=revision, imagen="visitas/fotos/x.jpg")
+        Foto.objects.create(revision=revision, imagen="visitas/fotos/y.jpg")
         ProductoAplicado.objects.create(
-            visita=visita, producto=producto, lote="L1", dosis=1, unidad="ml/l"
+            revision=revision, producto=producto, lote="L1", dosis=1, unidad="ml/l"
         )
         return visita
 

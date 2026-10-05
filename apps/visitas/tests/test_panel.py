@@ -20,10 +20,11 @@ from apps.accounts.models import User
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla
+from apps.sitios.models import PuntoControl
 from apps.visitas.models import Foto, Visita
 from apps.visitas.services import registrar_visita_manual
 
-from .test_models import crear_visita
+from .test_models import crear_revision, crear_visita, punto_de
 
 MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="macontrol-panel-test-")
 
@@ -39,10 +40,14 @@ class BaseTests(TestCase):
     def setUpTestData(cls):
         cls.visita = crear_visita(
             estado=Visita.Estado.REALIZADA,
-            realizada_en=timezone.now(),
+            abierta_en=timezone.now(),
+            cerrada_en=timezone.now(),
+            cierre=Visita.Cierre.ADMINISTRADOR,
             origen=Visita.Origen.MANUAL,
             motivo_manual="Carga",
         )
+        cls.revision = crear_revision(cls.visita)
+        cls.punto = punto_de(cls.visita)
         cls.proyecto = cls.visita.proyecto
         cls.empleado = cls.visita.empleado
         cls.admin = User.objects.create_user(
@@ -59,7 +64,8 @@ class BaseTests(TestCase):
             "origen": Visita.Origen.MANUAL,
             "motivo_manual": "Carga",
             "estado": Visita.Estado.REALIZADA,
-            "realizada_en": timezone.now(),
+            "abierta_en": timezone.now(),
+            "cerrada_en": timezone.now(),
         }
         datos.update(extra)
         return Visita.objects.create(**datos)
@@ -84,7 +90,10 @@ class ListadoVisitasTests(BaseTests):
 
     def test_filtra_por_empleado_proyecto_y_estado(self):
         pendiente = self.otra_visita(
-            estado=Visita.Estado.PENDIENTE, realizada_en=None, motivo_manual=""
+            estado=Visita.Estado.PENDIENTE,
+            abierta_en=None,
+            cerrada_en=None,
+            motivo_manual="",
         )
         self.assertEqual(self._pks(estado="pendiente"), {pendiente.pk})
         self.assertEqual(
@@ -134,9 +143,11 @@ class RevisarIncidenciaTests(BaseTests):
 
 class FichaVisitaTests(BaseTests):
     def test_historial_no_muestra_coordenadas(self):
-        self.visita.latitud = Decimal("-35.123456")
-        self.visita.longitud = Decimal("-57.654321")
-        self.visita.precision_m = Decimal("12.5")
+        self.revision.latitud = Decimal("-35.123456")
+        self.revision.longitud = Decimal("-57.654321")
+        self.revision.precision_m = Decimal("12.5")
+        self.revision.datos = {"secreto": "valor-reservado"}
+        self.revision.save()
         self.visita.datos = {"secreto": "valor-reservado"}
         self.visita.observaciones = "Cambio visible"
         self.visita.save()
@@ -163,6 +174,18 @@ class FichaVisitaTests(BaseTests):
         )
         self.assertContains(respuesta, "Cantidad de cebos")
 
+    def test_muestra_cada_revision_con_su_planilla_y_su_punto(self):
+        self.revision.esquema_planilla = [
+            {"clave": "cebos", "etiqueta": "Cebos repuestos", "tipo": "numero"}
+        ]
+        self.revision.datos = {"cebos": 4}
+        self.revision.save()
+        respuesta = self.client.get(
+            reverse("panel:visitas:ficha", args=[self.visita.pk])
+        )
+        self.assertContains(respuesta, "General")
+        self.assertContains(respuesta, "Cebos repuestos")
+
     def test_ficha_inexistente_da_404(self):
         respuesta = self.client.get(reverse("panel:visitas:ficha", args=[999999]))
         self.assertEqual(respuesta.status_code, 404)
@@ -177,7 +200,7 @@ class FotoPanelTests(BaseTests):
 
     def _foto(self):
         return Foto.objects.create(
-            visita=self.visita,
+            revision=self.revision,
             imagen=SimpleUploadedFile("x.jpg", _jpeg(), content_type="image/jpeg"),
         )
 
@@ -280,6 +303,7 @@ class ManualTests(BaseTests):
     def _datos(self, **extra):
         datos = {
             "empleado": self.empleado.pk,
+            "puntos": [self.punto.pk],
             "motivo": "La app no tenía señal",
             "realizada_en": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
             "productos-TOTAL_FORMS": 1,
@@ -312,6 +336,7 @@ class ManualTests(BaseTests):
             "administrador": self.admin,
             "motivo": "x",
             "realizada_en": timezone.now(),
+            "puntos": [self.punto],
             "datos": {},
             "productos_aplicados": [],
             "fotos": [],
@@ -340,8 +365,10 @@ class ManualTests(BaseTests):
         self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
         self.assertEqual(visita.asignada_por, self.admin)
         self.assertEqual(visita.motivo_manual, "La app no tenía señal")
-        self.assertEqual(visita.fotos.count(), 2)
-        self.assertEqual(visita.productos.get().producto, self.producto)
+        self.assertEqual(Foto.objects.filter(revision__visita=visita).count(), 2)
+        self.assertEqual(
+            visita.revisiones.get().productos.get().producto, self.producto
+        )
         with self.assertRaises(ValidationError) as ctx:
             self._llamar_servicio(motivo="")
         self.assertIn("motivo", ctx.exception.message_dict)
@@ -354,19 +381,26 @@ class ManualTests(BaseTests):
         self.assertEqual(pendiente.origen, Visita.Origen.MANUAL)
         self.assertEqual(pendiente.asignada_por, self.admin)
 
-    def test_pendiente_con_evidencia_se_rechaza(self):
-        pendiente = self._pendiente()
-        Foto.objects.create(visita=pendiente, imagen=self._foto())
-        respuesta = self.client.post(self.url, self._datos(pendiente=pendiente.pk))
+    def test_exige_al_menos_un_punto_del_sitio(self):
+        ajeno = punto_de(crear_visita())
+        antes = Visita.objects.count()
+        respuesta = self.client.post(self.url, self._datos(puntos=[]))
         self.assertEqual(respuesta.status_code, 200)
-        self.assertIn(
-            "ya tiene fotos o productos", str(respuesta.context["form"].errors)
+        self.assertIn("puntos", respuesta.context["form"].errors)
+        respuesta = self.client.post(self.url, self._datos(puntos=[ajeno.pk]))
+        self.assertIn("puntos", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), antes)
+        with self.assertRaises(ValidationError) as ctx:
+            self._llamar_servicio(puntos=[ajeno])
+        self.assertIn("puntos", ctx.exception.message_dict)
+
+    def test_una_revision_por_punto_elegido(self):
+        sala = PuntoControl.objects.create(
+            sitio=self.proyecto.sitio, nombre="Sala", orden=1
         )
-        pendiente.refresh_from_db()
-        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
-        self.assertEqual(pendiente.fotos.count(), 1)
-        with self.assertRaises(ValidationError):
-            self._llamar_servicio(pendiente=pendiente)
+        self.client.post(self.url, self._datos(puntos=[self.punto.pk, sala.pk]))
+        visita = Visita.objects.exclude(pk=self.visita.pk).get()
+        self.assertEqual([r.punto for r in visita.revisiones.all()], [self.punto, sala])
 
     def test_pendiente_de_otro_proyecto_se_rechaza(self):
         otro = Proyecto.objects.create(
@@ -417,7 +451,24 @@ class ManualTests(BaseTests):
         self.assertEqual(Visita.objects.count(), 1)
         self.client.post(self.url, self._datos(datos_cebos="4"))
         visita = Visita.objects.exclude(pk=self.visita.pk).get()
-        self.assertEqual(visita.datos, {"cebos": 4})
+        self.assertEqual(visita.revisiones.get().datos, {"cebos": 4})
+
+    def test_planilla_de_ambito_visita_va_a_la_visita(self):
+        CampoPlanilla.objects.create(
+            tipo_servicio=self.proyecto.tipo_servicio,
+            orden=1,
+            etiqueta="Resumen de la jornada",
+            clave="resumen",
+            tipo=CampoPlanilla.Tipo.TEXTO,
+            obligatorio=True,
+            ambito=CampoPlanilla.Ambito.VISITA,
+        )
+        respuesta = self.client.post(self.url, self._datos())
+        self.assertIn("datosv_resumen", respuesta.context["form"].errors)
+        self.client.post(self.url, self._datos(datosv_resumen="Todo en orden"))
+        visita = Visita.objects.exclude(pk=self.visita.pk).get()
+        self.assertEqual(visita.datos, {"resumen": "Todo en orden"})
+        self.assertEqual(visita.revisiones.get().datos, {})
 
     def test_foto_invalida_no_deja_visita_ni_archivos(self):
         antes = self._archivos()
