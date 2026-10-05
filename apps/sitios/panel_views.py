@@ -45,7 +45,7 @@ class SitioListado(AdministradorRequeridoMixin, ListadoPanelMixin):
 class SitioAlta(AdministradorRequeridoMixin, CreateView):
     model = Sitio
     form_class = SitioForm
-    template_name = "sitios/panel/form.html"
+    template_name = "sitios/panel/formulario.html"
     extra_context = {"titulo": "Nuevo sitio"}
 
     def get_success_url(self):
@@ -55,7 +55,7 @@ class SitioAlta(AdministradorRequeridoMixin, CreateView):
 class SitioEdicion(AdministradorRequeridoMixin, UpdateView):
     model = Sitio
     form_class = SitioForm
-    template_name = "sitios/panel/form.html"
+    template_name = "sitios/panel/formulario.html"
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
