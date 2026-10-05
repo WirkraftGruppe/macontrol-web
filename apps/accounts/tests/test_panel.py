@@ -115,3 +115,79 @@ class UsuarioPanelTests(TestCase):
         cliente = Client()
         self.assertFalse(cliente.login(username="emp1", password=CLAVE))
         self.assertTrue(cliente.login(username="emp1", password=nueva))
+
+
+class UsuarioPanelSuperusuarioTests(TestCase):
+    """Un administrador del panel no gestiona cuentas de superusuario."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_user(
+            "admin1", password=CLAVE, rol=User.Rol.ADMINISTRADOR
+        )
+        cls.super = User.objects.create_superuser(
+            "super1", "s@example.com", CLAVE, rol=User.Rol.ADMINISTRADOR
+        )
+
+    def _url(self, nombre, usuario=None):
+        return reverse(f"panel:usuarios:{nombre}", args=[(usuario or self.super).pk])
+
+    def test_admin_no_cambia_contrasena_de_superusuario(self):
+        self.client.force_login(self.admin)
+        nueva = "Otra-Clave-Nueva-77"
+        respuesta = self.client.post(
+            self._url("contrasena"), {"new_password1": nueva, "new_password2": nueva}
+        )
+        self.assertEqual(respuesta.status_code, 404)
+        self.super.refresh_from_db()
+        self.assertTrue(self.super.check_password(CLAVE))
+
+    def test_admin_no_edita_ni_desactiva_superusuario(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self._url("editar")).status_code, 404)
+        respuesta = self.client.post(
+            self._url("editar"),
+            {"username": "hack", "email": "h@example.com", "rol": User.Rol.EMPLEADO},
+        )
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertEqual(self.client.get(self._url("desactivar")).status_code, 404)
+        self.assertEqual(self.client.post(self._url("desactivar")).status_code, 404)
+        self.super.refresh_from_db()
+        self.assertTrue(self.super.is_active)
+        self.assertEqual(self.super.username, "super1")
+        self.assertEqual(self.super.email, "s@example.com")
+        self.assertEqual(self.super.rol, User.Rol.ADMINISTRADOR)
+
+    def test_superusuario_si_gestiona_superusuarios(self):
+        otro = User.objects.create_superuser(
+            "super2", "o@example.com", CLAVE, rol=User.Rol.ADMINISTRADOR
+        )
+        self.client.force_login(self.super)
+        nueva = "Otra-Clave-Nueva-77"
+        respuesta = self.client.post(
+            self._url("contrasena", otro),
+            {"new_password1": nueva, "new_password2": nueva},
+        )
+        self.assertRedirects(respuesta, reverse("panel:usuarios:listado"))
+        otro.refresh_from_db()
+        self.assertTrue(otro.check_password(nueva))
+
+    def test_contrasena_no_revela_ids_a_anonimo(self):
+        inexistente = reverse("panel:usuarios:contrasena", args=[999999])
+        existente = self._url("contrasena")
+        r1 = self.client.get(inexistente)
+        r2 = self.client.get(existente)
+        self.assertEqual(r1.status_code, r2.status_code)
+        self.assertEqual(r1.status_code, 302)
+        self.assertTrue(r1["Location"].startswith(r2["Location"].split("?")[0]))
+
+    def test_listado_oculta_acciones_sobre_superusuario(self):
+        self.client.force_login(self.admin)
+        html = self.client.get(reverse("panel:usuarios:listado")).content.decode()
+        self.assertIn("super1", html)
+        for nombre in ("editar", "contrasena", "desactivar"):
+            self.assertNotIn(self._url(nombre), html)
+        self.client.force_login(self.super)
+        html = self.client.get(reverse("panel:usuarios:listado")).content.decode()
+        for nombre in ("editar", "contrasena"):
+            self.assertIn(self._url(nombre, self.admin), html)

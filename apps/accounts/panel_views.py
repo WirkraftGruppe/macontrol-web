@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.forms import SetPasswordForm
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
+from django.utils.functional import cached_property
 from django.views.generic import CreateView, FormView, TemplateView, UpdateView
 
 from apps.panel.listados import ListadoPanelMixin
@@ -14,6 +15,14 @@ from .panel_forms import UsuarioAltaForm, UsuarioEdicionForm
 
 User = get_user_model()
 URL_LISTADO = reverse_lazy("panel:usuarios:listado")
+
+
+def usuarios_gestionables(request):
+    """Cuentas que el solicitante puede editar: solo un superusuario ve a los demás."""
+    usuarios = User.objects.all()
+    if request.user.is_superuser:
+        return usuarios
+    return usuarios.filter(is_superuser=False)
 
 
 class UsuarioListadoView(AdministradorRequeridoMixin, ListadoPanelMixin):
@@ -39,6 +48,9 @@ class UsuarioListadoView(AdministradorRequeridoMixin, ListadoPanelMixin):
         contexto["roles"] = User.Rol.choices
         contexto["rol"] = self.request.GET.get("rol", "")
         contexto["activo"] = self.request.GET.get("activo", "")
+        propio_superusuario = self.request.user.is_superuser
+        for usuario in contexto["object_list"]:
+            usuario.gestionable = propio_superusuario or not usuario.is_superuser
         return contexto
 
 
@@ -55,11 +67,13 @@ class UsuarioAltaView(AdministradorRequeridoMixin, CreateView):
 
 
 class UsuarioEditarView(AdministradorRequeridoMixin, UpdateView):
-    model = User
     form_class = UsuarioEdicionForm
     template_name = "accounts/panel/formulario.html"
     success_url = URL_LISTADO
     extra_context = {"titulo": "Editar usuario"}
+
+    def get_queryset(self):
+        return usuarios_gestionables(self.request)
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
@@ -80,11 +94,13 @@ class UsuarioDesactivarView(AdministradorRequeridoMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        contexto["usuario"] = get_object_or_404(User, pk=self.kwargs["pk"])
+        contexto["usuario"] = get_object_or_404(
+            usuarios_gestionables(self.request), pk=self.kwargs["pk"]
+        )
         return contexto
 
     def post(self, request, *args, **kwargs):
-        usuario = get_object_or_404(User, pk=kwargs["pk"])
+        usuario = get_object_or_404(usuarios_gestionables(request), pk=kwargs["pk"])
         if usuario.pk == request.user.pk:
             messages.error(request, "No es posible desactivar la propia cuenta.")
         else:
@@ -99,9 +115,11 @@ class UsuarioContrasenaView(AdministradorRequeridoMixin, FormView):
     template_name = "accounts/panel/formulario.html"
     success_url = URL_LISTADO
 
-    def dispatch(self, request, *args, **kwargs):
-        self.usuario = get_object_or_404(User, pk=kwargs["pk"])
-        return super().dispatch(request, *args, **kwargs)
+    @cached_property
+    def usuario(self):
+        return get_object_or_404(
+            usuarios_gestionables(self.request), pk=self.kwargs["pk"]
+        )
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
