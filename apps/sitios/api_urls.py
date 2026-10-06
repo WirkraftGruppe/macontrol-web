@@ -23,5 +23,10 @@ urlpatterns = [
         api_views.AltaPuntoView.as_view(),
         name="alta-punto",
     ),
+    path(
+        "puntos/<int:pk>/ubicacion/",
+        api_views.UbicacionPuntoView.as_view(),
+        name="ubicacion-punto",
+    ),
     path("me/puntos/", api_views.MisPuntosView.as_view(), name="mis-puntos"),
 ]
