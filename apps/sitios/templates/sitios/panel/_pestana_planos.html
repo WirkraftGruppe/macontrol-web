@@ -9,7 +9,9 @@
     <a href="?pestana=planos&amp;plano={{ p.pk }}"{% if p.pk == plano.pk %} aria-current="page"{% endif %}>{{ p.nombre }}</a>
     {% endfor %}
   </nav>
-  <p class="ayuda">Arrastre un marcador para moverlo: la posición se guarda sola. Haga clic en un lugar libre del plano para dar de alta un punto. Los puntos sin posición aparecen en el centro. Sin ratón, cargue x e y al editar el punto.</p>
+  <p class="ayuda">Arrastre un marcador para moverlo: la posición se guarda sola. Para dar de alta un punto, pulse «Crear nuevo punto» y haga clic en el plano; para ubicar uno existente, pulse «Ubicar» en la lista y haga clic en el plano. Escape o el mismo botón cancelan. Los puntos sin posición aparecen en el centro. Sin ratón, cargue x e y al editar el punto.</p>
+  <p><button type="button" class="boton" id="plano-crear" aria-pressed="false">Crear nuevo punto</button></p>
+  <p id="plano-modo" role="status"></p>
   <p id="plano-mensaje" role="status"></p>
   <div id="plano-editor" class="mapa-leaflet"></div>
   <form id="plano-alta" class="formulario" method="post" action="{% url 'panel:sitios:punto_alta' object.pk %}" hidden>
@@ -23,6 +25,16 @@
     <div class="campo"><label for="plano-alta-sector">Sector</label><input type="text" name="sector" id="plano-alta-sector" maxlength="100"></div>
     <div class="acciones"><button class="boton boton-primario" type="submit">Crear punto</button></div>
   </form>
+  <h3>Sin ubicar en este plano</h3>
+  {% if datos_plano.sin_ubicar %}
+  <ul id="plano-sin-ubicar">
+    {% for p in datos_plano.sin_ubicar %}
+    <li>{{ p.nombre }} <button type="button" class="boton" data-ubicar="{{ p.id }}" aria-pressed="false">Ubicar</button></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="ayuda">Todos los puntos activos del sitio están ubicados en este plano.</p>
+  {% endif %}
   {{ datos_plano|json_script:"datos-plano" }}
   {% else %}
   <p>Este sitio no tiene planos. Suba un JPG, PNG o PDF para ubicar los puntos.</p>

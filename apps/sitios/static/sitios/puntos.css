@@ -33,3 +33,5 @@
 .marcador-vencida { background: var(--danger); }
 .marcador-sin_revisar { background: var(--neutral); }
 .marcador-sin-posicion { opacity: 0.6; }
+.mapa-leaflet.modo-activo, .mapa-leaflet.modo-activo .leaflet-interactive { cursor: crosshair; }
+#plano-modo { font-weight: 600; }

@@ -1,4 +1,4 @@
-/* Editor del plano: marcadores arrastrables (x, y en fracción 0 a 1) y alta de puntos con clic. */
+/* Editor del plano: marcadores arrastrables (x, y en fracción 0 a 1); alta y ubicación de puntos con clic dentro de un modo explícito. */
 (function () {
   "use strict";
 
@@ -52,6 +52,63 @@
 
   var marcadores = {};
 
+  /* Un handler propio de htmx.ajax reemplaza al de fábrica: el éxito se lee del estado HTTP. */
+  function exito(respuesta) {
+    var estado = respuesta && respuesta.xhr ? respuesta.xhr.status : 0;
+    return estado >= 200 && estado <= 299;
+  }
+
+  /* Modo del clic en el plano: null, {tipo: "alta"} o {tipo: "ubicar", punto}. */
+  var modo = null;
+  var botonCrear = document.getElementById("plano-crear");
+  var textoModo = document.getElementById("plano-modo");
+  var provisorio = null;
+
+  function botonesUbicar() {
+    return document.querySelectorAll("[data-ubicar]");
+  }
+
+  function fijarModo(nuevo) {
+    modo = nuevo;
+    if (!nuevo && provisorio) {
+      provisorio.remove();
+      provisorio = null;
+    }
+    if (!nuevo && formulario) {
+      formulario.hidden = true;
+    }
+    contenedor.classList.toggle("modo-activo", !!nuevo);
+    if (botonCrear) {
+      botonCrear.setAttribute("aria-pressed", nuevo && nuevo.tipo === "alta" ? "true" : "false");
+    }
+    botonesUbicar().forEach(function (boton) {
+      var activo = nuevo && nuevo.tipo === "ubicar" && String(nuevo.punto.id) === boton.dataset.ubicar;
+      boton.setAttribute("aria-pressed", activo ? "true" : "false");
+    });
+    if (!nuevo) {
+      textoModo.textContent = "";
+    } else if (nuevo.tipo === "alta") {
+      textoModo.textContent = "Modo alta: haga clic en el plano para ubicar el nuevo punto. Escape cancela.";
+    } else {
+      textoModo.textContent = "Modo ubicar: haga clic en el plano para ubicar " + nuevo.punto.nombre + ". Escape cancela.";
+    }
+  }
+
+  function ubicar(punto, posicion) {
+    htmx.ajax("POST", punto.url, {
+      source: contenedor,
+      swap: "none",
+      values: { plano: datos.plano, x: posicion.x.toFixed(4), y: posicion.y.toFixed(4) },
+      handler: function (elemento, respuesta) {
+        if (exito(respuesta)) {
+          window.location.reload();
+        } else {
+          avisar("No se pudo ubicar " + punto.nombre + " en el plano.");
+        }
+      },
+    });
+  }
+
   function guardar(marcador, punto) {
     var nueva = deLatLng(marcador.getLatLng());
     htmx.ajax("POST", punto.url, {
@@ -59,7 +116,7 @@
       swap: "none",
       values: { x: nueva.x.toFixed(4), y: nueva.y.toFixed(4) },
       handler: function (elemento, respuesta) {
-        if (respuesta.successful) {
+        if (exito(respuesta)) {
           punto.x = nueva.x;
           punto.y = nueva.y;
           marcador.getElement().classList.remove("marcador-sin-posicion");
@@ -90,15 +147,44 @@
     marcador.on("dragend", function () {
       guardar(marcador, punto);
     });
+    marcador.on("click", function (evento) {
+      L.DomEvent.stopPropagation(evento);
+    });
     marcadores[punto.id] = marcador;
   });
 
-  var provisorio = null;
+  if (botonCrear) {
+    botonCrear.addEventListener("click", function () {
+      fijarModo(modo && modo.tipo === "alta" ? null : { tipo: "alta" });
+    });
+  }
+  botonesUbicar().forEach(function (boton) {
+    boton.addEventListener("click", function () {
+      var punto = datos.sin_ubicar.filter(function (p) {
+        return String(p.id) === boton.dataset.ubicar;
+      })[0];
+      var mismo = modo && modo.tipo === "ubicar" && modo.punto === punto;
+      fijarModo(mismo || !punto ? null : { tipo: "ubicar", punto: punto });
+    });
+  });
+  document.addEventListener("keydown", function (evento) {
+    if (evento.key === "Escape" && modo) {
+      fijarModo(null);
+    }
+  });
+
   mapa.on("click", function (evento) {
-    if (!formulario) {
+    if (!modo) {
       return;
     }
     var posicion = deLatLng(evento.latlng);
+    if (modo.tipo === "ubicar") {
+      ubicar(modo.punto, posicion);
+      return;
+    }
+    if (!formulario) {
+      return;
+    }
     document.getElementById("plano-alta-x").value = posicion.x.toFixed(4);
     document.getElementById("plano-alta-y").value = posicion.y.toFixed(4);
     if (provisorio) {
