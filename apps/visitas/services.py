@@ -10,6 +10,7 @@ from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 from simple_history.utils import update_change_reason
 
+from apps.accounts.models import User
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.sitios.models import PuntoControl
@@ -603,6 +604,7 @@ def cerrar_visita(
         visita_bd.full_clean()
         visita_bd.save()
 
+        # La visita de un administrador no es servicio: no anula la del empleado.
         hay_posterior = (
             Visita.objects.filter(
                 proyecto=proyecto,
@@ -610,6 +612,7 @@ def cerrar_visita(
                 cerrada_en__gt=cerrada_en,
             )
             .exclude(pk=visita_bd.pk)
+            .exclude(empleado__rol=User.Rol.ADMINISTRADOR)
             .exists()
         )
         if not hay_posterior and not visita_bd.empleado.es_administrador:
