@@ -18,6 +18,7 @@
 {# El mapa y el buscador son una ayuda: sin JS, se cargan lat y lng a mano. #}
 <section class="sitio-ubicacion" id="sitio-ubicacion" hidden
          data-url-buscar="{% url 'panel:sitios:geocodificar' %}"
+         data-csrf="{{ csrf_token }}"
          data-campo-lat="{{ form.latitud.id_for_label }}"
          data-campo-lng="{{ form.longitud.id_for_label }}"
          data-campo-direccion="{{ form.direccion.id_for_label }}"
@@ -31,6 +32,7 @@
   <p id="sitio-mensaje" role="status"></p>
   <ul class="sitio-resultados" id="sitio-resultados"></ul>
   <div id="sitio-mapa"></div>
+  <p class="ayuda">&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a></p>
 </section>
 {% url 'panel:sitios:listado' as listado_url %}
 {% include "panel/partials/formulario.html" with cancelar_url=listado_url %}

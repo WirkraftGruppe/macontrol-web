@@ -21,7 +21,7 @@
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; colaboradores de OpenStreetMap",
-    referrerPolicy: "strict-origin",
+    referrerPolicy: "strict-origin-when-cross-origin",
   }).addTo(mapa);
 
   var marcadores = {};

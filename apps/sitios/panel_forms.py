@@ -72,6 +72,13 @@ class PuntoForm(forms.ModelForm):
         return datos
 
 
+class PuntoAltaForm(PuntoForm):
+    """Alta: sin coordenadas; la ubicación se toma del primer escaneo."""
+
+    class Meta(PuntoForm.Meta):
+        fields = [c for c in PuntoForm.Meta.fields if c not in ("latitud", "longitud")]
+
+
 def _en_rango(valor, limite, nombre):
     if valor is not None and abs(valor) > limite:
         raise forms.ValidationError(f"{nombre} debe estar entre -{limite} y {limite}.")

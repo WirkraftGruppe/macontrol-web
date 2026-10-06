@@ -54,6 +54,13 @@ class SitioPanelTests(TestCase):
         datos.update(extra)
         return datos
 
+    def test_ficha_muestra_atribucion_osm(self):
+        url = reverse("panel:sitios:ficha", args=[self.sitio.pk])
+        r = self.client.get(url, {"pestana": "mapa"})
+        self.assertContains(r, "colaboradores de OpenStreetMap</a>")
+        r = self.client.get(reverse("panel:sitios:alta"))
+        self.assertContains(r, "https://www.openstreetmap.org/copyright")
+
     def test_descargar_qr_png_con_nombre(self):
         r = self.client.get(
             reverse("panel:sitios:punto_qr_png", args=[self.sitio.puntos.get().pk])
@@ -237,6 +244,16 @@ class PlanoPanelTests(_BaseAdminTests):
 
 
 class PuntoPanelTests(_BaseAdminTests):
+    def test_alta_sin_campos_de_coordenadas(self):
+        r = self.client.get(reverse("panel:sitios:punto_alta", args=[self.sitio.pk]))
+        self.assertContains(r, "La ubicación se toma del primer escaneo")
+        self.assertNotIn("latitud", r.context["form"].fields)
+        self.assertNotIn("longitud", r.context["form"].fields)
+        r = self.client.get(
+            reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        )
+        self.assertIn("latitud", r.context["form"].fields)
+
     def test_aceptar_ubicacion_propuesta(self):
         propuesta = {
             "latitud": "-35.100000",
