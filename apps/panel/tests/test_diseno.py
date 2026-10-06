@@ -49,6 +49,8 @@ class DisenoTests(TestCase):
             "proxima": "warn",
             "al_dia": "ok",
             "sin_programar": "neutral",
+            "sin_revisar": "neutral",
+            "abierta": "warn",
             "realizada": "ok",
             "pendiente": "warn",
             "cancelada": "neutral",

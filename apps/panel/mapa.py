@@ -1,27 +1,14 @@
-"""Mapa de sitios: datos agregados por sitio con el peor estado de sus proyectos."""
+"""Mapa de sitios: datos agregados por sitio con el peor estado de sus puntos."""
 
 from django.db.models import Max, Prefetch, Q
 from django.urls import NoReverseMatch, reverse
 
-from apps.proyectos.models import EstadoVisita, Proyecto
-from apps.sitios.models import Sitio
+from apps.proyectos.models import Proyecto
+from apps.sitios.estado import estados_de_puntos, peor_estado_punto
+from apps.sitios.models import PuntoControl, Sitio
 from apps.visitas.models import Visita
 
 ORIGEN_TESELAS = "https://tile.openstreetmap.org"
-
-# De peor a mejor: el color del sitio es el primero que aparezca entre sus proyectos.
-GRAVEDAD = [
-    EstadoVisita.VENCIDA,
-    EstadoVisita.PROXIMA,
-    EstadoVisita.AL_DIA,
-    EstadoVisita.SIN_PROGRAMAR,
-]
-
-
-def peor_estado(estados):
-    """Devuelve el peor de los estados dados; sin proyectos, sin programar."""
-    estados = set(estados)
-    return next((e for e in GRAVEDAD if e in estados), EstadoVisita.SIN_PROGRAMAR)
 
 
 def url_ficha(sitio):
@@ -49,7 +36,14 @@ def sitios_para_mapa(cliente=None, servicio=None, estado=None):
     sitios = (
         Sitio.objects.filter(activo=True, latitud__isnull=False, longitud__isnull=False)
         .select_related("cliente")
-        .prefetch_related(Prefetch("proyectos", queryset=proyectos, to_attr="activos"))
+        .prefetch_related(
+            Prefetch("proyectos", queryset=proyectos, to_attr="activos"),
+            Prefetch(
+                "puntos",
+                queryset=PuntoControl.objects.filter(activo=True),
+                to_attr="puntos_activos",
+            ),
+        )
     )
     if cliente:
         sitios = sitios.filter(cliente_id=cliente)
@@ -59,9 +53,12 @@ def sitios_para_mapa(cliente=None, servicio=None, estado=None):
             proyectos__tipo_servicio_id=servicio,
         ).distinct()
 
+    sitios = list(sitios)
+    # Una sola llamada para todos los puntos: el costo no crece con los sitios.
+    estados = estados_de_puntos(p for s in sitios for p in s.puntos_activos)
     resultado = []
     for sitio in sitios:
-        color = peor_estado(p.estado_visita for p in sitio.activos)
+        color = peor_estado_punto(estados[p.pk] for p in sitio.puntos_activos)
         if estado and color != estado:
             continue
         ultimas = [p.ultima_visita for p in sitio.activos if p.ultima_visita]

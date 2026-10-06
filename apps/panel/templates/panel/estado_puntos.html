@@ -1,0 +1,3 @@
+<ul id="estado-puntos">{% for punto, estado in puntos %}
+  <li data-punto="{{ punto.pk }}" data-estado="{{ estado }}" data-x="{{ punto.x|default_if_none:''|stringformat:'s' }}" data-y="{{ punto.y|default_if_none:''|stringformat:'s' }}" data-plano="{{ punto.plano_id|default_if_none:'' }}"></li>{% endfor %}
+</ul>

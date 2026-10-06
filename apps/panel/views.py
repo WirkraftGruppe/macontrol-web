@@ -9,8 +9,8 @@ from django.views.generic import TemplateView
 
 from apps.accounts.limites import LimiteIngresoMixin
 from apps.accounts.mixins import AdministradorRequeridoMixin
-from apps.proyectos.models import EstadoVisita
 from apps.servicios.models import TipoServicio
+from apps.sitios.estado import EstadoPunto
 
 from .forms import FormularioIngreso
 from .mapa import ORIGEN_TESELAS, sitios_para_mapa
@@ -38,7 +38,7 @@ class MapaView(AdministradorRequeridoMixin, TemplateView):
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["servicios"] = TipoServicio.objects.order_by("nombre")
-        contexto["estados"] = EstadoVisita.choices
+        contexto["estados"] = EstadoPunto.choices
         return contexto
 
 
@@ -48,7 +48,7 @@ class MapaDatosView(AdministradorRequeridoMixin, View):
 
     def get(self, request):
         estado = request.GET.get("estado")
-        if estado not in EstadoVisita.values:
+        if estado not in EstadoPunto.values:
             estado = None
         sitios = sitios_para_mapa(
             cliente=_entero(request.GET.get("cliente")),

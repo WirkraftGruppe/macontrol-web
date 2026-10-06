@@ -10,9 +10,11 @@ TONOS = {
     "proxima": "warn",
     "al_dia": "ok",
     "sin_programar": "neutral",
+    "sin_revisar": "neutral",
     # Estados de visita
     "realizada": "ok",
     "pendiente": "warn",
+    "abierta": "warn",
     "cancelada": "neutral",
 }
 
