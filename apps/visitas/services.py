@@ -6,7 +6,7 @@ from uuid import UUID
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from simple_history.utils import update_change_reason
 
@@ -23,7 +23,7 @@ MAX_FOTOS = 10
 MAX_PRODUCTOS = 30
 TOLERANCIA_FUTURO = timedelta(minutes=10)
 MENSAJE_QR_INVALIDO = "El código QR no corresponde a este proyecto."
-MOTIVO_UBICACION_FIJADA = "Ubicación fijada por escaneo de administrador"
+MOTIVO_UBICACION_FIJADA = "Ubicación fijada por el primer escaneo"
 
 logger = logging.getLogger(__name__)
 
@@ -285,41 +285,11 @@ def abrir_visita(
         return visita, True
 
 
-def _proponer_ubicacion(punto, revision):
-    """Guarda las coordenadas de la revisión como ubicación propuesta del punto.
-
-    Solo si el punto no tiene lat/lng, la precisión es de a lo sumo
-    `PRECISION_MAXIMA_M` y no hay otra propuesta pendiente (la actualización
-    condicional lo decide en la base).
-    """
-    precision = revision.precision_m
-    if (
-        revision.latitud is None
-        or revision.longitud is None
-        or precision is None
-        or precision > settings.PRECISION_MAXIMA_M
-    ):
-        return
-    PuntoControl.objects.filter(
-        Q(latitud__isnull=True) | Q(longitud__isnull=True),
-        pk=punto.pk,
-        ubicacion_propuesta__isnull=True,
-    ).update(
-        ubicacion_propuesta={
-            "latitud": f"{revision.latitud:.6f}",
-            "longitud": f"{revision.longitud:.6f}",
-            "precision_m": f"{precision:.1f}",
-            "revision": revision.pk,
-        }
-    )
-
-
-def _fijar_ubicacion_por_escaneo(punto, revision, administrador):
-    """Un administrador que escanea un punto sin coordenadas las fija con las suyas.
+def _fijar_ubicacion_por_escaneo(punto, revision, usuario):
+    """El primer escaneo de un punto sin coordenadas las fija, sea cual sea el rol.
 
     Bloquea el punto; con precisión peor que `PRECISION_MAXIMA_M` no fija nada y
-    la revisión igual se registra. Limpia la propuesta pendiente y deja al
-    administrador en el historial del punto.
+    la revisión igual se registra. Deja al usuario en el historial del punto.
     """
     precision = revision.precision_m
     if precision is None or precision > settings.PRECISION_MAXIMA_M:
@@ -329,10 +299,9 @@ def _fijar_ubicacion_por_escaneo(punto, revision, administrador):
         return
     bloqueado.latitud = revision.latitud
     bloqueado.longitud = revision.longitud
-    bloqueado.ubicacion_propuesta = None
-    bloqueado._history_user = administrador
+    bloqueado._history_user = usuario
     bloqueado._change_reason = MOTIVO_UBICACION_FIJADA
-    bloqueado.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
+    bloqueado.save(update_fields=["latitud", "longitud"])
 
 
 def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
@@ -410,10 +379,7 @@ def _guardar_revision(
         incidencia_detalle=incidencia_detalle,
     )
     _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas)
-    if empleado.es_administrador:
-        _fijar_ubicacion_por_escaneo(punto, revision, empleado)
-    else:
-        _proponer_ubicacion(punto, revision)
+    _fijar_ubicacion_por_escaneo(punto, revision, empleado)
     return revision
 
 
@@ -653,11 +619,21 @@ def registrar_visita_manual(
     igual a `realizada_en`; `datos_visita` es la planilla de ámbito `visita`. Crea
     la visita, o completa `pendiente` (sin revisiones previas), con
     `origen=manual`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige
-    `confirmar_atraso` y deja la confirmación en el historial. Todo ocurre en una
+    `confirmar_atraso` y deja la confirmación en el historial; una hora más de
+    `TOLERANCIA_FUTURO` posterior a la actual se rechaza. Todo ocurre en una
     transacción; si algo falla no queda nada, tampoco los archivos. Levanta
     `ValidationError` con errores por campo. No debe llamarse dentro de otro
     `atomic`.
     """
+    if realizada_en > timezone.now() + TOLERANCIA_FUTURO:
+        raise ValidationError(
+            {
+                "realizada_en": (
+                    "La fecha y hora de la visita no puede ser posterior a la "
+                    "hora actual."
+                )
+            }
+        )
     with _transaccion_con_archivos() as guardadas:
         errores = {}
         if not (motivo or "").strip():
