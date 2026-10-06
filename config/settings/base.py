@@ -63,6 +63,33 @@ ATRASO_MAXIMO_HORAS = leer_atraso_maximo_horas()
 VISITA_ABIERTA_MAXIMO_HORAS = 16
 
 
+def leer_distancia_maxima_m():
+    """Distancia máxima, en metros, entre un escaneo y el punto antes de marcar incidencia.
+
+    Entero entre 50 y 5000; default 300. Por debajo de 50 el error del GPS de un teléfono
+    marcaría incidencias falsas; por encima de 5000 la verificación deja de decir algo.
+    """
+    crudo = env("DISTANCIA_MAXIMA_M", default="300")
+    try:
+        valor = int(crudo)
+    except ValueError:
+        valor = 0
+    if not 50 <= valor <= 5000:
+        raise ImproperlyConfigured(
+            "DISTANCIA_MAXIMA_M debe ser un entero entre 50 y 5000."
+        )
+    return valor
+
+
+# Una revisión o una apertura a más metros del punto (o del sitio, si el punto no
+# tiene coordenadas) marca `incidencia_ubicacion`; nunca se rechaza (plan cierre-puntos).
+DISTANCIA_MAXIMA_M = leer_distancia_maxima_m()
+
+# Precisión del GPS, en metros, a partir de la cual una lectura ya no fija ni propone
+# coordenadas de un sitio o de un punto (plan cierre-puntos).
+PRECISION_MAXIMA_M = 50
+
+
 INSTALLED_APPS = [
     "config.apps.AdminMAControlConfig",
     "django.contrib.auth",
@@ -163,6 +190,10 @@ LOGOUT_REDIRECT_URL = "/panel/ingresar/"
 # Explícito aunque coincide con el valor por defecto de Django: la vista de Swagger
 # (`?script` de drf-spectacular) incrusta el token CSRF y depende de esta política.
 SESSION_COOKIE_SAMESITE = "Lax"
+
+# Las teselas de OpenStreetMap exigen la cabecera Referer: con `same-origin` (el valor
+# por defecto de Django) OSM responde 403. Hacia otros orígenes solo viaja el origen.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 # Un POST de visita lleva como máximo MAX_FOTOS (10) archivos; 12 deja margen.
 DATA_UPLOAD_MAX_NUMBER_FILES = 12
