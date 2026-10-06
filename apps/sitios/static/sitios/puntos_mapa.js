@@ -31,6 +31,13 @@
     return L.divIcon({ className: "marcador marcador-" + estado, iconSize: [22, 22] });
   }
 
+  // El nombre viene de la base de datos: el tooltip se arma con textContent.
+  function textoTooltip(punto) {
+    var el = document.createElement("span");
+    el.textContent = punto.nombre + " · " + (ETIQUETAS[punto.estado] || "");
+    return el;
+  }
+
   function poner(punto) {
     var posicion = [punto.lat, punto.lng];
     if (marcadores[punto.id]) {
@@ -38,7 +45,7 @@
       return;
     }
     marcadores[punto.id] = L.marker(posicion, { icon: icono(punto.estado), title: punto.nombre })
-      .bindTooltip(punto.nombre + " · " + (ETIQUETAS[punto.estado] || ""))
+      .bindTooltip(textoTooltip(punto))
       .addTo(mapa);
   }
 

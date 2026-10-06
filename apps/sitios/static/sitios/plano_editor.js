@@ -72,6 +72,13 @@
     });
   }
 
+  // El nombre viene de la base de datos: el tooltip se arma con textContent.
+  function textoTooltip(punto) {
+    var el = document.createElement("span");
+    el.textContent = punto.nombre + " · " + (ETIQUETAS[punto.estado] || "");
+    return el;
+  }
+
   datos.puntos.forEach(function (punto) {
     var sinPosicion = punto.x === null || punto.y === null;
     var marcador = L.marker(aLatLng(sinPosicion ? 0.5 : punto.x, sinPosicion ? 0.5 : punto.y), {
@@ -79,7 +86,7 @@
       icon: icono(punto.estado, sinPosicion),
       title: punto.nombre,
     }).addTo(mapa);
-    marcador.bindTooltip(punto.nombre + " · " + (ETIQUETAS[punto.estado] || ""));
+    marcador.bindTooltip(textoTooltip(punto));
     marcador.on("dragend", function () {
       guardar(marcador, punto);
     });

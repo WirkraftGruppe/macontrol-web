@@ -1,16 +1,26 @@
 """Planos de un sitio: valida, convierte el PDF y normaliza la imagen a PNG."""
 
+import subprocess
+import sys
 import warnings
 from io import BytesIO
+from pathlib import Path
 
-import pypdfium2
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from apps.sitios import rasterizar_pdf
+
 TAMANO_MAXIMO = 20 * 1024 * 1024
 LADO_MAXIMO = 4000
 MAX_PIXELES = 40_000_000
+TIEMPO_MAXIMO_PDF = 15
+RAIZ_PROYECTO = Path(__file__).resolve().parents[2]
+ERROR_PDF_COMPLEJO = (
+    "El PDF es demasiado complejo para convertirlo; expórtelo como PNG o JPG."
+)
+ERROR_PDF_ILEGIBLE = "No se pudo leer el PDF (corrupto o protegido con contraseña)."
 ERROR_IMAGEN = "El archivo no es una imagen JPG, PNG ni un PDF válido."
 
 
@@ -38,24 +48,33 @@ def procesar_plano(archivo):
 
 
 def _rasterizar_pdf(datos):
-    """Primera página del PDF con el lado mayor en ``LADO_MAXIMO`` px."""
+    """Primera página del PDF con el lado mayor en ``LADO_MAXIMO`` px.
+
+    El render corre en un subproceso con tiempo máximo (``TIEMPO_MAXIMO_PDF``): un
+    PDF con miles de operaciones de dibujo puede tardar minutos en pdfium.
+    """
     try:
-        documento = pypdfium2.PdfDocument(datos)
-        try:
-            if len(documento) == 0:
-                raise ValidationError("El PDF no tiene páginas.")
-            pagina = documento[0]
-            ancho, alto = pagina.get_size()
-            if min(ancho, alto) <= 0:
-                raise ValidationError("La primera página del PDF no tiene tamaño.")
-            escala = LADO_MAXIMO / max(ancho, alto)
-            return pagina.render(scale=escala).to_pil().convert("RGB")
-        finally:
-            documento.close()
-    except pypdfium2.PdfiumError as error:
-        raise ValidationError(
-            "No se pudo leer el PDF (corrupto o protegido con contraseña)."
-        ) from error
+        proceso = subprocess.run(
+            [sys.executable, "-m", "apps.sitios.rasterizar_pdf", str(LADO_MAXIMO)],
+            input=datos,
+            capture_output=True,
+            timeout=TIEMPO_MAXIMO_PDF,
+            check=False,
+            cwd=RAIZ_PROYECTO,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ValidationError(ERROR_PDF_COMPLEJO) from error
+    if proceso.returncode == rasterizar_pdf.SIN_PAGINAS:
+        raise ValidationError("El PDF no tiene páginas.")
+    if proceso.returncode == rasterizar_pdf.SIN_TAMANO:
+        raise ValidationError("La primera página del PDF no tiene tamaño.")
+    if proceso.returncode != 0:
+        raise ValidationError(ERROR_PDF_ILEGIBLE)
+    try:
+        with Image.open(BytesIO(proceso.stdout), formats=("PNG",)) as png:
+            return png.convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError) as error:
+        raise ValidationError(ERROR_PDF_ILEGIBLE) from error
 
 
 def _abrir_imagen(datos):

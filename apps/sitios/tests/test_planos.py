@@ -1,5 +1,8 @@
 import tempfile
+import time
+import zlib
 from io import BytesIO
+from unittest import mock
 
 import pypdfium2
 from django.core.exceptions import ValidationError
@@ -97,3 +100,31 @@ class PlanoTests(TestCase):
         plano.imagen = _subida(b"no es imagen")
         with self.assertRaises(ValidationError):
             plano.clean()
+
+
+def _pdf_complejo(operaciones=10_000):
+    """PDF mínimo cuya primera página rellena el mismo rectángulo muchas veces."""
+    contenido = zlib.compress(b"0 0 600 800 re f\n" * operaciones)
+    objetos = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Contents 4 0 R >>",
+        b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(contenido)
+        + contenido
+        + b"\nendstream",
+    ]
+    salida = b"%PDF-1.4\n"
+    for numero, cuerpo in enumerate(objetos, start=1):
+        salida += b"%d 0 obj\n" % numero + cuerpo + b"\nendobj\n"
+    return salida + b"trailer\n<< /Root 1 0 R /Size 5 >>\n%%EOF\n"
+
+
+class PdfComplejoTests(TestCase):
+    def test_pdf_complejo_se_rechaza_con_tiempo_maximo(self):
+        inicio = time.monotonic()
+        with mock.patch.object(planos, "TIEMPO_MAXIMO_PDF", 2):
+            with self.assertRaises(ValidationError) as contexto:
+                planos.procesar_plano(_subida(_pdf_complejo()))
+        transcurrido = time.monotonic() - inicio
+        self.assertIn("demasiado complejo", contexto.exception.messages[0])
+        self.assertLess(transcurrido, 2 + 3)
