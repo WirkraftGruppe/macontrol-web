@@ -6,7 +6,7 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 ANTES = ("visitas", "0004_historicalvisita_incidencia_revisada_en_and_more")
-DESPUES = ("visitas", "0007_quitar_campos_de_visita")
+DESPUES = ("visitas", "0008_ubicacion_y_administrador")
 
 
 def _destino(visitas):

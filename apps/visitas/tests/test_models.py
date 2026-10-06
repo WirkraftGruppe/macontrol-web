@@ -69,8 +69,12 @@ class VisitaTests(TestCase):
             username="admin-vis", password="x", rol=User.Rol.ADMINISTRADOR
         )
 
-    def test_empleado_debe_tener_rol_empleado(self):
+    def test_empleado_acepta_empleado_o_administrador_y_rechaza_otro_rol(self):
         self.visita.empleado = self.admin
+        self.visita.full_clean()
+        self.visita.empleado = User.objects.create_user(
+            username="otro-rol", password="x", rol="visitante"
+        )
         with self.assertRaises(ValidationError) as ctx:
             self.visita.full_clean()
         self.assertIn("empleado", ctx.exception.message_dict)
