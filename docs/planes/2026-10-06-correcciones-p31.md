@@ -179,7 +179,7 @@ commit_base: 6510a35
 |---|---|
 | T1 | hecha (integrada 2f4ad1b) |
 | T2 | hecha (integrada 16cec24) |
-| T3 | pendiente |
+| T3 | hecha (integrada 9ac7257) |
 | T4 | pendiente |
 
 ### Corridas
@@ -190,6 +190,9 @@ commit_base: 6510a35
 | 2026-10-06 | T1 (verificador-b) | 556d341 | PASA 7/7 | |
 | 2026-10-06 | T2 (verificador) | 0a8cdda | PASA 10/10 | worktree correcciones-p31-T2 |
 | 2026-10-06 | T2 (verificador-b) | 0a8cdda | PASA 10/10 | |
+| 2026-10-06 | T3 (verificador) | 91b2773 | PASA 9/9 | worktree correcciones-p31-T3 |
+| 2026-10-06 | T3 (verificador-b) | 91b2773 | PASA 9/9 | |
+| 2026-10-06 | T4 paso 3: spectacular --validate | 9ac7257 | sin cambios | el YAML no cambia (diff=0) |
 
 ## Pendientes que deja este plan
 
