@@ -45,10 +45,37 @@ class CampoJSON(serializers.CharField):
 
 
 class AbrirVisitaSerializer(serializers.Serializer):
-    """Entrada de `POST visitas/abrir/`: el proyecto y el QR escaneado en el sitio."""
+    """Entrada de `POST visitas/abrir/`: el proyecto, el QR escaneado en el sitio y,
+    opcionales, las coordenadas del teléfono para verificar la ubicación."""
 
     proyecto = serializers.IntegerField()
     qr_codigo = serializers.UUIDField()
+    latitud = serializers.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        min_value=Decimal("-90"),
+        max_value=Decimal("90"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    longitud = serializers.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        min_value=Decimal("-180"),
+        max_value=Decimal("180"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    precision_m = serializers.DecimalField(
+        max_digits=7,
+        decimal_places=1,
+        min_value=Decimal("0"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
 
 
 class CrearRevisionSerializer(serializers.Serializer):

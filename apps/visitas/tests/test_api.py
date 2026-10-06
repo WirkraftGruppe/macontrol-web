@@ -203,12 +203,10 @@ class FlujoRevisionesTests(ApiVisitasBase):
         r = self.api.post("/api/v1/visitas/", {}, format="json")
         self.assertEqual(r.status_code, 404)
 
-    def test_revision_en_visita_ajena_o_cerrada_se_rechaza(self):
+    def test_revision_en_visita_cerrada_o_pendiente_se_rechaza(self):
         casos = {
-            "ajena": self._abierta(self.otro),
             "cerrada": self._realizada(self.empleado, 2),
             "pendiente": self._visita(self.empleado),
-            "inexistente": SimpleNamespace(id=999999),
         }
         for nombre, visita in casos.items():
             with self.subTest(nombre):
@@ -225,17 +223,23 @@ class FlujoRevisionesTests(ApiVisitasBase):
         ):
             self.assertEqual(vista.throttle_scope, "crear_visita")
 
-    def test_administrador_no_usa_las_rutas_de_escritura(self):
-        visita = self._abierta()
+    def test_administrador_usa_las_rutas_de_escritura_sin_tocar_el_proyecto(self):
+        self.proyecto.frecuencia_dias = 30
+        self.proyecto.save()
         admin = self._api(self.admin)
-        self.assertEqual(self._post(visita, api=admin).status_code, 403)
-        self.assertEqual(self._cerrar(visita, api=admin).status_code, 403)
         r = admin.post(
             "/api/v1/visitas/abrir/",
             {"proyecto": self.proyecto.id, "qr_codigo": str(self.punto.qr_codigo)},
             format="json",
         )
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 201, r.content)
+        visita = Visita.objects.get(pk=r.data["id"])
+        self.assertEqual(visita.empleado, self.admin)
+        self.assertEqual(self._post(visita, api=admin).status_code, 201)
+        self.assertEqual(self._cerrar(visita, api=admin).status_code, 200)
+        self.proyecto.refresh_from_db()
+        self.assertEqual(self.proyecto.encargado_actual, self.empleado)
+        self.assertIsNone(self.proyecto.proxima_visita)
         self.assertEqual(APIClient().post("/api/v1/revisiones/").status_code, 401)
 
 
@@ -474,13 +478,6 @@ class CerrarVisitaApiTests(ApiVisitasBase):
         self.visita.refresh_from_db()
         self.assertEqual(self.visita.estado, Visita.Estado.ABIERTA)
 
-    def test_visita_ajena_da_404(self):
-        ajena = self._abierta(self.otro)
-        self._revision(ajena)
-        self.assertEqual(self._cerrar(ajena).status_code, 404)
-        ajena.refresh_from_db()
-        self.assertEqual(ajena.estado, Visita.Estado.ABIERTA)
-
     def test_planilla_de_visita_invalida_da_400_y_valida_cierra(self):
         CampoPlanilla.objects.create(
             tipo_servicio=self.tipo,
@@ -503,10 +500,51 @@ class CerrarVisitaApiTests(ApiVisitasBase):
         self.assertTrue(r.data["incidencia"])
         self.assertEqual(r.data["datos"], {"resumen": "ok"})
 
-    def test_doble_cierre_da_400(self):
-        self._post(self.visita)
-        self.assertEqual(self._cerrar(self.visita).status_code, 200)
-        self.assertEqual(self._cerrar(self.visita).status_code, 400)
+
+class CerrarVisitaTests(ApiVisitasBase):
+    def test_cerrar_dos_veces_mismo_empleado_da_200(self):
+        visita = self._abierta()
+        self._post(visita)
+        primera = self._cerrar(visita)
+        self.assertEqual(primera.status_code, 200, primera.content)
+        segunda = self._cerrar(visita)
+        self.assertEqual(segunda.status_code, 200, segunda.content)
+        self.assertEqual(segunda.data["id"], visita.id)
+        self.assertEqual(len(segunda.data["revisiones"]), 1)
+
+    def test_cerrada_por_otro_da_409(self):
+        for cierre in (Visita.Cierre.SISTEMA, Visita.Cierre.ADMINISTRADOR):
+            with self.subTest(cierre=cierre):
+                visita = self._abierta(
+                    estado=Visita.Estado.REALIZADA,
+                    cerrada_en=timezone.now(),
+                    cierre=cierre,
+                )
+                self._revision(visita)
+                r = self._cerrar(visita)
+                self.assertEqual(r.status_code, 409, r.content)
+                self.assertEqual(r.data["detalle"], "La visita ya fue cerrada.")
+                visita.refresh_from_db()
+                self.assertEqual(visita.cierre, cierre)
+
+
+class VisitaAjenaTests(ApiVisitasBase):
+    def test_ajena_e_inexistente_dan_el_mismo_404(self):
+        ajena = self._abierta(self.otro)
+        self._revision(ajena)
+        inexistente = SimpleNamespace(id=999999)
+        cuerpos = []
+        for nombre, visita in (("ajena", ajena), ("inexistente", inexistente)):
+            with self.subTest(nombre):
+                for r in (self._post(visita), self._cerrar(visita)):
+                    self.assertEqual(r.status_code, 404, r.content)
+                    cuerpos.append(r.json())
+        self.assertEqual(len(cuerpos), 4)
+        self.assertTrue(all(c == cuerpos[0] for c in cuerpos))
+        self.assertEqual(cuerpos[0]["detalle"], "La visita no existe.")
+        ajena.refresh_from_db()
+        self.assertEqual(ajena.estado, Visita.Estado.ABIERTA)
+        self.assertEqual(ajena.revisiones.count(), 1)
 
 
 class MisVisitasTests(BaseApiTests):
@@ -535,9 +573,8 @@ class MisVisitasTests(BaseApiTests):
         )
         self.assertEqual(item["programada_para"], "2026-09-01")
         self.assertNotIn("latitud", item)
-        self.assertEqual(
-            self._api(self.admin).get("/api/v1/me/visitas/").status_code, 403
-        )
+        r = self._api(self.admin).get("/api/v1/me/visitas/")
+        self.assertEqual((r.status_code, r.data["results"]), (200, []))
         self.assertEqual(APIClient().get("/api/v1/me/visitas/").status_code, 401)
 
 

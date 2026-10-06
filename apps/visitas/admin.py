@@ -23,7 +23,7 @@ CAMPOS_PLANIFICACION = ("programada_para", "asignada_por")
 CAMPOS_REVISION = ("incidencia_revisada_por", "incidencia_revisada_en")
 
 # Campos que llena el servicio al abrir la visita: nunca se editan a mano.
-CAMPOS_DE_LA_APP = ("incidencia_asignacion",)
+CAMPOS_DE_LA_APP = ("incidencia_asignacion", "distancia_m", "incidencia_ubicacion")
 
 CAMPOS_VISITA = (
     (
@@ -94,6 +94,8 @@ class RevisionInline(SoloLectura, admin.TabularInline):
         "latitud",
         "longitud",
         "precision_m",
+        "distancia_m",
+        "incidencia_ubicacion",
     )
 
 
