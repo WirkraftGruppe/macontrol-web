@@ -532,9 +532,9 @@ commit_base: 4e2c496
 | T11 | hecha |
 | T12 | hecha |
 | T13 | hecha |
-| T14 | en curso |
-| T15 | pendiente |
-| T16 | pendiente |
+| T14 | hecha |
+| T15 | en curso |
+| T16 | en curso |
 | T17 | pendiente |
 
 ### Corridas
@@ -555,6 +555,7 @@ commit_base: 4e2c496
 | 2026-10-05 | T12 | 131eceb | FALLA formal (0/6 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Los 4 tests de criterio pasaron sin cambios de producción (fichas, línea de tiempo, casillas y filtro ya estaban desde T5); el único cambio de código es P-puntos-control-17 (selector y `registrar_visita_manual`; `apps/visitas/services.py` autorizado por el usuario). Integrada en f9649e4 (suite 456 OK), antes que T11 por rutas disjuntas |
 | 2026-10-05 | T11 | d5124b5 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Integrada en 57f71b3 (suite 465 OK); en la raíz `PuntoPanelTests.test_ficha_con_pestanas_sondeo_y_leaflet` corre la rama con `panel:estado_sitio` y pasa. El implementador escribió y borró `.tmp_suite.txt` en la raíz (fuera de su worktree) |
 | 2026-10-06 | T11 (con T11b) | e9d59a2 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad ola 3 (57f71b3): H1 importante (un PDF de 907 B ocupaba un worker 62 s al rasterizar), H2 menor (tooltips de Leaflet con innerHTML); corregidos en T11b (decisión del usuario: PDF en subproceso con `TIEMPO_MAXIMO_PDF = 15`, tooltips con textContent), integrada en 430c023 (suite 466 OK). T11b tocó `apps/sitios/planos.py`, `rasterizar_pdf.py` (nuevo) y `tests/test_planos.py`, fuera de las rutas de T11, autorizado para la corrección. Re-auditoría (e9d59a2): H1 cerrado (rechazo a los 15,01 s) y H2 cerrado; quedan P-puntos-control-29 y -30 |
+| 2026-10-06 | T14 | 598d2cb | FALLA formal (0/3 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. Paso 2 (prueba en `runserver`) diferido por decisión del usuario: P-puntos-control-31. Orden de integración T13 → T12 → T11 (T12 antes que T11 por rutas disjuntas) |
 
 ## Pendientes que deja este plan
 
@@ -590,6 +591,7 @@ commit_base: 4e2c496
 - P-puntos-control-28 [observación] T11: un punto sin `x`/`y` aparece en el centro del editor del plano; no se ubica un punto existente con clic, solo arrastrando o editando. El JS (`plano_editor.js`, `puntos_mapa.js`, `sondeo.js`) solo pasó `node --check`: el arrastre y el recoloreo se prueban a mano en T14.
 - P-puntos-control-29 [menor] Re-auditoría T11b: (N1) si el worker de gunicorn muere antes del timeout (SIGKILL por su propio timeout, OOM o redeploy), el hijo de `apps/sitios/rasterizar_pdf.py` sigue a 100 % de CPU sin tope: sumar `RLIMIT_CPU` (~20 s) junto al `RLIMIT_AS`. (N2) `apps/sitios/planos.py:73-77` no acota el PNG del hijo: tope de bytes de stdout, lado ≤ `LADO_MAXIMO` y `DecompressionBombError` capturado (hoy da 500); un `OSError` del `fork` también da 500. Opcional: `env` mínimo para el hijo, sin secretos.
 - P-puntos-control-30 [observación] [despliegue] El timeout del worker web debe superar `TIEMPO_MAXIMO_PDF` (15 s) más el tiempo de subida de un plano de 20 MB. `RLIMIT_AS` de 2 GiB del hijo no se ejecutó nunca (los tests corren en Windows): comprobar en Linux `python -m apps.sitios.rasterizar_pdf 4000 < plano.pdf > /dev/null; echo $?` → 0.
+- P-puntos-control-31 [importante] T14 paso 2 diferido por decisión del usuario: nadie probó en navegador el arrastre de marcadores del plano, el clic de alta, el clic de ubicación en el mapa ni el sondeo cada 5 s pausado con la pestaña oculta (el JS solo pasó `node --check`). Probar a mano con `cargar_demo` (T15) antes de fusionar en `main`.
 
 ### Decisiones
 
