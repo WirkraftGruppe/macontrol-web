@@ -527,8 +527,8 @@ commit_base: 4e2c496
 | T6 | hecha |
 | T7 | hecha |
 | T8 | hecha |
-| T9 | en curso |
-| T10 | pendiente |
+| T9 | hecha |
+| T10 | en curso |
 | T11 | pendiente |
 | T12 | pendiente |
 | T13 | pendiente |
@@ -548,6 +548,7 @@ commit_base: 4e2c496
 | 2026-10-05 | T3, T5, T6, T7 | 917e580 | FALLA formal (0/32 criterios en FALLA) | verificador; la única FALLA es congelado.sh por el contrato modificado 50822be (decisión del usuario: el criterio del punto General pasa de T3 a T6) |
 | 2026-10-05 | T5 (con T5b) | 5401ad3 | FALLA formal (0/13 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad ola 1: sin bloqueantes; importantes 1 y 2 corregidos en T5b (04a54d0, 5401ad3) y cerrados en la re-auditoría |
 | 2026-10-05 | T8 | 735f76b | FALLA formal (0/5 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be |
+| 2026-10-05 | T9 | f678582 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Integrada en 3f424ef (suite 442 OK) |
 
 ## Pendientes que deja este plan
 
