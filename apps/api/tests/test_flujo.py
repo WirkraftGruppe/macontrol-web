@@ -1,4 +1,4 @@
-"""Flujo de punta a punta del empleado con JWT real: QR, visita, historial y foto."""
+"""Flujo de punta a punta del empleado con JWT real: QR, jornada, historial y foto."""
 
 import json
 import shutil
@@ -89,7 +89,7 @@ class FlujoEmpleadoTests(TestCase):
         return api
 
     def test_escanear_registrar_historial_foto(self):
-        """Escanear el QR, registrar la visita y ver historial y foto, con JWT real."""
+        """Escanear, abrir, revisar, cerrar y ver historial y foto, con JWT real."""
         api = self._cliente_con_token("emp")
 
         qr = api.post(f"/api/v1/qr/{self.punto.qr_codigo}/resolver/")
@@ -110,9 +110,13 @@ class FlujoEmpleadoTests(TestCase):
                 "cantidad": "5",
             }
         ]
+        abierta = api.post(
+            "/api/v1/visitas/abrir/", {"proyecto": proyecto["id"]}, format="json"
+        )
+        self.assertEqual(abierta.status_code, 201, abierta.content)
         cuerpo = {
+            "visita": abierta.data["id"],
             "qr_codigo": str(self.punto.qr_codigo),
-            "proyecto": proyecto["id"],
             "cliente_uuid": str(uuid4()),
             "realizada_en": timezone.now().isoformat(),
             "latitud": "-36.100000",
@@ -122,19 +126,23 @@ class FlujoEmpleadoTests(TestCase):
             "productos_aplicados": json.dumps(productos),
             "fotos": [jpeg("a.jpg", "red"), jpeg("b.jpg", "blue")],
         }
-        creada = api.post("/api/v1/visitas/", cuerpo, format="multipart")
+        creada = api.post("/api/v1/revisiones/", cuerpo, format="multipart")
         self.assertEqual(creada.status_code, 201, creada.content)
+        cerrada = api.post(
+            f"/api/v1/visitas/{abierta.data['id']}/cerrar/", {}, format="json"
+        )
+        self.assertEqual(cerrada.status_code, 200, cerrada.content)
 
         historial = api.get("/api/v1/me/historial/")
         self.assertEqual(historial.status_code, 200, historial.content)
         self.assertEqual(
-            [v["id"] for v in historial.data["results"]], [creada.data["id"]]
+            [v["id"] for v in historial.data["results"]], [abierta.data["id"]]
         )
-        visita = Visita.objects.get(pk=creada.data["id"])
+        visita = Visita.objects.get(pk=abierta.data["id"])
         self.assertEqual(
             ProductoAplicado.objects.filter(revision__visita=visita).count(), 1
         )
-        urls = historial.data["results"][0]["fotos"]
+        urls = historial.data["results"][0]["revisiones"][0]["fotos"]
         self.assertEqual(len(urls), 2)
 
         respuesta = api.get(urls[0], HTTP_ACCEPT="image/jpeg")

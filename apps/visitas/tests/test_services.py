@@ -25,11 +25,9 @@ from apps.visitas.services import (
     MAX_FOTOS,
     MAX_PRODUCTOS,
     RevisionDuplicada,
-    VisitaDuplicada,
     abrir_visita,
     cerrar_visita,
     registrar_revision,
-    registrar_visita_desde_app,
     registrar_visita_manual,
 )
 from apps.visitas.tests.test_models import crear_revision, crear_visita, punto_de
@@ -703,14 +701,15 @@ class ManualPorPuntosTests(SinArchivosMixin, TestCase):
 
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
-class RegistrarDesdeAppTests(SinArchivosMixin, TestCase):
-    """Envoltura del contrato viejo (`POST visitas/`): abrir, revisar y cerrar."""
+class RegistrarRevisionTests(SinArchivosMixin, TestCase):
+    """`registrar_revision` sobre una visita abierta: reemplaza a la envoltura vieja."""
 
     def setUp(self):
-        self.pendiente = crear_visita(programada_para=date(2026, 9, 1))
-        self.empleado = self.pendiente.empleado
-        self.proyecto = self.pendiente.proyecto
-        self.punto = punto_de(self.pendiente)
+        pendiente = crear_visita(programada_para=date(2026, 9, 1))
+        self.empleado = pendiente.empleado
+        self.proyecto = pendiente.proyecto
+        self.punto = punto_de(pendiente)
+        self.visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
         self.producto = Producto.objects.create(nombre_comercial="Cebo")
         self.archivos_previos = self.archivos_en_disco()
 
@@ -719,8 +718,8 @@ class RegistrarDesdeAppTests(SinArchivosMixin, TestCase):
 
     def registrar(self, **extra):
         argumentos = {
+            "visita": self.visita,
             "empleado": self.empleado,
-            "proyecto": self.proyecto.pk,
             "qr_codigo": self.punto.qr_codigo,
             "cliente_uuid": uuid4(),
             "realizada_en": timezone.now() - timedelta(minutes=5),
@@ -732,95 +731,52 @@ class RegistrarDesdeAppTests(SinArchivosMixin, TestCase):
             "fotos": [jpeg_chico()],
         }
         argumentos.update(extra)
-        return registrar_visita_desde_app(**argumentos)
+        return registrar_revision(**argumentos)
 
     def assertNadaCreado(self):
-        self.assertEqual(Visita.objects.count(), 1)
         self.assertEqual(Revision.objects.count(), 0)
         self.assertEqual(Foto.objects.count(), 0)
         self.assertEqual(ProductoAplicado.objects.count(), 0)
         self.assertEqual(self.archivos_en_disco(), self.archivos_previos)
-        self.pendiente.refresh_from_db()
-        self.assertEqual(self.pendiente.estado, Visita.Estado.PENDIENTE)
 
-    def test_completa_la_pendiente_propia(self):
-        item = {
-            "producto": self.producto.pk,
+    def item_valido(self, producto=None):
+        return {
+            "producto": (producto or self.producto).pk,
             "lote": "L1",
             "dosis": "2.5",
             "unidad": "ml/l",
             "cantidad": None,
         }
-        realizada_en = timezone.now() - timedelta(minutes=5)
-        visita = self.registrar(
-            productos_aplicados=[item],
-            observaciones="Sin novedades",
-            realizada_en=realizada_en,
-        )
-        self.assertEqual(visita.pk, self.pendiente.pk)
-        self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
-        self.assertEqual(visita.realizada_en, realizada_en)
-        self.assertEqual(visita.origen, Visita.Origen.APP)
-        self.assertFalse(visita.incidencia_asignacion)
-        self.assertEqual(visita.observaciones, "Sin novedades")
-        revision = visita.revisiones.get()
-        self.assertEqual(revision.fotos.count(), 1)
-        self.assertEqual(revision.productos.get().lote, "L1")
-        self.proyecto.refresh_from_db()
-        self.assertEqual(self.proyecto.encargado_actual, self.empleado)
 
-    def test_completar_pendiente_limpia_motivo_manual(self):
-        self.pendiente.origen = Visita.Origen.MANUAL
-        self.pendiente.motivo_manual = "Carga a mano"
-        self.pendiente.save()
-        visita = self.registrar()
-        self.assertEqual(visita.pk, self.pendiente.pk)
+    def test_abrir_limpia_motivo_manual_de_la_pendiente(self):
+        pendiente = crear_visita(
+            origen=Visita.Origen.MANUAL, motivo_manual="Carga a mano"
+        )
+        visita, _ = abrir_visita(
+            empleado=pendiente.empleado, proyecto=pendiente.proyecto
+        )
+        self.assertEqual(visita.pk, pendiente.pk)
         self.assertEqual(visita.origen, Visita.Origen.APP)
         self.assertEqual(visita.motivo_manual, "")
-        self.pendiente.refresh_from_db()
-        self.assertEqual(self.pendiente.motivo_manual, "")
 
-    def test_crea_nueva_con_origen_app_sin_pendiente(self):
-        self.pendiente.delete()
-        visita = self.registrar()
+    def test_abrir_sin_pendiente_crea_nueva_con_origen_app(self):
+        otra = crear_visita()
+        otra.delete()
+        visita, creada = abrir_visita(empleado=otra.empleado, proyecto=otra.proyecto)
+        self.assertTrue(creada)
         self.assertEqual(visita.origen, Visita.Origen.APP)
-        self.assertEqual(visita.estado, Visita.Estado.REALIZADA)
-        self.assertEqual(visita.empleado, self.empleado)
         self.assertFalse(visita.incidencia_asignacion)
 
-    def test_pendiente_de_otro_crea_nueva_con_incidencia_asignacion(self):
-        otro = User.objects.create_user(
-            username="emp-b", password="x", rol=User.Rol.EMPLEADO
-        )
-        self.pendiente.empleado = otro
-        self.pendiente.save()
-        visita = self.registrar()
-        self.assertNotEqual(visita.pk, self.pendiente.pk)
-        self.assertTrue(visita.incidencia_asignacion)
-        self.pendiente.refresh_from_db()
-        self.assertEqual(self.pendiente.estado, Visita.Estado.PENDIENTE)
-        self.assertEqual(self.pendiente.empleado, otro)
+    def test_registra_recibida_en_del_servidor(self):
+        antes = timezone.now()
+        revision = self.registrar(realizada_en=antes - timedelta(days=2))
+        self.assertGreaterEqual(revision.recibida_en, antes)
+        self.assertLessEqual(revision.recibida_en, timezone.now())
+        self.assertLess(revision.realizada_en, revision.recibida_en)
 
-    def test_cliente_uuid_repetido_levanta_visita_duplicada(self):
-        codigo = uuid4()
-        primera = self.registrar(cliente_uuid=codigo)
-        with self.assertRaises(VisitaDuplicada) as contexto:
-            self.registrar(cliente_uuid=codigo)
-        self.assertEqual(contexto.exception.visita.pk, primera.pk)
-        self.assertEqual(Visita.objects.count(), 1)
-        self.assertEqual(Foto.objects.count(), 1)
-
-    def test_qr_de_otro_sitio_se_rechaza(self):
-        with self.assertRaises(ValidationError) as contexto:
-            self.registrar(qr_codigo=uuid4())
-        self.assertIn("qr_codigo", contexto.exception.message_dict)
-        self.assertNadaCreado()
-
-    def test_qr_del_sitio_ya_no_es_el_del_punto(self):
-        """El QR resuelve un punto: el de otro punto activo del sitio también sirve."""
+    def test_qr_de_otro_punto_activo_del_sitio_sirve(self):
         sala = PuntoControl.objects.create(sitio=self.proyecto.sitio, nombre="Sala")
-        visita = self.registrar(qr_codigo=sala.qr_codigo)
-        self.assertEqual(visita.revisiones.get().punto, sala)
+        self.assertEqual(self.registrar(qr_codigo=sala.qr_codigo).punto, sala)
 
     def test_cliente_dado_de_baja_se_rechaza(self):
         cliente = self.proyecto.sitio.cliente
@@ -859,53 +815,16 @@ class RegistrarDesdeAppTests(SinArchivosMixin, TestCase):
     def test_producto_inactivo_se_rechaza(self):
         self.producto.activo = False
         self.producto.save()
-        item = {"producto": self.producto.pk, "lote": "L", "dosis": "1", "unidad": "ml"}
         with self.assertRaises(ValidationError) as contexto:
-            self.registrar(productos_aplicados=[item])
+            self.registrar(productos_aplicados=[self.item_valido()])
         self.assertIn("productos_aplicados", contexto.exception.message_dict)
         self.assertNadaCreado()
 
-    def test_sin_fotos_se_rechaza(self):
-        with self.assertRaises(ValidationError) as contexto:
-            self.registrar(fotos=[])
-        self.assertIn("fotos", contexto.exception.message_dict)
-        self.assertNadaCreado()
-
-    def test_foto_invalida_revierte_todo_y_borra_archivos(self):
-        basura = SimpleUploadedFile("x.jpg", b"no es imagen", "image/jpeg")
-        with self.assertRaises(ValidationError) as contexto:
-            self.registrar(fotos=[jpeg_chico(), basura])
-        self.assertIn("fotos", contexto.exception.message_dict)
-        self.assertNadaCreado()
-
-    def test_registra_recibida_en_del_servidor(self):
-        antes = timezone.now()
-        visita = self.registrar(realizada_en=antes - timedelta(days=2))
-        revision = visita.revisiones.get()
-        self.assertGreaterEqual(revision.recibida_en, antes)
-        self.assertLessEqual(revision.recibida_en, timezone.now())
-        self.assertLess(revision.realizada_en, revision.recibida_en)
-
-    def item_valido(self, producto=None):
-        return {
-            "producto": (producto or self.producto).pk,
-            "lote": "L1",
-            "dosis": "2.5",
-            "unidad": "ml/l",
-            "cantidad": None,
-        }
-
-    def test_mas_fotos_que_el_tope_se_rechaza(self):
-        fotos = [jpeg_chico() for _ in range(MAX_FOTOS + 1)]
-        with self.assertRaises(ValidationError) as contexto:
-            self.registrar(fotos=fotos)
-        self.assertIn("fotos", contexto.exception.message_dict)
-        self.assertNadaCreado()
-
     def test_mas_productos_que_el_tope_se_rechaza(self):
-        item = self.item_valido()
         with self.assertRaises(ValidationError) as contexto:
-            self.registrar(productos_aplicados=[item] * (MAX_PRODUCTOS + 1))
+            self.registrar(
+                productos_aplicados=[self.item_valido()] * (MAX_PRODUCTOS + 1)
+            )
         self.assertIn("productos_aplicados", contexto.exception.message_dict)
         self.assertNadaCreado()
 
@@ -942,29 +861,7 @@ class RegistrarDesdeAppTests(SinArchivosMixin, TestCase):
                 self.registrar(fotos=[jpeg_chico(), basura])
         self.assertIn("fotos", contexto.exception.message_dict)
 
-    def test_cliente_uuid_obligatorio(self):
-        with self.assertRaises(ValidationError) as contexto:
-            self.registrar(cliente_uuid=None)
-        self.assertIn("cliente_uuid", contexto.exception.message_dict)
-        self.assertNadaCreado()
-
-    def test_latitud_fuera_de_rango_se_rechaza(self):
-        for valor in (Decimal("90.1"), Decimal("-91")):
-            with self.subTest(valor=valor):
-                with self.assertRaises(ValidationError) as contexto:
-                    self.registrar(latitud=valor)
-                self.assertIn("latitud", contexto.exception.message_dict)
-                self.assertNadaCreado()
-
-    def test_longitud_fuera_de_rango_se_rechaza(self):
-        for valor in (Decimal("180.1"), Decimal("-181")):
-            with self.subTest(valor=valor):
-                with self.assertRaises(ValidationError) as contexto:
-                    self.registrar(longitud=valor)
-                self.assertIn("longitud", contexto.exception.message_dict)
-                self.assertNadaCreado()
-
-    def test_origen_app_exige_foto_y_coordenadas_en_la_revision(self):
+    def test_foto_y_coordenadas_invalidas_se_informan_juntas(self):
         with self.assertRaises(ValidationError) as contexto:
             self.registrar(fotos=[], latitud=Decimal("99"))
         self.assertEqual({"fotos", "latitud"}, set(contexto.exception.message_dict))

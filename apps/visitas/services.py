@@ -35,14 +35,6 @@ class RevisionDuplicada(Exception):
         self.revision = revision
 
 
-class VisitaDuplicada(RevisionDuplicada):
-    """Variante del contrato viejo (`POST visitas/`): expone la `visita`."""
-
-    @property
-    def visita(self):
-        return self.revision.visita
-
-
 @contextmanager
 def _transaccion_con_archivos():
     """Transacción que, si falla, borra los archivos de las fotos ya escritas.
@@ -550,73 +542,6 @@ def cerrar_visita(
                 update_fields=["encargado_actual", "proxima_visita", "actualizado"]
             )
     return visita_bd
-
-
-def registrar_visita_desde_app(
-    *,
-    empleado,
-    proyecto,
-    qr_codigo,
-    cliente_uuid,
-    realizada_en,
-    latitud,
-    longitud,
-    precision_m,
-    datos,
-    productos_aplicados,
-    fotos,
-    observaciones="",
-    incidencia=False,
-    incidencia_detalle="",
-):
-    """Envoltura del contrato viejo (`POST visitas/`): abrir, revisar y cerrar.
-
-    Abre (o reutiliza) la visita del empleado en el proyecto, registra una revisión
-    en el punto del QR y cierra la visita con `cerrada_en = realizada_en`. Devuelve
-    la `Visita` realizada. Todo en una transacción. Levanta `VisitaDuplicada` si el
-    `cliente_uuid` ya existe. Se elimina junto con `POST visitas/`.
-    """
-    if cliente_uuid is None:
-        raise ValidationError({"cliente_uuid": "Este campo es obligatorio."})
-    try:
-        with _transaccion_con_archivos() as guardadas:
-            existente = _duplicada(cliente_uuid)
-            if existente:
-                raise VisitaDuplicada(existente)
-            proyecto = _cargar_proyecto(proyecto)
-            # Los errores de QR salen antes de abrir nada.
-            _resolver_punto(proyecto, qr_codigo)
-            visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
-            _guardar_revision(
-                visita=visita,
-                qr_codigo=qr_codigo,
-                cliente_uuid=cliente_uuid,
-                realizada_en=realizada_en,
-                latitud=latitud,
-                longitud=longitud,
-                precision_m=precision_m,
-                datos=datos,
-                productos_aplicados=productos_aplicados,
-                fotos=fotos,
-                observaciones=observaciones,
-                incidencia=incidencia,
-                incidencia_detalle=incidencia_detalle,
-                guardadas=guardadas,
-            )
-            return cerrar_visita(
-                visita,
-                quien=empleado,
-                cierre=Visita.Cierre.EMPLEADO,
-                observaciones=observaciones,
-                incidencia=incidencia,
-                incidencia_detalle=incidencia_detalle,
-                cerrada_en=realizada_en,
-            )
-    except IntegrityError:
-        existente = _duplicada(cliente_uuid)
-        if existente:
-            raise VisitaDuplicada(existente)
-        raise
 
 
 def registrar_visita_manual(
