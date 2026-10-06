@@ -237,7 +237,7 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): cierre-puntos>
+commit_base: 9a284ed
 
 ### Estado de subtareas
 
