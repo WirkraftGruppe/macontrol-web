@@ -260,10 +260,10 @@ commit_base: 9a284ed
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
-| T5 | pendiente |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
+| T5 | hecha |
 | T6 | pendiente |
 | T7 | pendiente |
 | T8 | pendiente |
@@ -275,12 +275,24 @@ commit_base: 9a284ed
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-06 | T1 | 71eda88 | PASA (verificador 6/6, verificador-b 6/6) | spot check presupuesto: 95/150 |
+| 2026-10-06 | T2, T5 | 8a774ff, 8a21588 | PASA (verificador 13/13, verificador-b 13/13) | spot check T2 test_filtros; integradas 6272a20 y 4036b5b |
+| 2026-10-06 | T4 | 3c7d1b7 | FALLA formal: 0/8 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 433/500; integrada 2eb5000 |
+| 2026-10-06 | T3 | fa9176b | FALLA formal: 0/14 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 534/550; integrada 69b433b |
 
 ## Pendientes que deja este plan
 
 ### Problemas
 
+- P-cierre-puntos-1 [menor] Los botones "Reactivar" de usuarios y campos (T2) usan `class="enlace"`, que no existe en ningún CSS: se ven como botón por defecto.
+- P-cierre-puntos-2 [menor] `.env.example` no documenta `DISTANCIA_MAXIMA_M` (T1 no podía tocarlo).
+- P-cierre-puntos-3 [menor] `apps/sitios` importa `procesar_imagen` y `validar_tamano_foto` de `apps/visitas` (models y serializers de T4); sin ciclo hoy, conviene un módulo compartido.
+- P-cierre-puntos-4 [observación] `precision_m` se valida y no se guarda en altas de sitio/punto ni en `abrir_visita`.
+
 ### Decisiones
+
+- 2026-10-06 — T3 puede tocar `test_migraciones.py` y `test_models.py` de visitas — 0008 y la decisión 1 invalidaban dos tests existentes — reemplaza a: (nada)
+- 2026-10-06 — T4 se parte en T4 (altas y foto) y T10 (ubicación en campo y lectura del administrador) — T4 excedió su presupuesto (567/500) y no se sube — reemplaza a: (nada)
+- 2026-10-06 — Se acepta el FALLA formal de `congelado.sh` por la modificación 27b13f8 en las verificaciones de este plan — la modificación la decidió el usuario; ningún criterio de código falla — reemplaza a: (nada)
 
 ### Cierra
 
