@@ -29,6 +29,7 @@ from .serializers import (
     PuntoCampoSerializer,
     ResolverQRSerializer,
     SitioCampoSerializer,
+    UbicacionPuntoSerializer,
 )
 
 ESTADOS_CON_TRABAJO = (Visita.Estado.PENDIENTE, Visita.Estado.ABIERTA)
@@ -67,7 +68,7 @@ def _datos_plano(punto):
 class ResolverQRView(APIView):
     """Dado el UUID de un QR, devuelve el punto, su plano, el sitio y los proyectos."""
 
-    permission_classes = [EsEmpleado]
+    permission_classes = [EsEmpleado | EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "qr"
 
@@ -76,7 +77,7 @@ class ResolverQRView(APIView):
         responses={200: ResolverQRSerializer},
         summary="Resolver un código QR",
         description=(
-            "Solo empleados. Un QR inexistente, de un punto o sitio "
+            "Empleados y administradores. Un QR inexistente, de un punto o sitio "
             "inactivo o de un cliente inactivo responde el mismo 404."
         ),
     )
@@ -197,7 +198,7 @@ class PlanoImagenView(APIView):
 class MisPuntosView(APIView):
     """Puntos activos de los sitios donde el empleado tiene visitas por hacer."""
 
-    permission_classes = [EsEmpleado]
+    permission_classes = [EsEmpleado | EsAdministrador]
 
     @extend_schema(
         summary="Mis puntos de control",
@@ -321,3 +322,36 @@ class AltaPuntoView(APIView):
         return Response(
             PuntoCampoSerializer(punto).data, status=status.HTTP_201_CREATED
         )
+
+
+class UbicacionPuntoView(APIView):
+    """Fija las coordenadas de un punto con el GPS del administrador."""
+
+    permission_classes = [EsAdministrador]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "crear_visita"
+
+    @extend_schema(
+        request=UbicacionPuntoSerializer,
+        responses={200: PuntoCampoSerializer, **_RESPUESTAS_CAMPO},
+        summary="Fijar la ubicación de un punto en campo",
+        description=(
+            "Solo administradores. Reemplaza las coordenadas y descarta la ubicación "
+            "propuesta; `precision_m` no puede superar `PRECISION_MAXIMA_M`."
+        ),
+    )
+    def post(self, request, pk):
+        punto = (
+            PuntoControl.objects.select_related("sitio__cliente").filter(pk=pk).first()
+        )
+        if punto is None:
+            raise NotFound("El punto no existe.")
+        serializer = UbicacionPuntoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            services.fijar_ubicacion_en_campo(
+                administrador=request.user, punto=punto, **serializer.validated_data
+            )
+        except ErrorDeValidacion as error:
+            raise _a_400(error)
+        return Response(PuntoCampoSerializer(punto).data)

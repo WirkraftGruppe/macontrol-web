@@ -203,10 +203,10 @@ class ResolverQRTests(TestCase):
         self.assertEqual(inactivo.status_code, 404)
         self.assertEqual(inactivo.json(), inexistente.json())
 
-    def test_administrador_no_resuelve_qr(self):
+    def test_administrador_resuelve_qr(self):
         cliente = APIClient()
         cliente.force_authenticate(self.admin)
-        self.assertEqual(self._resolver(cliente=cliente).status_code, 403)
+        self.assertEqual(self._resolver(cliente=cliente).status_code, 200)
         self.assertEqual(self._resolver(cliente=APIClient()).status_code, 401)
 
     def test_respuesta_sin_coordenadas_ni_contactos(self):
@@ -436,7 +436,7 @@ class MisPuntosTests(TestCase):
         self.assertEqual(self.api.get(self.URL).json(), [])
         admin = APIClient()
         admin.force_authenticate(self.admin)
-        self.assertEqual(admin.get(self.URL).status_code, 403)
+        self.assertEqual(admin.get(self.URL).status_code, 200)
         self.assertEqual(APIClient().get(self.URL).status_code, 401)
 
 
@@ -470,6 +470,9 @@ class ModoCampoTests(TestCase):
 
     def _url_punto(self, sitio):
         return reverse("api:sitios:alta-punto", kwargs={"pk": sitio.pk})
+
+    def _url_ubicacion(self, punto):
+        return reverse("api:sitios:ubicacion-punto", kwargs={"pk": punto.pk})
 
     def _png(self):
         buffer = io.BytesIO()
@@ -534,6 +537,45 @@ class ModoCampoTests(TestCase):
         r = self.api.post(self._url_punto(sitio), solo_latitud, format="json")
         self.assertEqual(r.status_code, 400)
 
+    def test_fijar_ubicacion_registra_quien(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        punto = sitio.puntos.get()
+        punto.ubicacion_propuesta = {"latitud": "-1", "longitud": "-2"}
+        punto.save()
+        r = self.api.post(
+            self._url_ubicacion(punto),
+            {"latitud": "-36.100000", "longitud": "-57.800000", "precision_m": 8},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        punto.refresh_from_db()
+        self.assertEqual(float(punto.latitud), -36.1)
+        self.assertIsNone(punto.ubicacion_propuesta)
+        ultimo = punto.history.first()
+        self.assertEqual(ultimo.history_user, self.admin)
+        self.assertEqual(
+            ultimo.history_change_reason, "Ubicación fijada en campo desde la app"
+        )
+
+    def test_ubicacion_exige_administrador_precision_y_activos(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        punto = sitio.puntos.get()
+        url = self._url_ubicacion(punto)
+        datos = {"latitud": "-36.1", "longitud": "-57.8", "precision_m": 5}
+        self.api.force_authenticate(self.empleado)
+        self.assertEqual(self.api.post(url, datos, format="json").status_code, 403)
+        self.assertEqual(APIClient().post(url, datos, format="json").status_code, 401)
+        self.api.force_authenticate(self.admin)
+        r = self.api.post(url, {**datos, "precision_m": 51}, format="json")
+        self.assertEqual(r.status_code, 400)
+        punto.refresh_from_db()
+        self.assertIsNone(punto.latitud)
+        r = self.api.post(self._url_ubicacion(PuntoControl(pk=0)), datos, format="json")
+        self.assertEqual(r.status_code, 404)
+        self.cliente.activo = False
+        self.cliente.save()
+        self.assertEqual(self.api.post(url, datos, format="json").status_code, 400)
+
     def test_cliente_inactivo_da_400(self):
         sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
         self.cliente.activo = False
@@ -542,3 +584,27 @@ class ModoCampoTests(TestCase):
         r = self.api.post(self._url_punto(sitio), {"nombre": "X"}, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(PuntoControl.objects.count(), 1)
+
+    def test_administrador_resuelve_qr_y_ve_mis_puntos(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        punto = sitio.puntos.get()
+        tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=tipo,
+            titulo="Control",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        Visita.objects.create(
+            proyecto=proyecto,
+            empleado=self.admin,
+            origen=Visita.Origen.MANUAL,
+            programada_para=datetime.date(2026, 1, 1),
+        )
+        r = self.api.post(f"/api/v1/qr/{punto.qr_codigo}/resolver/")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["punto"]["id"], punto.id)
+        r = self.api.get("/api/v1/me/puntos/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([p["id"] for p in r.json()], [punto.id])

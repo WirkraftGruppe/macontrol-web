@@ -155,6 +155,14 @@ class AltaPuntoSerializer(_PrecisionMixin):
         return datos
 
 
+class UbicacionPuntoSerializer(_PrecisionMixin):
+    """Ubicación del punto tomada con el GPS del administrador."""
+
+    latitud = _latitud()
+    longitud = _longitud()
+    precision_m = serializers.FloatField(min_value=0)
+
+
 class PuntoCampoSerializer(serializers.Serializer):
     """Punto creado o ubicado en campo; el QR lo ve solo el administrador."""
 

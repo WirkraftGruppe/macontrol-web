@@ -189,3 +189,17 @@ def crear_punto_en_campo(
     punto._change_reason = "Alta en campo desde la app"
     punto.save()
     return punto
+
+
+def fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m):
+    """Fija lat/lng del punto desde el GPS de un administrador y limpia la propuesta."""
+    _exigir_activo(punto.sitio)
+    if not punto.activo:
+        raise ValidationError("El punto está inactivo.")
+    _exigir_precision(precision_m)
+    punto.latitud = latitud
+    punto.longitud = longitud
+    punto.ubicacion_propuesta = None
+    punto._history_user = administrador
+    punto._change_reason = "Ubicación fijada en campo desde la app"
+    punto.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
