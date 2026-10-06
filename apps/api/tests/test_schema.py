@@ -67,3 +67,10 @@ class SchemaTests(TestCase):
         renovar = rutas["/api/v1/auth/token/refresh/"]["post"]
         self.assertIn("415", renovar["responses"])
         self.assertTrue(renovar["description"])
+        # La rotación devuelve también un refresh nuevo: el 200 debe exigir ambos.
+        esquema = renovar["responses"]["200"]["content"]["application/json"]["schema"]
+        nombre = esquema["$ref"].rsplit("/", 1)[-1]
+        componente = api.get("/api/v1/schema/", {"format": "json"}).json()[
+            "components"
+        ]["schemas"][nombre]
+        self.assertTrue({"access", "refresh"} <= set(componente["required"]))
