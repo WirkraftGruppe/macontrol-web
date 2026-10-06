@@ -243,7 +243,7 @@ commit_base: 9a284ed
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
@@ -257,6 +257,7 @@ commit_base: 9a284ed
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-06 | T1 | 71eda88 | PASA (verificador 6/6, verificador-b 6/6) | spot check presupuesto: 95/150 |
 
 ## Pendientes que deja este plan
 
