@@ -297,6 +297,7 @@ commit_base: 9a284ed
 | 2026-10-06 | T10 (+ 5 [test] de T4) | 660ab2c | FALLA formal: 0/11 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 133/250; integrada aa74093 |
 | 2026-10-06 | auditoría T6 (T3, T4, T10) | da33eb8 | aprobado con correcciones: 0 bloqueantes, 1 importante (→ T11), 3 menores y 4 observaciones (→ P-cierre-puntos-5 a 11) | auditor-seguridad |
 | 2026-10-06 | T6 (raíz), T7, T8, T11 | bea9b11, f1a72a0, f78cb8c, 06ebd5c | FALLA formal: 0/20 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8, bea9b11) | aceptado por el usuario; spot check presupuestos T7 253/400, T8 170/250, T11 23/80 y test de T11; integradas b3bdc5c, c612c13, dd94639 |
+| 2026-10-06 | auditoría final T9 | d3f3972 | apto con correcciones: 0 bloqueantes, 2 importantes (token → T8b; incidencias de ubicación → P-cierre-puntos-13), 2 menores (→ P-cierre-puntos-14 y 15) | auditor-seguridad; contrato regenerado idéntico |
 
 ## Pendientes que deja este plan
 
@@ -313,6 +314,9 @@ commit_base: 9a284ed
 - P-cierre-puntos-9 [observación] `registrar_revision` bloquea la visita antes de comprobar el dueño: la demora distingue "existe y está activa" de "no existe"; filtrar por `empleado` dentro del `select_for_update` (auditoría T6).
 - P-cierre-puntos-10 [observación] El rol que decide si la visita cuenta como servicio se evalúa al cerrar, no al abrir (auditoría T6).
 - P-cierre-puntos-12 [observación] `registrar_revision_demo` usa el primer proyecto activo del sitio (por `pk`); con varios proyectos activos no se puede elegir otro (T7).
+- P-cierre-puntos-13 [importante] El contador "Incidencias de ubicación" del tablero no se puede atender: el panel no muestra `distancia_m` ni `incidencia_ubicacion` ni filtra por ellas, `marcar_incidencia_revisada` exige `incidencia=True` (`apps/visitas/services.py:746-748`) y `/admin/` las tiene de solo lectura; además cuenta visitas de administradores. Propuesta del auditor: aceptar incidencias de ubicación en `marcar_incidencia_revisada`, filtro "ubicación" en el listado de visitas, distancia en la ficha y excluir administradores del contador (decisión de producto; etiqueta `panel-cierre`).
+- P-cierre-puntos-14 [menor] El popup del mapa (`apps/panel/mapa.py:31-34`) toma como "Última visita" también las visitas de administradores, que no cuentan como servicio (decisión 1); excluirlas del `Max` con un test (auditoría final).
+- P-cierre-puntos-15 [menor] Contrato: `POST /api/v1/sitios/` documenta un 404 que no puede dar (cliente inválido es 400); ninguna ruta autenticada documenta 401 ni las rutas con throttle documentan 429; `auth/token/` no documenta el 400 por cuerpo incompleto (auditoría final).
 - P-cierre-puntos-11 [observación] Altas de sitio y punto, ubicación, abrir, revisiones y cerrar comparten el cupo `crear_visita` (120/h): un alta de sitio grande en campo lo agota (auditoría T6).
 
 ### Decisiones
@@ -320,6 +324,7 @@ commit_base: 9a284ed
 - 2026-10-06 — T3 puede tocar `test_migraciones.py` y `test_models.py` de visitas — 0008 y la decisión 1 invalidaban dos tests existentes — reemplaza a: (nada)
 - 2026-10-06 — T4 se parte en T4 (altas y foto) y T10 (ubicación en campo y lectura del administrador) — T4 excedió su presupuesto (567/500) y no se sube — reemplaza a: (nada)
 - 2026-10-06 — El hallazgo importante de la auditoría de T6 (`hay_posterior` cuenta visitas de administradores) se corrige en una subtarea nueva T11 de la ola 3, y los menores quedan como pendientes — contradice la decisión 1 y no entra en el presupuesto de T3 — reemplaza a: (nada)
+- 2026-10-06 — La regresión del contrato de `auth/token/refresh/` (documenta solo `access` aunque rota y devuelve `refresh`) se corrige como T8b dentro del presupuesto de T8; la falta de atención de las incidencias de ubicación queda para otro plan — la primera fija el contrato que consume la app; la segunda es decisión de producto — reemplaza a: (nada)
 - 2026-10-06 — Se acepta el FALLA formal de `congelado.sh` por la modificación 27b13f8 en las verificaciones de este plan — la modificación la decidió el usuario; ningún criterio de código falla — reemplaza a: (nada)
 
 ### Cierra
