@@ -14,7 +14,7 @@ from apps.productos.models import Producto
 from apps.proyectos.consultas import filtrar_por_estado_visita
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
-from apps.sitios.models import Sitio
+from apps.sitios.models import PuntoControl, Sitio
 from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 
 ESQUEMA = [
@@ -181,3 +181,41 @@ class ProyectoPanelTests(TestCase):
             self._visita(proyecto, producto)
         with self.assertNumQueries(base):
             self.client.get(url)
+
+    def test_ficha_lista_revisiones_consultas_constantes(self):
+        proyecto = self._proyecto("revisiones")
+        producto = Producto.objects.create(nombre_comercial="Cebo W")
+        url = reverse("panel:proyectos:ficha", args=[proyecto.pk])
+
+        def visita_con_revisiones(cantidad):
+            visita = self._visita(proyecto, producto)
+            for orden in range(2, cantidad + 1):
+                punto = PuntoControl.objects.create(
+                    sitio=self.sitio, nombre=f"Punto {visita.pk}-{orden}", orden=orden
+                )
+                ahora = timezone.now()
+                revision = Revision.objects.create(
+                    visita=visita,
+                    punto=punto,
+                    orden=orden,
+                    realizada_en=ahora,
+                    recibida_en=ahora,
+                    esquema_planilla=ESQUEMA,
+                    datos={"cebaderos": orden},
+                )
+                Foto.objects.create(revision=revision, imagen="visitas/fotos/w.jpg")
+                ProductoAplicado.objects.create(
+                    revision=revision, producto=producto, lote="L", dosis=1, unidad="u"
+                )
+
+        visita_con_revisiones(2)
+        self.client.get(url)  # calienta cachés (sesión, contenttypes)
+        with CaptureQueriesContext(connection) as contador:
+            respuesta = self.client.get(url)
+        base = len(contador)
+        self.assertContains(respuesta, "<details")
+        for _ in range(3):
+            visita_con_revisiones(3)
+        with self.assertNumQueries(base):
+            respuesta = self.client.get(url)
+        self.assertContains(respuesta, "<summary>Punto ", count=7)
