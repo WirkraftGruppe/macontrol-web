@@ -634,6 +634,26 @@ class AdministradorEnCampoTests(SinArchivosMixin, TestCase):
         self.assertEqual(self.proyecto.encargado_actual, self.empleado)
         self.assertIsNone(self.proyecto.proxima_visita)
 
+    def test_visita_posterior_de_administrador_no_anula_el_servicio(self):
+        """El empleado no cierra; el administrador visita después; el cron cierra."""
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
+        crear_revision(visita, realizada_en=timezone.now() - timedelta(hours=3))
+        de_admin, _ = abrir(empleado=self.admin, proyecto=self.proyecto)
+        crear_revision(de_admin)
+        cerrar_visita(de_admin, quien=self.admin, cierre=Visita.Cierre.EMPLEADO)
+        otro = User.objects.create_user(
+            username="otro-emp", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.proyecto.encargado_actual = otro
+        self.proyecto.save()
+        cerrada = cerrar_visita(visita, quien=self.admin, cierre=Visita.Cierre.SISTEMA)
+        self.proyecto.refresh_from_db()
+        self.assertEqual(self.proyecto.encargado_actual, self.empleado)
+        self.assertEqual(
+            self.proyecto.proxima_visita,
+            timezone.localdate(cerrada.cerrada_en) + timedelta(days=30),
+        )
+
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
 class ManualPorPuntosTests(SinArchivosMixin, TestCase):
