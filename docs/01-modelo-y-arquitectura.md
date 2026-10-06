@@ -1,6 +1,6 @@
 # MAControl S.A. — Modelo de datos y arquitectura
 
-Versión 0.2 · 29/09/2026 · incorpora respuestas de la administración · Base para `CLAUDE.md` y las migraciones iniciales.
+Versión 0.3 · 06/10/2026 · puntos de control y visitas como jornada (`docs/planes/2026-10-05-puntos-control.md`) · Base para `CLAUDE.md` y las migraciones iniciales.
 
 ## 1. Alcance
 
@@ -26,10 +26,15 @@ El superusuario de Django es un administrador con acceso al `/admin/` técnico; 
 ## 3. Entidades
 
 ```
-Cliente 1──n Sitio 1──n Proyecto 1──n Visita n──1 Empleado
-                │                        │
-                └── qr_codigo (uno)      └── n Foto, n ProductoAplicado
-Proyecto n──1 TipoServicio 1──n CampoPlanilla
+Cliente 1──n Sitio 1──n PuntoControl (qr_codigo)
+              │  │            │
+              │  └──n Plano 1──n PuntoControl (x, y)
+              │
+              └──n Proyecto 1──n Visita n──1 Empleado
+                                  │
+                                  └──n Revision n──1 PuntoControl
+                                          └── n Foto, n ProductoAplicado
+Proyecto n──1 TipoServicio 1──n CampoPlanilla (ámbito punto | visita)
 ```
 
 ### 3.1 `clientes.Cliente`
@@ -39,20 +44,31 @@ Proyecto n──1 TipoServicio 1──n CampoPlanilla
 - `cliente` (FK), `nombre` (ej. "Planta Chascomús"), `direccion`, `localidad`, `latitud`, `longitud`
 - `sector` (choices: industria, puerto, gastronomía, hotelería, edificio, salud, educación, rural, espacio_verde, transporte, hogar, otro)
 - `contacto_en_sitio`, `telefono_en_sitio`, `horario_acceso`, `notas`
-- `qr_codigo` — UUID único, generado al crear; **es el contenido del QR**. Un QR por sitio.
-- `qr_impreso_el` (fecha, opcional) para saber si la etiqueta ya fue colocada
 - `activo`, `creado`, `actualizado`
 
-Regla: el QR identifica al sitio, no al proyecto. Al escanear, la app recibe los proyectos activos de ese sitio y el empleado elige cuál está atendiendo (si hay uno solo, se abre directo).
+Regla: el sitio no tiene QR propio; los QR son de sus puntos de control. Al crear un sitio se crea el punto `General` (orden 0), de modo que todo sitio tiene al menos un QR. Desactivar un sitio desactiva todos sus puntos.
+
+#### 3.2.1 `sitios.PuntoControl` — el lugar concreto con su propio QR
+- `sitio` (FK), `nombre` (ej. "Depósito 2"), `sector` (texto libre, opcional), `orden`, `activo`
+- `qr_codigo` — UUID único, generado al crear; **es el contenido del QR**. Un QR por punto. `qr_impreso_el` (fecha, opcional) para saber si la etiqueta ya fue colocada. El administrador puede regenerar el QR de un punto (invalida la etiqueta impresa y queda en el historial)
+- `plano` (FK a `Plano`, opcional) y `x`, `y` (fracciones de 0 a 1 de la imagen): ubicación en el plano
+- `latitud`, `longitud` (opcionales) y `ubicacion_propuesta` (JSON, no editable): si el punto no tiene coordenadas, una revisión con precisión de 50 m o mejor guarda la suya como propuesta, y un administrador la acepta o la descarta. Nunca se aplica sola
+- Un punto activo exige un sitio activo, y el plano debe ser del mismo sitio. Un punto se desactiva, no se borra: conserva sus revisiones
+
+Regla: el QR identifica un punto, no un proyecto. Al escanearlo, la app recibe el punto, su plano, el sitio y los proyectos activos del sitio; el empleado elige cuál está atendiendo (si hay uno solo, se abre directo). El estado de un punto (`al_dia`, `proxima`, `vencida`, `sin_revisar`) sale de su última revisión y de la `frecuencia_dias` de cada proyecto activo del sitio; vale el peor entre los proyectos (`apps/sitios/estado.py`). Sin proyectos activos queda `al_dia`. Las revisiones de visitas canceladas no cuentan. Los puntos inactivos no se resuelven ni se muestran.
+
+#### 3.2.2 `sitios.Plano` — imagen de una planta o zona
+`sitio` (FK), `nombre`, `imagen`, `ancho_px`, `alto_px` (calculados), `orden`, `activo`. Se sube JPG, PNG o PDF (máx. 20 MB y 40 millones de píxeles) y se guarda siempre como PNG, sin metadatos, con el lado mayor de 4000 px como máximo y un nombre aleatorio. Del PDF se usa la primera página; se rasteriza en un subproceso (`rasterizar_pdf.py`) con tiempo máximo de 15 s (`TIEMPO_MAXIMO_PDF`): si se pasa, se rechaza pidiendo exportarlo como PNG o JPG. Un PDF cifrado, corrupto o sin páginas también se rechaza. Al borrar el plano se borra el archivo y sus puntos quedan sin ubicar (`plano = null`).
 
 ### 3.3 `servicios.TipoServicio` — catálogo
 `nombre`, `slug`, `descripcion`, `activo`. Sirve tanto al panel (planillas) como a la web pública (páginas de servicio). Carga inicial: los 12 servicios de la Carta de Servicios más mantenimiento edilicio.
 
-### 3.4 `servicios.CampoPlanilla` — la planilla que aparece tras escanear
-Cada tipo de servicio define sus campos; la app los renderiza dinámicamente y el panel los muestra en el historial.
+### 3.4 `servicios.CampoPlanilla` — la planilla de cada revisión y de la visita
+Cada tipo de servicio define sus campos; la app los renderiza dinámicamente y el panel los muestra en el historial. La planilla de `punto` se completa tras escanear cada QR; la de `visita`, al cerrar. `TipoServicio.esquema_planilla(ambito)` devuelve los campos activos de un ámbito, y `Revision` y `Visita` guardan una copia del esquema usado (`esquema_planilla`).
 - `tipo_servicio` (FK), `orden`, `etiqueta`, `clave` (slug interno)
 - `tipo` (choices: texto, numero, booleano, opcion, opcion_multiple, fecha)
-- `opciones` (JSON, para tipo opción), `obligatorio`, `ayuda`
+- `ambito` (choices: `punto` = se responde en cada revisión; `visita` = se responde una vez al cerrar la jornada; por defecto `punto`)
+- `opciones` (JSON, para tipo opción), `obligatorio`, `ayuda`, `activo`
 
 Ejemplo — Control de roedores: `estaciones_revisadas` (número), `estaciones_con_consumo` (número), `cebo_repuesto` (booleano), `observaciones` (texto).
 Ejemplo — Exclusión de aves: `estado_redes` (opción: bueno/dañado/no aplica), `estado_pinches` (opción), `sellado_realizado` (booleano).
@@ -66,23 +82,39 @@ Ejemplo — Exclusión de aves: `estado_redes` (opción: bueno/dañado/no aplica
 
 Propiedades derivadas (no columnas): `ultima_visita`, `estado_visita` (al día / próxima a vencer / vencida / sin programar), usadas para colorear el mapa.
 
-### 3.6 `visitas.Visita` — cada intervención registrada
+### 3.6 `visitas.Visita` — la jornada de un empleado en un proyecto
 - `proyecto` (FK), `empleado` (FK User)
-- `origen` (choices: `app` = escaneo de QR, `manual` = cargada por un administrador). La app **no puede** crear visitas sin escaneo válido; el administrador sí, con `origen=manual` y campo `motivo_manual` obligatorio (ej. "QR ilegible, datos enviados por WhatsApp")
+- `origen` (choices: `app` = abierta escaneando un QR, `manual` = cargada por un administrador). La app **no puede** abrir visitas sin escanear un punto válido; el administrador sí, con `origen=manual` y campo `motivo_manual` obligatorio (ej. "QR ilegible, datos enviados por WhatsApp")
 - `programada_para` (fecha, opcional) y `asignada_por` (FK User, opcional): una visita puede existir antes de realizarse, como asignación del jefe
-- `realizada_en` (datetime; null = pendiente), `estado` (pendiente, realizada, cancelada)
-- `latitud`, `longitud`, `precision_m` — ubicación del teléfono al escanear
-- `datos` (JSON) — respuestas a los `CampoPlanilla` del tipo de servicio, validadas contra la definición
+- `estado`: `pendiente` (asignada, sin abrir), `abierta` (en curso), `realizada` (cerrada con al menos una revisión) o `cancelada`
+- `abierta_en` y `cerrada_en` (datetime). `realizada_en` es una propiedad: el valor de `cerrada_en`
+- `cierre` (choices: `empleado`, `sistema`, `administrador`): quién cerró la jornada
+- `datos` (JSON) — respuestas a los `CampoPlanilla` de ámbito `visita`, validadas contra la definición; `esquema_planilla` guarda el esquema usado
 - `observaciones`, `incidencia` (booleano) + `incidencia_detalle`
+- `incidencia_asignacion` (otro empleado tenía la pendiente cuando esta visita se abrió), `incidencia_revisada_por` e `incidencia_revisada_en`
 - `creado`, `actualizado`
 
-Al guardar una visita realizada: `proyecto.encargado_actual = empleado`, `proyecto.actualizado = now`, y si `frecuencia_dias` está definida, `proxima_visita = realizada_en + frecuencia_dias`.
+Coherencia: una `realizada` lleva `cerrada_en`; una `cancelada` no; una `abierta` lleva `abierta_en`; una `pendiente` no tiene revisiones.
+
+**Cierre.** `cerrar_visita` (`apps/visitas/services.py`) exige que la visita esté abierta y al menos una revisión recibida durante la jornada (hora del servidor). Con `cierre=empleado` solo cierra el dueño de la visita; con `cierre=administrador`, solo un administrador, y cuentan todas las revisiones. Con `cierre=sistema` (comando `cerrar_visitas_abiertas`, pensado para un cron diario: cierra las abiertas hace más de `VISITA_ABIERTA_MAXIMO_HORAS`, 16 por defecto) la visita toma la hora de la última revisión; sin revisiones, si venía asignada vuelve a `pendiente` y si no queda `cancelada`, y el proyecto no se toca.
+
+Al cerrar una visita con revisiones: `proyecto.encargado_actual = empleado` y, si `frecuencia_dias` está definida, `proxima_visita = fecha de cierre + frecuencia_dias`. Solo la visita realizada más reciente del proyecto fija esos campos. Una visita pendiente o abierta no cambia el proyecto.
+
+### 3.6.1 `visitas.Revision` — el escaneo de un punto dentro de una visita
+- `visita` (FK), `punto` (FK a `PuntoControl`), `orden`
+- `realizada_en` (hora del teléfono) y `recibida_en` (hora del servidor)
+- `cliente_uuid` (UUID único, opcional): lo genera la app para reintentar sin duplicar; un reintento recibe 409
+- `latitud`, `longitud`, `precision_m` — ubicación del teléfono al escanear
+- `datos` (JSON, planilla de ámbito `punto`) y `esquema_planilla`
+- `observaciones`, `incidencia` (booleano) + `incidencia_detalle`
+
+Reglas: la visita debe estar abierta y ser del empleado; el QR debe ser de un punto activo del sitio del proyecto; coordenadas obligatorias; de 1 a 10 fotos; `realizada_en` no puede ser futura ni tener más de `ATRASO_MAXIMO_HORAS` (168 por defecto) de atraso: pasado ese límite el administrador la carga como visita manual. Si el punto no tiene ubicación, la revisión propone la suya (ver 3.2.1).
 
 ### 3.7 `visitas.Foto`
-`visita` (FK), `imagen`, `tomada_en`, `orden`. Mínimo una foto por visita realizada desde la app (validación en el serializer).
+`revision` (FK), `codigo` (UUID, usado en la URL de descarga), `imagen`, `tomada_en`, `orden`. Mínimo una foto por revisión hecha desde la app (validación en el servicio) y máximo diez.
 
 ### 3.8 `visitas.ProductoAplicado` — confirmado por la empresa
-`visita` (FK), `producto` (FK a `productos.Producto`), `lote`, `dosis`, `unidad`, `cantidad`. La planilla de toda visita incluye una sección "Productos utilizados": el empleado **elige de la lista precargada** (no escribe nombres) y completa lote y dosis. Puede agregar varios. `CampoPlanilla` no la modela porque es común a todos los servicios; se define en el serializer.
+`revision` (FK), `producto` (FK a `productos.Producto`), `lote`, `dosis`, `unidad`, `cantidad`. La planilla de toda revisión incluye una sección "Productos utilizados": el empleado **elige de la lista precargada** (no escribe nombres) y completa lote y dosis. Puede agregar varios. `CampoPlanilla` no la modela porque es común a todos los servicios; se define en el serializer.
 
 ### 3.9 `productos.Producto` — catálogo precargado por administradores
 `nombre_comercial`, `principio_activo`, `registro` (ANMAT/SENASA), `presentacion`, `unidad_dosis_por_defecto`, `activo`. Los administradores lo mantienen desde el panel; la app lo descarga y lo guarda en caché para funcionar sin conexión.
@@ -104,18 +136,22 @@ Extiende `AbstractUser`: `rol` (administrador/empleado), `telefono`, `activo`. L
 ## 4. Flujos
 
 ### 4.1 Empleado (app)
-1. Inicia sesión (JWT). `GET /api/v1/me/visitas/?estado=pendiente` → lista de asignaciones.
-2. Escanea QR → `POST /api/v1/qr/{codigo}/resolver/` → devuelve sitio + proyectos activos + planilla de cada uno. Si el sitio no existe o está inactivo, error explícito.
-3. Elige proyecto (o se abre directo si es único). Si tiene una visita pendiente asignada para ese proyecto, la app la usa; si no, crea una nueva (`origen=app`).
-4. Completa planilla, agrega los productos utilizados eligiendo del catálogo (lote y dosis), saca ≥1 foto (la app redimensiona a 1600 px de lado mayor antes de subir: el servidor rechaza JPEG progresivos de más de 16 MP y WebP de más de 8 MP), opcionalmente marca incidencia. `POST /api/v1/visitas/` con multipart (JSON + fotos + geolocalización). Sin conexión: se guarda local y se reintenta; el servidor acepta `realizada_en` del cliente y guarda además `recibida_en`.
-5. `GET /api/v1/me/historial/` y `GET /api/v1/me/historial.pdf` para descargar su propio historial.
+1. Inicia sesión (JWT). `GET /api/v1/me/visitas/` → sus visitas `pendiente` y `abierta` (las abiertas primero). `GET /api/v1/me/puntos/` (con `?sitio=<id>` opcional) → los puntos activos, con coordenadas y estado, de los sitios activos donde tiene visitas pendientes o abiertas.
+2. Escanea el QR de un punto → `POST /api/v1/qr/{codigo}/resolver/` → devuelve el punto (con su plano y los marcadores, con estado, de los puntos del plano), el sitio, el cliente y los proyectos activos del sitio, cada uno con sus esquemas de planilla (`esquema_punto`, `esquema_visita`) y su visita pendiente o abierta propia, si la hay. Un QR inexistente o de un punto, sitio o cliente inactivo da el mismo 404.
+3. Elige proyecto (o se abre directo si es único) y abre la jornada: `POST /api/v1/visitas/abrir/` con `proyecto` y `qr_codigo` (el UUID del punto escaneado, que debe ser de un punto activo del sitio del proyecto). Si tiene una visita abierta en ese proyecto la devuelve (200, idempotente); si tiene una pendiente asignada la abre; si no, crea una nueva con `origen=app` (201). Un QR ajeno o inactivo da el mismo 400 genérico que un proyecto inexistente.
+4. En cada punto que revisa: completa la planilla de ámbito `punto`, agrega los productos utilizados eligiendo del catálogo (lote y dosis), saca de 1 a 10 fotos (la app redimensiona a 1600 px de lado mayor antes de subir: el servidor rechaza JPEG progresivos de más de 16 MP y WebP de más de 8 MP) y opcionalmente marca incidencia. `POST /api/v1/revisiones/` con multipart (`visita`, `qr_codigo` del punto, `cliente_uuid`, `realizada_en`, geolocalización, `datos`, `productos_aplicados` y `fotos`). Sin conexión: se guarda local y se reintenta con el mismo `cliente_uuid`; el servidor acepta `realizada_en` del cliente y guarda además `recibida_en`. Puede revisar tantos puntos como quiera en la misma visita.
+5. Cierra la jornada: `POST /api/v1/visitas/{id}/cerrar/` con la planilla de ámbito `visita`, observaciones e incidencia (todo opcional). Exige al menos una revisión; la visita queda `realizada` con `cierre=empleado` y se actualiza el proyecto (3.6). Una visita abierta que se olvida se cierra por sistema (comando `cerrar_visitas_abiertas`).
+6. Planos: `GET /api/v1/planos/{id}/imagen/` sirve el PNG del plano. Exige una visita propia abierta o pendiente en un proyecto de ese sitio, con el sitio y el cliente activos; si no, 404 (el mismo que un plano inexistente o inactivo). Los administradores acceden siempre. La respuesta no se cachea (`private, no-store`).
+7. `GET /api/v1/me/historial/` para consultar su propio historial de visitas realizadas (`GET /api/v1/me/historial.pdf` para descargarlo está previsto en `informes` y aún no existe); `GET /api/v1/fotos/{codigo}/` descarga una foto propia.
 
 ### 4.2 Administrador (panel)
-- **Mapa** (`/panel/mapa/`): todos los sitios activos, color por peor `estado_visita` de sus proyectos; popup con proyectos, última visita, encargado actual, botón "asignar visita".
+- **Mapa** (`/panel/mapa/`): todos los sitios activos con coordenadas, color por el peor estado de sus puntos activos (`sin_revisar` pesa más que `proxima` y menos que `vencida`; ver 3.2.1); popup con proyectos, última visita realizada, encargado actual, botón "asignar visita". Calcula el estado de todos los puntos con un número fijo de consultas.
 - **Proyectos** (`/panel/proyectos/`): tabla filtrable (cliente, sitio, servicio, estado, encargado, vencidos), ordenable por `proxima_visita`.
-- **Ficha de proyecto**: datos, historial de visitas con fotos y planilla, línea de tiempo, botones "asignar visita", "cargar visita manual", "generar certificado".
+- **Ficha de proyecto**: datos, historial de visitas con sus revisiones, fotos y planillas, línea de tiempo, botones "asignar visita", "cargar visita manual", "generar certificado".
 - **Asignar visita**: elige empleado y fecha → crea `Visita` pendiente. El empleado la ve en su lista.
-- **Sitios**: alta con geocodificación asistida (mapa clicable para fijar el punto) y botón "descargar QR" (PNG/PDF con nombre del sitio y logo, listo para plastificar).
+- **Visita manual**: el administrador elige empleado, los puntos revisados, fecha y motivo (obligatorio) → una revisión por punto y visita cerrada con `cierre=administrador`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige confirmación.
+- **Sitios**: alta con geocodificación asistida (mapa clicable para fijar el punto). La ficha tiene pestañas `puntos`, `planos` y `mapa`: alta, edición y baja de puntos de control, subida de planos, ubicación de cada punto sobre el plano, y aceptar o descartar la ubicación propuesta. Cada punto tiene su botón "descargar QR" (PNG con sitio, punto y sector, listo para plastificar).
+- **Estado en vivo**: la ficha del sitio sondea `/panel/sitios/<id>/estado/` cada 5 s con HTMX (`hx-trigger="every 5s"`) y recolorea los puntos. El sondeo se pausa mientras la pestaña está oculta (`sondeo.js`). Esa vista (`apps/panel/estado.py`) es el único punto de transporte del estado: si más adelante se pasa a SSE, solo cambia ella.
 - **Usuarios**: alta manual de administradores y empleados.
 - **Productos**: catálogo con alta/baja y registro ANMAT/SENASA; lo que el empleado ve en la app.
 - **Certificados**: desde la ficha del proyecto o del cliente, rango de fechas → PDF numerado con cliente, CUIT, fechas, productos con registro, lote y dosis. Se guarda y se puede volver a descargar.
@@ -141,13 +177,13 @@ macontrol/
 │   │                        #   templates/<app>/{panel,pdf}/… · tests/
 │   ├── accounts/            # User, roles, permisos
 │   ├── clientes/
-│   ├── sitios/              # Sitio, QR, geocodificación
+│   ├── sitios/              # Sitio, PuntoControl, Plano, estado de puntos, QR, geocodificación
 │   ├── servicios/           # TipoServicio, CampoPlanilla
 │   ├── proyectos/
-│   ├── visitas/             # Visita, Foto, ProductoAplicado, reglas de actualización
+│   ├── visitas/             # Visita, Revision, Foto, ProductoAplicado, reglas de actualización
 │   ├── productos/
 │   ├── informes/            # generación de PDF (informes, certificados, historial, QR)
-│   ├── panel/               # layout, login, tablero, mapa; urls.py = router de una línea por app
+│   ├── panel/               # layout, login, tablero, mapa, estado en vivo; urls.py = router de una línea por app
 │   ├── api/                 # transversal: JWT, permisos base, paginación; urls.py = router por app
 │   └── web/                 # sitio público: páginas, contenido, SEO
 ├── templates/               # solo base.html y panel/base.html
@@ -167,8 +203,8 @@ macontrol/
 - **Contrato de la app**: `docs/api/openapi-v1.yaml` es el contrato de `/api/v1/` que consume la app. Todo cambio de respuesta, de parámetro o de versión de drf-spectacular exige regenerarlo en el mismo commit con `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py spectacular --validate --file docs/api/openapi-v1.yaml`; un criterio de cierre lo compara con el generado.
 - **Fotos**: redimensionadas al subir (máx. 1600 px) con `Pillow`; almacenamiento local en etapa 1, backend intercambiable (`django-storages`) para S3/R2.
 - **PDF**: WeasyPrint desde templates HTML (`templates/pdf/`), mismo sistema visual que la web.
-- **QR**: `segno` o `qrcode`, contenido `https://macontrol.com.ar/q/{uuid}`. Abierto en un navegador común muestra solo "Sitio de MAControl S.A. — use la app"; la app intercepta la URL.
-- **Auditoría**: `django-simple-history` en Proyecto, Sitio y Visita para saber quién cambió qué.
+- **QR**: `segno`, uno por punto de control, contenido `https://macontrol.com.ar/q/{uuid}` (el UUID es el `qr_codigo` del punto). Abierto en un navegador común muestra solo "Sitio de MAControl S.A. — use la app"; la app intercepta la URL.
+- **Auditoría**: `django-simple-history` en Proyecto, Sitio, PuntoControl, Plano, Visita, Revision y ProductoAplicado para saber quién cambió qué.
 - **Tests**: runner de Django (`manage.py test --keepdb`), un `tests/` por app; los flujos 4.1 y 4.2 tienen tests de integración desde el inicio.
 - **Calidad**: `ruff` para lint y formato.
 
