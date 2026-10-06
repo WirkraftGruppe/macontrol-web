@@ -1,5 +1,11 @@
 {% extends "panel/base.html" %}
+{% load static %}
 {% block title %}{{ object.nombre }} · MAControl{% endblock %}
+{% block extra_head %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
+  <link rel="stylesheet" href="{% static 'sitios/puntos.css' %}">
+{% endblock %}
 {% block panel_contenido %}
 {% with sitio=object %}
 <h1>{{ sitio.nombre }}</h1>
@@ -19,14 +25,25 @@
   <dt>Estado</dt><dd>{% if sitio.activo %}Activo{% else %}Inactivo{% endif %}</dd>
 </dl>
 
-<section>
-  <h2>Código QR</h2>
-  <img src="{% url 'panel:sitios:qr_png' sitio.pk %}?inline=1" alt="Código QR de {{ sitio.nombre }}" width="260">
-  <p>
-    <a class="boton boton-primario" href="{% url 'panel:sitios:qr_png' sitio.pk %}">Descargar PNG</a>
-    <a class="boton boton-peligro" href="{% url 'panel:sitios:regenerar_qr' sitio.pk %}">Regenerar QR</a>
-  </p>
-</section>
+<nav class="pestanas" aria-label="Puntos de control del sitio">
+  {% for clave, nombre in pestanas %}
+  <a href="?pestana={{ clave }}"{% if clave == pestana %} aria-current="page"{% endif %}>{{ nombre }}</a>
+  {% endfor %}
+</nav>
+
+{# Sondeo del estado de los puntos (contrato con apps/panel): el mapa y el editor se recolorean al recibirlo. #}
+{% url 'panel:estado_sitio' sitio.pk as url_estado %}
+{% if url_estado %}
+<div id="estado-sitio" data-sondeo hx-get="{{ url_estado }}" hx-trigger="every 5s" hx-swap="innerHTML" hidden></div>
+{% endif %}
+
+{% if pestana == "mapa" %}
+  {% include "sitios/panel/_pestana_mapa.html" %}
+{% elif pestana == "planos" %}
+  {% include "sitios/panel/_pestana_planos.html" %}
+{% else %}
+  {% include "sitios/panel/_pestana_puntos.html" %}
+{% endif %}
 
 <section>
   <h2>Proyectos</h2>
@@ -39,4 +56,10 @@
   </ul>
 </section>
 {% endwith %}
+{% endblock %}
+{% block scripts %}
+  {% if pestana != "puntos" %}<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>{% endif %}
+  <script src="{% static 'sitios/sondeo.js' %}"></script>
+  {% if pestana == "mapa" %}<script src="{% static 'sitios/puntos_mapa.js' %}"></script>{% endif %}
+  {% if pestana == "planos" %}<script src="{% static 'sitios/plano_editor.js' %}"></script>{% endif %}
 {% endblock %}

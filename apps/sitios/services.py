@@ -1,6 +1,7 @@
-"""Servicios de Sitios: supresión de datos y regeneración del QR de un punto."""
+"""Servicios de Sitios: supresión de datos, QR y ubicación de los puntos."""
 
 import uuid
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -71,3 +72,45 @@ def regenerar_qr_lote(puntos):
         for punto in puntos:
             regenerar_qr(punto)
     return len(puntos)
+
+
+def fijar_ubicacion(punto, latitud, longitud):
+    """Fija lat/lng del punto (clic en el mapa) y deja el motivo en el historial."""
+    punto.latitud = latitud
+    punto.longitud = longitud
+    punto._change_reason = "Ubicación fijada en el mapa"
+    punto.save(update_fields=["latitud", "longitud"])
+
+
+def aceptar_ubicacion_propuesta(punto):
+    """Pasa la ``ubicacion_propuesta`` a lat/lng; falla si no hay propuesta."""
+    propuesta = punto.ubicacion_propuesta
+    if not propuesta:
+        raise ValidationError("El punto no tiene una ubicación propuesta.")
+    punto.latitud = Decimal(propuesta["latitud"])
+    punto.longitud = Decimal(propuesta["longitud"])
+    punto.ubicacion_propuesta = None
+    punto._change_reason = "Ubicación propuesta aceptada"
+    punto.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
+
+
+def descartar_ubicacion_propuesta(punto):
+    """Descarta la propuesta; así una revisión posterior puede traer otra."""
+    punto.ubicacion_propuesta = None
+    punto._change_reason = "Ubicación propuesta descartada"
+    punto.save(update_fields=["ubicacion_propuesta"])
+
+
+def mover_en_plano(punto, x, y):
+    """Guarda la posición del marcador en el plano (fracción 0 a 1)."""
+    punto.x = x
+    punto.y = y
+    punto._change_reason = "Marcador movido en el plano"
+    punto.save(update_fields=["x", "y"])
+
+
+def desactivar_punto(punto):
+    """Da de baja el punto: conserva sus revisiones, pero deja de pedirse."""
+    punto.activo = False
+    punto._change_reason = "Punto desactivado"
+    punto.save(update_fields=["activo"])
