@@ -529,10 +529,10 @@ commit_base: 4e2c496
 | T8 | hecha |
 | T9 | hecha |
 | T10 | hecha |
-| T11 | pendiente |
-| T12 | pendiente |
-| T13 | pendiente |
-| T14 | pendiente |
+| T11 | hecha |
+| T12 | hecha |
+| T13 | hecha |
+| T14 | en curso |
 | T15 | pendiente |
 | T16 | pendiente |
 | T17 | pendiente |
@@ -551,6 +551,9 @@ commit_base: 4e2c496
 | 2026-10-05 | T9 | f678582 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Integrada en 3f424ef (suite 442 OK) |
 | 2026-10-05 | T9 (con T9b) | b65990d | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad ola 2 (e03c8db): H1 importante (abrir sin QR daba acceso a planos y puntos), H2 menor, H3 observación; corregidos en T9b (de9be8b, b65990d; decisión del usuario: `visitas/abrir` exige `qr_codigo`, cambia el contrato /api/v1/), integrada en 77e3a1a (suite 446 OK). T9b tocó `apps/sitios` y `test_migraciones.py` fuera de las rutas de T9, autorizado por el principal para la corrección. Re-auditoría (654a6f4): H1 y H3 cerrados, H2 cerrado salvo P-puntos-control-24 |
 | 2026-10-05 | T10 | 654a6f4 | FALLA formal (0/5 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. openapi en e03c8db y regenerado en 654a6f4 tras T9b |
+| 2026-10-05 | T13 | e34b340 | FALLA formal (0/7 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. `apps/panel/urls.py`: además de la ruta cambia el import (`from . import estado, views`), necesario para la excepción 5. Integrada en 3e59278 (suite 451 OK) |
+| 2026-10-05 | T12 | 131eceb | FALLA formal (0/6 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Los 4 tests de criterio pasaron sin cambios de producción (fichas, línea de tiempo, casillas y filtro ya estaban desde T5); el único cambio de código es P-puntos-control-17 (selector y `registrar_visita_manual`; `apps/visitas/services.py` autorizado por el usuario). Integrada en f9649e4 (suite 456 OK), antes que T11 por rutas disjuntas |
+| 2026-10-05 | T11 | d5124b5 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Integrada en 57f71b3 (suite 465 OK); en la raíz `PuntoPanelTests.test_ficha_con_pestanas_sondeo_y_leaflet` corre la rama con `panel:estado_sitio` y pasa. El implementador escribió y borró `.tmp_suite.txt` en la raíz (fuera de su worktree) |
 
 ## Pendientes que deja este plan
 
@@ -581,7 +584,12 @@ commit_base: 4e2c496
 - P-puntos-control-23 [observación] El implementador de T9 no corrió los tests nuevos en rojo antes de implementar, y la adaptación de `apps/api/tests/test_flujo.py` no tiene corrida roja.
 - P-puntos-control-24 [menor] Re-auditoría T9b: `me/puntos/?sitio=` con un entero de 19 a ~4300 dígitos da 500 en SQLite (`OverflowError` en `apps/sitios/api_views.py:218`; en Postgres probablemente lista vacía). Agregar `max_value=2**31 - 1` en `apps/sitios/serializers.py:93` y los casos `"9" * 30` y `str(2**63)` al test `MisPuntosTests.test_sitio_invalido_da_400`.
 - P-puntos-control-25 [observación] [empresa] `visitas/abrir` exige un QR del sitio, no presencia: un QR fotografiado permite reabrir visitas (y ver plano y puntos) sin límite. La presencia la prueban las revisiones (coordenadas y foto). Decisión de producto si se pide más.
+- P-puntos-control-26 [menor] T13: el filtro `estado` del mapa ya no acepta `sin_programar` (toma `EstadoPunto`); el popup por proyecto sigue mostrando `EstadoVisita`, con `sin_programar`. Un sitio nuevo aparece `sin_revisar` por su punto General.
+- P-puntos-control-27 [menor] T11: `PuntoDesactivar` permite desactivar el último punto activo del sitio, y reactivar un sitio no reactiva sus puntos (se hace a mano desde `PuntoForm`).
+- P-puntos-control-28 [observación] T11: un punto sin `x`/`y` aparece en el centro del editor del plano; no se ubica un punto existente con clic, solo arrastrando o editando. El JS (`plano_editor.js`, `puntos_mapa.js`, `sondeo.js`) solo pasó `node --check`: el arrastre y el recoloreo se prueban a mano en T14.
 
 ### Decisiones
 
 ### Cierra
+
+- cierra: P-puntos-control-17 — T12 excluye del selector de la carga manual las pendientes con revisiones y `registrar_visita_manual` las rechaza (`ManualTests.test_pendiente_con_revisiones_no_se_ofrece`)
