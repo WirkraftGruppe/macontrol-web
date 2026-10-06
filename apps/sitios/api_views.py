@@ -1,12 +1,15 @@
 """Vistas de la API de Sitios: resolver QR, imagen del plano y puntos del empleado."""
 
+from django.core.exceptions import ValidationError as ErrorDeValidacion
 from django.db.models import F
 from django.http import FileResponse
 from django.urls import reverse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import NotFound
+from rest_framework import status
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.negotiation import BaseContentNegotiation
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -15,12 +18,17 @@ from apps.accounts.permisos import EsAdministrador, EsEmpleado
 from apps.proyectos.models import Proyecto
 from apps.visitas.models import Visita
 
+from . import services
 from .estado import estados_de_puntos
-from .models import Plano, PuntoControl
+from .models import Plano, PuntoControl, Sitio
 from .serializers import (
+    AltaPuntoSerializer,
+    AltaSitioSerializer,
     MiPuntoSerializer,
     MisPuntosParametrosSerializer,
+    PuntoCampoSerializer,
     ResolverQRSerializer,
+    SitioCampoSerializer,
 )
 
 ESTADOS_CON_TRABAJO = (Visita.Estado.PENDIENTE, Visita.Estado.ABIERTA)
@@ -68,8 +76,8 @@ class ResolverQRView(APIView):
         responses={200: ResolverQRSerializer},
         summary="Resolver un código QR",
         description=(
-            "Solo empleados. Un QR inexistente, de un punto o sitio inactivo o de "
-            "un cliente inactivo responde el mismo 404."
+            "Solo empleados. Un QR inexistente, de un punto o sitio "
+            "inactivo o de un cliente inactivo responde el mismo 404."
         ),
     )
     def post(self, request, codigo):
@@ -226,3 +234,90 @@ class MisPuntosView(APIView):
         for punto in puntos:
             punto.estado = estados[punto.id]
         return Response(MiPuntoSerializer(puntos, many=True).data)
+
+
+def _a_400(error):
+    """Convierte la validación de un servicio en el 400 de la API."""
+    return ValidationError(error.messages)
+
+
+_RESPUESTAS_CAMPO = {
+    400: OpenApiResponse(
+        description="Datos inválidos o precisión de GPS insuficiente."
+    ),
+    403: OpenApiResponse(description="Solo administradores."),
+    404: OpenApiResponse(description="No existe."),
+}
+
+
+class AltaSitioView(APIView):
+    """Alta de un sitio con las coordenadas del GPS del administrador."""
+
+    permission_classes = [EsAdministrador]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "crear_visita"
+
+    @extend_schema(
+        request=AltaSitioSerializer,
+        responses={201: SitioCampoSerializer, **_RESPUESTAS_CAMPO},
+        summary="Crear un sitio en campo",
+        description=(
+            "Solo administradores. Cliente activo, coordenadas y `precision_m` "
+            "obligatorios; la precisión no puede superar `PRECISION_MAXIMA_M`."
+        ),
+    )
+    def post(self, request):
+        serializer = AltaSitioSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        datos = serializer.validated_data
+        try:
+            sitio = services.crear_sitio_en_campo(
+                administrador=request.user,
+                nombre=datos["nombre"],
+                direccion=datos.get("direccion", ""),
+                localidad=datos.get("localidad", ""),
+                cliente=datos["cliente"],
+                latitud=datos["latitud"],
+                longitud=datos["longitud"],
+                precision_m=datos["precision_m"],
+            )
+        except ErrorDeValidacion as error:
+            raise _a_400(error)
+        return Response(
+            SitioCampoSerializer(sitio).data, status=status.HTTP_201_CREATED
+        )
+
+
+class AltaPuntoView(APIView):
+    """Alta de un punto de control en un sitio activo, con o sin coordenadas y foto."""
+
+    permission_classes = [EsAdministrador]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "crear_visita"
+    parser_classes = [MultiPartParser, JSONParser]
+
+    @extend_schema(
+        request=AltaPuntoSerializer,
+        responses={201: PuntoCampoSerializer, **_RESPUESTAS_CAMPO},
+        summary="Crear un punto de control en campo",
+        description=(
+            "Solo administradores. Sin coordenadas el punto nace sin ubicación; con "
+            "ellas, `precision_m` es obligatoria y no puede superar "
+            "`PRECISION_MAXIMA_M`. La foto es opcional (multipart)."
+        ),
+    )
+    def post(self, request, pk):
+        sitio = Sitio.objects.select_related("cliente").filter(pk=pk).first()
+        if sitio is None:
+            raise NotFound("El sitio no existe.")
+        serializer = AltaPuntoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            punto = services.crear_punto_en_campo(
+                administrador=request.user, sitio=sitio, **serializer.validated_data
+            )
+        except ErrorDeValidacion as error:
+            raise _a_400(error)
+        return Response(
+            PuntoCampoSerializer(punto).data, status=status.HTTP_201_CREATED
+        )
