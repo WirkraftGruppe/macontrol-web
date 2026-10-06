@@ -26,6 +26,7 @@
   var mapa = L.map(contenedor).setView([-36.1, -57.8], 8);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
+    referrerPolicy: "strict-origin-when-cross-origin",
     attribution: "&copy; colaboradores de OpenStreetMap",
   }).addTo(mapa);
   var capa = L.layerGroup().addTo(mapa);

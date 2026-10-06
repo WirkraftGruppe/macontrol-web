@@ -1,12 +1,20 @@
+import os
+import shutil
+import tempfile
 from datetime import timedelta
+from decimal import Decimal
 from io import StringIO
+from unittest import mock
 
+from django.conf import settings
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.visitas.models import Visita
+from apps.sitios import services as servicios_sitio
+from apps.visitas.models import Revision, Visita
 from apps.visitas.tests.test_models import crear_revision, crear_visita
 
 
@@ -71,3 +79,57 @@ class CerrarAbiertasTests(TestCase):
             proyecto = visita.proyecto
             proyecto.refresh_from_db()
             self.assertIsNone(proyecto.proxima_visita)
+
+
+@override_settings(DEBUG=True, MEDIA_ROOT=tempfile.mkdtemp(prefix="revision-demo-"))
+class RevisionDemoTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+
+    def preparar(self):
+        visita = crear_visita(origen=Visita.Origen.APP, estado=Visita.Estado.CANCELADA)
+        punto = visita.proyecto.sitio.puntos.get(nombre="General")
+        servicios_sitio.fijar_ubicacion(punto, Decimal("-36.1"), Decimal("-57.8"))
+        return punto, visita.empleado
+
+    def ejecutar(self, *args):
+        salida = StringIO()
+        call_command("registrar_revision_demo", *args, stdout=salida)
+        return salida.getvalue()
+
+    def test_crea_revision_con_foto_y_guardas(self):
+        punto, empleado = self.preparar()
+        self.ejecutar("General")
+        revision = Revision.objects.get()
+        self.assertEqual(revision.punto, punto)
+        self.assertEqual(revision.visita.empleado, empleado)
+        self.assertEqual(revision.visita.estado, Visita.Estado.ABIERTA)
+        self.assertEqual(revision.fotos.count(), 1)
+        self.assertFalse(revision.incidencia_ubicacion)
+
+        # Segunda corrida: reutiliza la visita abierta.
+        self.ejecutar("General")
+        self.assertEqual(Visita.objects.filter(estado=Visita.Estado.ABIERTA).count(), 1)
+        self.assertEqual(Revision.objects.count(), 2)
+
+        # Guardas: sin DEBUG o fuera de development no toca nada.
+        with override_settings(DEBUG=False):
+            with self.assertRaisesMessage(CommandError, "DEBUG activo"):
+                self.ejecutar("General")
+        with mock.patch.dict(os.environ, {"DJANGO_ENV": "production"}):
+            with self.assertRaisesMessage(CommandError, "DJANGO_ENV=development"):
+                self.ejecutar("General")
+        self.assertEqual(Revision.objects.count(), 2)
+
+    def test_lejos_marca_incidencia_de_ubicacion(self):
+        self.preparar()
+        self.ejecutar("General", "--lejos")
+        revision = Revision.objects.get()
+        self.assertTrue(revision.incidencia_ubicacion)
+        self.assertGreater(revision.distancia_m, 500)
+
+    def test_punto_inexistente(self):
+        with self.assertRaises(CommandError):
+            self.ejecutar("No existe")

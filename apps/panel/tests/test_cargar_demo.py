@@ -12,7 +12,7 @@ from django.test import TestCase, override_settings
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
-from apps.panel.management.commands.cargar_demo import _es_sqlite
+from apps.panel.demo import _es_sqlite
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Foto, Revision, Visita
 
@@ -103,7 +103,7 @@ class CargarDemoTests(TestCase):
     def _rechaza_con(self, configuracion):
         """El comando rechaza esa base con el mensaje de SQLite y sin escribir."""
         falsa = mock.Mock(settings_dict=configuracion)
-        ruta = "apps.panel.management.commands.cargar_demo.connection"
+        ruta = "apps.panel.demo.connection"
         with override_settings(DEBUG=True), mock.patch(ruta, falsa):
             with self.assertRaisesMessage(CommandError, "solo corre contra SQLite"):
                 self._cargar()

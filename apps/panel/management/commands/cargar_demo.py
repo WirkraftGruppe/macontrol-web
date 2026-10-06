@@ -1,20 +1,19 @@
 """Carga datos de demostración genéricos: clientes, sitios, puntos, planos y visitas."""
 
-import os
 import uuid
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 
-from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management.base import BaseCommand, CommandError
-from django.db import connection, transaction
+from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 from PIL import Image, ImageDraw
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
+from apps.panel.demo import exigir_entorno_demo
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios import services as servicios_sitio
@@ -38,11 +37,6 @@ SITIOS = [
 ]
 
 
-def _es_sqlite(config):
-    """True solo si la base es SQLite: un HOST local puede ser un túnel a producción."""
-    return config.get("ENGINE", "").endswith("sqlite3")
-
-
 def _imagen(ancho, alto, color, formato, nombre):
     """Archivo subido con una imagen lisa generada con Pillow."""
     salida = BytesIO()
@@ -64,15 +58,7 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **opciones):
-        if not settings.DEBUG:
-            raise CommandError("cargar_demo solo se puede ejecutar con DEBUG activo.")
-        if os.environ.get("DJANGO_ENV") != "development":
-            raise CommandError("cargar_demo exige DJANGO_ENV=development.")
-        if not _es_sqlite(connection.settings_dict):
-            raise CommandError(
-                "cargar_demo solo corre contra SQLite (DJANGO_ENV=development sin "
-                "DATABASE_URL)."
-            )
+        exigir_entorno_demo("cargar_demo")
         with transaction.atomic():
             empleado = self._usuarios()
             tipo, _ = TipoServicio.objects.get_or_create(
