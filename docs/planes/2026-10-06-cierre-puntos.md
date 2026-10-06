@@ -50,6 +50,7 @@
 - **Modelo y servicios (T4, `sitios/0006`)**: `PuntoControl.foto` (`ImageField`, opcional, nombre aleatorio, validación igual a la de `Foto` de visitas). `crear_sitio_en_campo(*, administrador, cliente, nombre, direccion, localidad, latitud, longitud, precision_m)`, `crear_punto_en_campo(*, administrador, sitio, nombre, sector, latitud=None, longitud=None, precision_m=None, foto=None)`, `fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m)`; los tres registran `history_user` y `_change_reason`, y el último limpia `ubicacion_propuesta`. `fijar_ubicacion` no cambia de firma.
 - **Rutas nuevas (T4 y T10)**: `POST sitios/` (`api:sitios:alta-sitio`, T4), `POST sitios/<int:pk>/puntos/` (`api:sitios:alta-punto`, T4), `POST puntos/<int:pk>/ubicacion/` (`api:sitios:ubicacion-punto`, T10, responde 200); solo `EsAdministrador`; throttle scope `crear_visita`; cliente y sitio activos.
 - **Partición de T4** (modificación del 2026-10-06, decisión del usuario): T4 excedió su presupuesto (567/500) y se parte. T4 conserva modelo, migración, `crear_sitio_en_campo`, `crear_punto_en_campo` y las dos rutas de alta; T10 hace `fijar_ubicacion_en_campo`, `ubicacion-punto` y el permiso de administrador en resolver QR y `me/puntos`.
+- **Corrección de la auditoría de T6 (T11)** (modificación del 2026-10-06, decisión del usuario): `cerrar_visita` calcula `hay_posterior` sin contar visitas de administradores, para que una visita de administrador cerrada después no anule el efecto del servicio de un empleado sobre `encargado_actual` y `proxima_visita` (decisión 1).
 - **Helper de guardas (T7)**: `apps/panel/demo.py::exigir_entorno_demo()` lanza `CommandError` sin DEBUG, sin `DJANGO_ENV=development` o sin SQLite; lo usan `cargar_demo` y `registrar_revision_demo`.
 
 ## Olas
@@ -58,7 +59,7 @@
 |---|---|---|
 | 1 | T1 (principal: settings) | — |
 | 2 | T2 (accounts, servicios, proyectos: panel) ∥ T3 (visitas) ∥ T4 (sitios API) ∥ T5 (sitios panel), T10 (sitios API, después de integrar T4), T6 (integración y auditoría) | visitas (0008), sitios (0006) |
-| 3 | T7 (panel: OSM, guardas, tablero, demo) ∥ T8 (api: flujo modo campo y token), T9 (integración, contrato, auditoría, navegador) | — |
+| 3 | T7 (panel: OSM, guardas, tablero, demo) ∥ T8 (api: flujo modo campo y token) ∥ T11 (visitas: corrección de `hay_posterior`), T9 (integración, contrato, auditoría, navegador) | — |
 
 T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migración. T10 toca los archivos de T4 y ramifica de `plan/cierre-puntos` con T4 integrada.
 
@@ -224,11 +225,24 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.api.tests.test_schema.SchemaTests.test_token_documenta_cuerpo_y_415 --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T8`
 
+### T11 — Visitas: la visita de un administrador no anula el servicio del empleado
+
+- **Ola**: 3 · **Depende de**: T6
+- **Puede tocar**: `apps/visitas/services.py`, `apps/visitas/tests/test_services.py`
+- **No puede tocar**: `docs/planes/`, `config/`, `apps/visitas/models.py`, `apps/visitas/migrations/**`, `apps/visitas/management/**`, `apps/visitas/tests/test_comandos.py`, `apps/sitios/**`, `apps/panel/**`, `apps/api/**`
+- **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Services
+- **Presupuesto**: 80 líneas agregadas
+- **Qué hacer**: en `cerrar_visita`, excluir de `hay_posterior` las visitas cuyo `empleado` es administrador (hallazgo importante de la auditoría de T6, `apps/visitas/services.py:606-615`). Test que reproduce el defecto: empleado con revisión a las 11:00 y visita sin cerrar; administrador que abre, revisa y cierra a las 14:30 en el mismo proyecto; `cerrar_visitas_abiertas` (o `cerrar_visita` con `cierre=sistema`) cierra la del empleado; `encargado_actual` y `proxima_visita` del proyecto se actualizan por la visita del empleado.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_services.AdministradorEnCampoTests.test_visita_posterior_de_administrador_no_anula_el_servicio --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 80 --subtarea T11`
+
 ### T9 — Integración final, contrato, auditoría y prueba en navegador (principal)
 
-- **Ola**: 3 · **Depende de**: T7, T8
+- **Ola**: 3 · **Depende de**: T7, T8, T11
 - **Pasos**:
-  1. Verificar (`verificador` y `verificador-b`) e integrar T7 y T8.
+  1. Verificar (`verificador` y `verificador-b`) e integrar T7, T8 y T11.
   2. `manage.py spectacular --validate --file docs/api/openapi-v1.yaml`; commit `T9: contrato openapi`.
   3. `auditor-seguridad` sobre el modo campo (un administrador en la app no hace nada que no pueda en el panel) y la verificación de ubicación.
   4. Prueba en navegador del usuario (P-puntos-control-31): mapa general y ficha sin 403 de teselas, arrastre de marcadores, clic de alta, clic de ubicación, sondeo pausado con la pestaña oculta, `cargar_demo` + `registrar_revision_demo` (normal y `--lejos`) y el contador del tablero. Sin el OK del usuario el plan no se cierra.
@@ -237,6 +251,7 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T7: integra cierre-puntos-T7"`
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T8: integra cierre-puntos-T8"`
+  - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T11: integra cierre-puntos-T11"`
   - `[cmd]` `T=$(mktemp) && PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py spectacular --validate --file "$(cygpath -w "$T")" && diff -q --strip-trailing-cr "$T" docs/api/openapi-v1.yaml; r=$?; rm -f "$T"; exit $r`
   - `[grep-1]` `grep -n "/api/v1/puntos/{id}/ubicacion/" docs/api/openapi-v1.yaml`
   - `[grep-1]` `grep -n "'415'" docs/api/openapi-v1.yaml`
@@ -269,6 +284,7 @@ commit_base: 9a284ed
 | T8 | pendiente |
 | T9 | pendiente |
 | T10 | hecha |
+| T11 | pendiente |
 
 ### Corridas
 
@@ -288,11 +304,19 @@ commit_base: 9a284ed
 - P-cierre-puntos-2 [menor] `.env.example` no documenta `DISTANCIA_MAXIMA_M` (T1 no podía tocarlo).
 - P-cierre-puntos-3 [menor] `apps/sitios` importa `procesar_imagen` y `validar_tamano_foto` de `apps/visitas` (models y serializers de T4); sin ciclo hoy, conviene un módulo compartido.
 - P-cierre-puntos-4 [observación] `precision_m` se valida y no se guarda en altas de sitio/punto ni en `abrir_visita`.
+- P-cierre-puntos-5 [menor] `AltaPuntoView` (`apps/sitios/api_views.py:292-314`) no corta por `CONTENT_LENGTH` ni captura `RequestDataTooBig`/`TooManyFieldsSent`/`TooManyFilesSent`: foto enorme se escribe y abre antes del 400, y esos rechazos dan 500; aplicar el patrón de `CrearRevisionView` (auditoría T6).
+- P-cierre-puntos-6 [menor] `PuntoControl.foto` es editable en `/admin/` (`apps/sitios/admin.py:85-89`): reemplazar o limpiar deja el archivo huérfano y una imagen sobre el tope de `procesar_imagen` da 500; ponerla en `readonly_fields` (auditoría T6).
+- P-cierre-puntos-7 [menor] Desde `/admin/` se puede asignar una visita pendiente a un administrador (`limit_choices_to` acepta administrador): nunca la consume y marca `incidencia_asignacion` a los empleados del proyecto; limitar el campo en `VisitaAdmin` o rechazarlo en `Visita.clean()` (auditoría T6).
+- P-cierre-puntos-8 [observación] `fijar_ubicacion_en_campo` y `fijar_ubicacion` guardan la instancia sin `select_for_update`: el historial puede registrar valores viejos de otros campos (auditoría T6).
+- P-cierre-puntos-9 [observación] `registrar_revision` bloquea la visita antes de comprobar el dueño: la demora distingue "existe y está activa" de "no existe"; filtrar por `empleado` dentro del `select_for_update` (auditoría T6).
+- P-cierre-puntos-10 [observación] El rol que decide si la visita cuenta como servicio se evalúa al cerrar, no al abrir (auditoría T6).
+- P-cierre-puntos-11 [observación] Altas de sitio y punto, ubicación, abrir, revisiones y cerrar comparten el cupo `crear_visita` (120/h): un alta de sitio grande en campo lo agota (auditoría T6).
 
 ### Decisiones
 
 - 2026-10-06 — T3 puede tocar `test_migraciones.py` y `test_models.py` de visitas — 0008 y la decisión 1 invalidaban dos tests existentes — reemplaza a: (nada)
 - 2026-10-06 — T4 se parte en T4 (altas y foto) y T10 (ubicación en campo y lectura del administrador) — T4 excedió su presupuesto (567/500) y no se sube — reemplaza a: (nada)
+- 2026-10-06 — El hallazgo importante de la auditoría de T6 (`hay_posterior` cuenta visitas de administradores) se corrige en una subtarea nueva T11 de la ola 3, y los menores quedan como pendientes — contradice la decisión 1 y no entra en el presupuesto de T3 — reemplaza a: (nada)
 - 2026-10-06 — Se acepta el FALLA formal de `congelado.sh` por la modificación 27b13f8 en las verificaciones de este plan — la modificación la decidió el usuario; ningún criterio de código falla — reemplaza a: (nada)
 
 ### Cierra
