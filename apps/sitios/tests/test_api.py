@@ -6,6 +6,7 @@ import uuid
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -437,3 +438,107 @@ class MisPuntosTests(TestCase):
         admin.force_authenticate(self.admin)
         self.assertEqual(admin.get(self.URL).status_code, 403)
         self.assertEqual(APIClient().get(self.URL).status_code, 401)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class ModoCampoTests(TestCase):
+    """Alta de sitios y puntos y fijado de ubicación por un administrador en campo."""
+
+    def setUp(self):
+        cache.clear()
+        self.cliente = Cliente.objects.create(razon_social="ACME")
+        self.admin = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.empleado = User.objects.create_user(
+            username="emp", password="x", rol=User.Rol.EMPLEADO
+        )
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+        self.url_sitio = reverse("api:sitios:alta-sitio")
+
+    def _sitio(self, **extra):
+        datos = {
+            "cliente": self.cliente.id,
+            "nombre": "Galpón",
+            "latitud": "-36.100000",
+            "longitud": "-57.800000",
+            "precision_m": 12,
+            **extra,
+        }
+        return self.api.post(self.url_sitio, datos, format="json")
+
+    def _url_punto(self, sitio):
+        return reverse("api:sitios:alta-punto", kwargs={"pk": sitio.pk})
+
+    def _png(self):
+        buffer = io.BytesIO()
+        Image.new("RGB", (30, 30), "red").save(buffer, "PNG")
+        return SimpleUploadedFile("mi foto.png", buffer.getvalue(), "image/png")
+
+    def test_administrador_crea_sitio_y_punto_con_coordenadas(self):
+        r = self._sitio()
+        self.assertEqual(r.status_code, 201, r.content)
+        sitio = Sitio.objects.get(pk=r.json()["id"])
+        self.assertEqual(float(sitio.latitud), -36.1)
+        self.assertEqual(sitio.puntos.get().nombre, "General")
+        self.assertEqual(sitio.history.first().history_user, self.admin)
+        r = self.api.post(
+            self._url_punto(sitio),
+            {
+                "nombre": "Depósito",
+                "sector": "Norte",
+                "latitud": "-36.100500",
+                "longitud": "-57.800500",
+                "precision_m": 50,
+                "foto": self._png(),
+            },
+            format="multipart",
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        punto = PuntoControl.objects.get(pk=r.json()["id"])
+        self.assertEqual(float(punto.latitud), -36.1005)
+        self.assertEqual(punto.orden, 1)
+        self.assertRegex(punto.foto.name, r"^sitios/puntos/[0-9a-f]{32}\.jpg$")
+        self.assertEqual(punto.history.first().history_user, self.admin)
+
+    def test_empleado_no_puede_crear_sitio_ni_punto(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        self.api.force_authenticate(self.empleado)
+        self.assertEqual(self._sitio().status_code, 403)
+        r = self.api.post(self._url_punto(sitio), {"nombre": "X"}, format="json")
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(PuntoControl.objects.count(), 1)
+        self.assertEqual(APIClient().post(self.url_sitio, {}).status_code, 401)
+
+    def test_precision_insuficiente_da_400(self):
+        self.assertEqual(self._sitio(precision_m=50.5).status_code, 400)
+        self.assertEqual(Sitio.objects.count(), 0)
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        r = self.api.post(
+            self._url_punto(sitio),
+            {"nombre": "X", "latitud": "-36.1", "longitud": "-57.8", "precision_m": 80},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(sitio.puntos.count(), 1)
+
+    def test_punto_sin_coordenadas_se_crea(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        r = self.api.post(self._url_punto(sitio), {"nombre": "Techo"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        punto = PuntoControl.objects.get(pk=r.json()["id"])
+        self.assertIsNone(punto.latitud)
+        self.assertFalse(punto.foto)
+        solo_latitud = {"nombre": "Y", "latitud": "-36.1", "precision_m": 5}
+        r = self.api.post(self._url_punto(sitio), solo_latitud, format="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_cliente_inactivo_da_400(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        self.cliente.activo = False
+        self.cliente.save()
+        self.assertEqual(self._sitio().status_code, 400)
+        r = self.api.post(self._url_punto(sitio), {"nombre": "X"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(PuntoControl.objects.count(), 1)

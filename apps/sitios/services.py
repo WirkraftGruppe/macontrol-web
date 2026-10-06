@@ -3,6 +3,7 @@
 import uuid
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError
@@ -114,3 +115,77 @@ def desactivar_punto(punto):
     punto.activo = False
     punto._change_reason = "Punto desactivado"
     punto.save(update_fields=["activo"])
+
+
+def _exigir_precision(precision_m):
+    """El modo campo solo fija coordenadas con una precisión de GPS suficiente."""
+    if precision_m is None or precision_m > settings.PRECISION_MAXIMA_M:
+        raise ValidationError(
+            "La precisión del GPS debe ser de "
+            f"{settings.PRECISION_MAXIMA_M} m o mejor para fijar la ubicación."
+        )
+
+
+def _exigir_activo(sitio):
+    if not sitio.activo or not sitio.cliente.activo:
+        raise ValidationError("El sitio o su cliente están inactivos.")
+
+
+def crear_sitio_en_campo(
+    *,
+    administrador,
+    cliente,
+    nombre,
+    direccion,
+    localidad,
+    latitud,
+    longitud,
+    precision_m,
+):
+    """Alta de un sitio (con su punto General) hecha por un administrador en campo."""
+    if not cliente.activo:
+        raise ValidationError("El cliente está inactivo.")
+    _exigir_precision(precision_m)
+    sitio = Sitio(
+        cliente=cliente,
+        nombre=nombre,
+        direccion=direccion,
+        localidad=localidad,
+        latitud=latitud,
+        longitud=longitud,
+    )
+    sitio._history_user = administrador
+    sitio._change_reason = "Alta en campo desde la app"
+    sitio.save()
+    return sitio
+
+
+def crear_punto_en_campo(
+    *,
+    administrador,
+    sitio,
+    nombre,
+    sector,
+    latitud=None,
+    longitud=None,
+    precision_m=None,
+    foto=None,
+):
+    """Alta de un punto hecha por un administrador; con coordenadas exige precisión."""
+    _exigir_activo(sitio)
+    if latitud is not None or longitud is not None:
+        _exigir_precision(precision_m)
+    ultimo = sitio.puntos.order_by("-orden").values_list("orden", flat=True).first()
+    punto = PuntoControl(
+        sitio=sitio,
+        nombre=nombre,
+        sector=sector,
+        orden=(ultimo or 0) + 1,
+        latitud=latitud,
+        longitud=longitud,
+        foto=foto,
+    )
+    punto._history_user = administrador
+    punto._change_reason = "Alta en campo desde la app"
+    punto.save()
+    return punto

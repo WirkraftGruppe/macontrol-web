@@ -11,6 +11,7 @@ from django.dispatch import receiver
 from simple_history.models import HistoricalRecords
 
 from apps.clientes.models import Cliente
+from apps.visitas import imagenes
 
 from . import planos
 
@@ -163,6 +164,11 @@ def borrar_archivo_de_plano(sender, instance, **kwargs):
 _FRACCION = [MinValueValidator(0), MaxValueValidator(1)]
 
 
+def ruta_foto_punto(instancia, nombre):
+    """Ruta de almacenamiento: UUID aleatorio, nunca el nombre original."""
+    return f"sitios/puntos/{uuid.uuid4().hex}.jpg"
+
+
 class PuntoControl(models.Model):
     """Lugar concreto del sitio con su propio QR donde se hace una revisión."""
 
@@ -198,6 +204,7 @@ class PuntoControl(models.Model):
     ubicacion_propuesta = models.JSONField(
         "ubicación propuesta", null=True, blank=True, editable=False
     )
+    foto = models.ImageField("foto", upload_to=ruta_foto_punto, null=True, blank=True)
 
     history = HistoricalRecords(excluded_fields=["ubicacion_propuesta"])
 
@@ -217,3 +224,28 @@ class PuntoControl(models.Model):
             errores["plano"] = "El plano pertenece a otro sitio."
         if errores:
             raise ValidationError(errores)
+
+    def save(self, *args, **kwargs):
+        """Una foto nueva se procesa como las de visitas (JPEG sin metadatos)."""
+        nuevo = bool(self.foto) and not self.foto._committed
+        if nuevo:
+            contenido = imagenes.procesar_imagen(self.foto)
+            self.foto.save("foto.jpg", contenido, save=False)
+        try:
+            super().save(*args, **kwargs)
+        except BaseException:
+            # El archivo nuevo ya está escrito y el INSERT falló: no se deja huérfano.
+            if nuevo:
+                try:
+                    self.foto.storage.delete(self.foto.name)
+                except Exception:  # noqa: BLE001
+                    logger.exception("No se pudo borrar la foto huérfana.")
+            raise
+
+
+@receiver(post_delete, sender=PuntoControl)
+def borrar_foto_de_punto(sender, instance, **kwargs):
+    """Al borrar un punto (también en cascada) no queda la foto en disco."""
+    if instance.foto:
+        almacenamiento, nombre = instance.foto.storage, instance.foto.name
+        transaction.on_commit(lambda: almacenamiento.delete(nombre))

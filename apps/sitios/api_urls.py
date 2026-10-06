@@ -17,5 +17,11 @@ urlpatterns = [
         api_views.PlanoImagenView.as_view(),
         name="plano-imagen",
     ),
+    path("sitios/", api_views.AltaSitioView.as_view(), name="alta-sitio"),
+    path(
+        "sitios/<int:pk>/puntos/",
+        api_views.AltaPuntoView.as_view(),
+        name="alta-punto",
+    ),
     path("me/puntos/", api_views.MisPuntosView.as_view(), name="mis-puntos"),
 ]
