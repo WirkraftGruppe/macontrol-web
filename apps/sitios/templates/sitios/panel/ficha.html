@@ -60,6 +60,6 @@
 {% block scripts %}
   {% if pestana != "puntos" %}<script src="{% static 'vendor/leaflet/leaflet.js' %}"></script>{% endif %}
   <script src="{% static 'sitios/sondeo.js' %}"></script>
-  {% if pestana == "mapa" %}<script src="{% static 'sitios/puntos_mapa.js' %}"></script>{% endif %}
+  {% if pestana == "mapa" %}<script src="{% static 'sitios/sitio_ficha_mapa.js' %}"></script>{% endif %}
   {% if pestana == "planos" %}<script src="{% static 'sitios/plano_editor.js' %}"></script>{% endif %}
 {% endblock %}

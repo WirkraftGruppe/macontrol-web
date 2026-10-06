@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from decimal import Decimal
 
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -64,3 +65,48 @@ class MigracionPuntosTests(TransactionTestCase):
             .apps
         )
         self.assertEqual(apps.get_model("sitios", "PuntoControl").objects.count(), 2)
+
+
+class QuitarPropuestaTests(TransactionTestCase):
+    ANTES = [("sitios", "0006_puntocontrol_foto")]
+    DESPUES = [("sitios", "0007_quitar_ubicacion_propuesta")]
+
+    def tearDown(self):
+        ejecutor = MigrationExecutor(connection)
+        ejecutor.migrate(ejecutor.loader.graph.leaf_nodes())
+
+    def test_propuesta_pendiente_se_aplica_si_no_hay_coordenadas(self):
+        apps = _migrar(self.ANTES)
+        Cliente = apps.get_model("clientes", "Cliente")
+        Sitio = apps.get_model("sitios", "Sitio")
+        Punto = apps.get_model("sitios", "PuntoControl")
+        sitio = Sitio.objects.create(
+            cliente=Cliente.objects.create(razon_social="ACME"), nombre="Planta"
+        )
+        propuesta = {
+            "latitud": "-35.100000",
+            "longitud": "-57.500000",
+            "precision_m": "8",
+        }
+        sin_coordenadas = Punto.objects.create(
+            sitio=sitio, nombre="A", orden=1, ubicacion_propuesta=propuesta
+        )
+        con_coordenadas = Punto.objects.create(
+            sitio=sitio,
+            nombre="B",
+            orden=2,
+            latitud=Decimal("-36.100000"),
+            longitud=Decimal("-58.200000"),
+            ubicacion_propuesta=propuesta,
+        )
+        sin_propuesta = Punto.objects.create(sitio=sitio, nombre="C", orden=3)
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        punto = Punto.objects.get(pk=sin_coordenadas.pk)
+        self.assertEqual(punto.latitud, Decimal("-35.1"))
+        self.assertEqual(punto.longitud, Decimal("-57.5"))
+        punto = Punto.objects.get(pk=con_coordenadas.pk)
+        self.assertEqual(punto.latitud, Decimal("-36.1"))
+        self.assertEqual(punto.longitud, Decimal("-58.2"))
+        punto = Punto.objects.get(pk=sin_propuesta.pk)
+        self.assertIsNone(punto.latitud)

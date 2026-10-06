@@ -1,7 +1,6 @@
 """Servicios de Sitios: supresión de datos, QR y ubicación de los puntos."""
 
 import uuid
-from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -81,25 +80,6 @@ def fijar_ubicacion(punto, latitud, longitud):
     punto.longitud = longitud
     punto._change_reason = "Ubicación fijada en el mapa"
     punto.save(update_fields=["latitud", "longitud"])
-
-
-def aceptar_ubicacion_propuesta(punto):
-    """Pasa la ``ubicacion_propuesta`` a lat/lng; falla si no hay propuesta."""
-    propuesta = punto.ubicacion_propuesta
-    if not propuesta:
-        raise ValidationError("El punto no tiene una ubicación propuesta.")
-    punto.latitud = Decimal(propuesta["latitud"])
-    punto.longitud = Decimal(propuesta["longitud"])
-    punto.ubicacion_propuesta = None
-    punto._change_reason = "Ubicación propuesta aceptada"
-    punto.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
-
-
-def descartar_ubicacion_propuesta(punto):
-    """Descarta la propuesta; así una revisión posterior puede traer otra."""
-    punto.ubicacion_propuesta = None
-    punto._change_reason = "Ubicación propuesta descartada"
-    punto.save(update_fields=["ubicacion_propuesta"])
 
 
 def mover_en_plano(punto, x, y):
@@ -205,14 +185,13 @@ def crear_punto_en_campo(
 
 
 def fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m):
-    """Fija lat/lng del punto desde el GPS de un administrador y limpia la propuesta."""
+    """Fija lat/lng del punto desde el GPS de un administrador."""
     _exigir_activo(punto.sitio)
     if not punto.activo:
         raise ValidationError("El punto está inactivo.")
     _exigir_precision(precision_m)
     punto.latitud = latitud
     punto.longitud = longitud
-    punto.ubicacion_propuesta = None
     punto._history_user = administrador
     punto._change_reason = "Ubicación fijada en campo desde la app"
-    punto.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
+    punto.save(update_fields=["latitud", "longitud"])

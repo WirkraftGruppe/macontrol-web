@@ -245,4 +245,3 @@ class ModoCampoFlujoTests(TestCase):
         marcador = PuntoControl.objects.get(pk=punto.data["id"])
         self.assertEqual(float(marcador.latitud), -36.1005)
         self.assertEqual(float(marcador.longitud), -57.8005)
-        self.assertIsNone(marcador.ubicacion_propuesta)

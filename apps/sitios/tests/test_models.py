@@ -93,14 +93,6 @@ class PuntoControlTests(TestCase):
             punto.clean()
         self.assertIn("activo", error.exception.message_dict)
 
-    def test_historial_no_guarda_la_ubicacion_propuesta(self):
-        punto = self.sitio.puntos.get()
-        with self.assertRaises(FieldDoesNotExist):
-            PuntoControl.history.model._meta.get_field("ubicacion_propuesta")
-        punto.ubicacion_propuesta = {"lat": -36.1, "lng": -57.8}
-        punto.save()
-        self.assertEqual(punto.history.count(), 2)
-
 
 class EstadoRevisionTests(TestCase):
     def setUp(self):

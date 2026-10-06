@@ -540,8 +540,6 @@ class ModoCampoTests(TestCase):
     def test_fijar_ubicacion_registra_quien(self):
         sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
         punto = sitio.puntos.get()
-        punto.ubicacion_propuesta = {"latitud": "-1", "longitud": "-2"}
-        punto.save()
         r = self.api.post(
             self._url_ubicacion(punto),
             {"latitud": "-36.100000", "longitud": "-57.800000", "precision_m": 8},
@@ -550,7 +548,6 @@ class ModoCampoTests(TestCase):
         self.assertEqual(r.status_code, 200, r.content)
         punto.refresh_from_db()
         self.assertEqual(float(punto.latitud), -36.1)
-        self.assertIsNone(punto.ubicacion_propuesta)
         ultimo = punto.history.first()
         self.assertEqual(ultimo.history_user, self.admin)
         self.assertEqual(

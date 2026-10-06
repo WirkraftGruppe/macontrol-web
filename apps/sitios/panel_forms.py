@@ -97,17 +97,6 @@ class PlanoForm(forms.ModelForm):
         self.fields["orden"].required = False
 
 
-class UbicacionForm(forms.Form):
-    """Coordenadas que llegan por POST desde el mapa."""
-
-    latitud = forms.DecimalField(
-        min_value=-90, max_value=90, max_digits=9, decimal_places=6
-    )
-    longitud = forms.DecimalField(
-        min_value=-180, max_value=180, max_digits=9, decimal_places=6
-    )
-
-
 class PosicionForm(forms.Form):
     """Posición del marcador en el plano, en fracción del ancho y del alto."""
 

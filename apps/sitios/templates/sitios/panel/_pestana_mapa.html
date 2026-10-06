@@ -1,31 +1,11 @@
 <section>
-  <h2>Mapa de puntos</h2>
-  {% if con_propuesta %}
-  <div class="propuestas">
-    <h3>Ubicaciones propuestas por las revisiones</h3>
-    <ul>
-      {% for punto in con_propuesta %}
-      <li>
-        {{ punto.nombre }}: {{ punto.ubicacion_propuesta.latitud }}, {{ punto.ubicacion_propuesta.longitud }} (precisión {{ punto.ubicacion_propuesta.precision_m }} m)
-        <form class="en-linea" method="post" action="{% url 'panel:sitios:punto_propuesta' punto.pk %}">
-          {% csrf_token %}
-          <button class="boton boton-primario" type="submit" name="accion" value="aceptar">Aceptar</button>
-          <button class="boton boton-secundario" type="submit" name="accion" value="descartar">Descartar</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
+  <h2>Ubicación del sitio</h2>
+  {% if sitio.latitud is not None and sitio.longitud is not None %}
+  <div id="mapa-sitio" class="mapa-leaflet"></div>
+  {% else %}
+  <p>El sitio no tiene ubicación cargada.</p>
   {% endif %}
-  <p class="ayuda">Elija un punto y haga clic en el mapa para fijar su latitud y longitud.</p>
-  <div class="campo">
-    <label for="mapa-punto">Punto</label>
-    <select id="mapa-punto">
-      {% for punto in puntos_activos %}<option value="{{ punto.pk }}">{{ punto.nombre }}</option>{% endfor %}
-    </select>
-  </div>
-  <p id="mapa-mensaje" role="status"></p>
-  <div id="mapa-puntos" class="mapa-leaflet"></div>
+  <p><a href="{% url 'panel:sitios:editar' sitio.pk %}">Editar ubicación</a></p>
   <p class="ayuda">&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a></p>
   {{ datos_mapa|json_script:"datos-mapa" }}
 </section>
