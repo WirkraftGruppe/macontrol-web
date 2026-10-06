@@ -80,7 +80,6 @@ TOKENS = inline_serializer(
     "Tokens",
     {"access": serializers.CharField(), "refresh": serializers.CharField()},
 )
-ACCESO = inline_serializer("TokenAcceso", {"access": serializers.CharField()})
 RESPUESTAS_DE_CONTRATO = {
     415: OpenApiResponse(description="El cuerpo no es JSON (`Content-Type`)."),
     429: OpenApiResponse(description="Demasiados intentos; reintentar más tarde."),
@@ -122,11 +121,12 @@ class ObtenerToken(TokenObtainPairView):
 @extend_schema(
     summary="Renovar el token de acceso",
     description=(
-        "Entrega un nuevo token de acceso a partir del token de renovación; "
-        "falla si el usuario ya no existe o cambió su contraseña."
+        "Entrega un nuevo token de acceso y un nuevo token de renovación; el "
+        "token de renovación enviado queda invalidado, así que hay que guardar "
+        "el nuevo. Falla si el usuario ya no existe o cambió su contraseña."
     ),
     responses={
-        200: ACCESO,
+        200: TOKENS,
         401: OpenApiResponse(description="Token de renovación inválido o vencido."),
         415: RESPUESTAS_DE_CONTRATO[415],
         429: RESPUESTAS_DE_CONTRATO[429],
