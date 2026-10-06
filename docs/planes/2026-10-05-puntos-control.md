@@ -533,9 +533,9 @@ commit_base: 4e2c496
 | T12 | hecha |
 | T13 | hecha |
 | T14 | hecha |
-| T15 | en curso |
-| T16 | en curso |
-| T17 | pendiente |
+| T15 | hecha |
+| T16 | hecha |
+| T17 | en curso |
 
 ### Corridas
 
@@ -556,6 +556,8 @@ commit_base: 4e2c496
 | 2026-10-05 | T11 | d5124b5 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Integrada en 57f71b3 (suite 465 OK); en la raíz `PuntoPanelTests.test_ficha_con_pestanas_sondeo_y_leaflet` corre la rama con `panel:estado_sitio` y pasa. El implementador escribió y borró `.tmp_suite.txt` en la raíz (fuera de su worktree) |
 | 2026-10-06 | T11 (con T11b) | e9d59a2 | FALLA formal (0/8 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad ola 3 (57f71b3): H1 importante (un PDF de 907 B ocupaba un worker 62 s al rasterizar), H2 menor (tooltips de Leaflet con innerHTML); corregidos en T11b (decisión del usuario: PDF en subproceso con `TIEMPO_MAXIMO_PDF = 15`, tooltips con textContent), integrada en 430c023 (suite 466 OK). T11b tocó `apps/sitios/planos.py`, `rasterizar_pdf.py` (nuevo) y `tests/test_planos.py`, fuera de las rutas de T11, autorizado para la corrección. Re-auditoría (e9d59a2): H1 cerrado (rechazo a los 15,01 s) y H2 cerrado; quedan P-puntos-control-29 y -30 |
 | 2026-10-06 | T14 | 598d2cb | FALLA formal (0/3 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. Paso 2 (prueba en `runserver`) diferido por decisión del usuario: P-puntos-control-31. Orden de integración T13 → T12 → T11 (T12 antes que T11 por rutas disjuntas) |
+| 2026-10-06 | T16 | 6c2740e | FALLA formal (0/6 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Control de exactitud de docs/01 contra el código: 5/5 coinciden. Integrada en 5c69216 (suite 466 OK) |
+| 2026-10-06 | T15 (con T15b) | 7279c6e | FALLA formal (0/4 criterios en FALLA) | verificador en el worktree (corrido en 34d3410, e3c085e y 7279c6e); única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad T15 (34d3410): H1 importante (la guarda de DEBUG no impedía sembrar `demo-admin`/`demo1234` en una base remota vía `DATABASE_URL`), H2 menor (anunciaba contraseña y rol de usuarios existentes), test de DEBUG sin mensaje; T15b ronda 1 (e3c085e): `DJANGO_ENV=development` + base local por HOST, H2 cerrado; re-auditoría: H1 abierto en parte (`?host=`, `?hostaddr=`, `?service=`, `PGHOST`); T15b ronda 2 (7279c6e, decisión del usuario): solo SQLite; re-auditoría final: H1 cerrado. Las guardas de entorno y SQLite exceden el "solo con DEBUG" del contrato por decisión del usuario. Integrada en 596f2fc (suite 473 OK) |
 
 ## Pendientes que deja este plan
 
@@ -592,8 +594,22 @@ commit_base: 4e2c496
 - P-puntos-control-29 [menor] Re-auditoría T11b: (N1) si el worker de gunicorn muere antes del timeout (SIGKILL por su propio timeout, OOM o redeploy), el hijo de `apps/sitios/rasterizar_pdf.py` sigue a 100 % de CPU sin tope: sumar `RLIMIT_CPU` (~20 s) junto al `RLIMIT_AS`. (N2) `apps/sitios/planos.py:73-77` no acota el PNG del hijo: tope de bytes de stdout, lado ≤ `LADO_MAXIMO` y `DecompressionBombError` capturado (hoy da 500); un `OSError` del `fork` también da 500. Opcional: `env` mínimo para el hijo, sin secretos.
 - P-puntos-control-30 [observación] [despliegue] El timeout del worker web debe superar `TIEMPO_MAXIMO_PDF` (15 s) más el tiempo de subida de un plano de 20 MB. `RLIMIT_AS` de 2 GiB del hijo no se ejecutó nunca (los tests corren en Windows): comprobar en Linux `python -m apps.sitios.rasterizar_pdf 4000 < plano.pdf > /dev/null; echo $?` → 0.
 - P-puntos-control-31 [importante] T14 paso 2 diferido por decisión del usuario: nadie probó en navegador el arrastre de marcadores del plano, el clic de alta, el clic de ubicación en el mapa ni el sondeo cada 5 s pausado con la pestaña oculta (el JS solo pasó `node --check`). Probar a mano con `cargar_demo` (T15) antes de fusionar en `main`.
+- P-puntos-control-32 [observación] Auditoría T15, H3: si algo falla dentro del `transaction.atomic()` de `cargar_demo` después de crear el plano, `sitios/planos/<uuid>.png` queda huérfano en MEDIA (`Plano.save` solo limpia si falla su propio INSERT). Registrar y borrar en un `except`, como `_transaccion_con_archivos`.
+- P-puntos-control-33 [observación] Auditoría T15, H4: con `ATRASO_MAXIMO_HORAS` < 72, `cargar_demo` falla en la primera revisión (atraso de 3 días) después de abrir la visita, y la idempotencia (`proyecto.visitas.exists()`) deja la demo incompleta para siempre. Acotar el atraso a `ATRASO_MAXIMO_HORAS - 1 h` o mirar visitas realizadas.
+- P-puntos-control-34 [observación] T16: `GET /api/v1/me/historial.pdf` figuraba en docs/01 y no existe en `apps/informes` ni en el OpenAPI; docs/01 lo marca "previsto, aún no existe". Revisar si es de un plan de `informes`.
+- P-puntos-control-35 [observación] `apps/panel/tests/test_recorrido.py` crea su `MEDIA_ROOT` con `mkdtemp` a nivel de módulo y no lo borra: quedan directorios `macontrol-recorrido-test-*` en `%TEMP%` por corrida (anterior a T15).
 
 ### Decisiones
+
+- 2026-10-05 — Un QR por punto de control (`PuntoControl.qr_codigo`); el `Sitio` deja de tener QR y nace con un punto "General"; el QR sigue siendo la prueba de presencia — un sitio grande tiene varios lugares que se revisan por separado — reemplaza a: 2026-09-29 (un QR por sitio físico), solo el portador del QR
+- 2026-10-05 — La `Visita` es una jornada (`pendiente`/`abierta`/`realizada`/`cancelada`, `cierre` empleado/sistema/administrador, `cerrada_en`) con N `Revision`, una por punto escaneado; la API pasa de `POST visitas/` a `visitas/abrir/`, `revisiones/` y `visitas/<id>/cerrar/` — una visita recorre varios puntos — reemplaza a: 2026-10-04 (rutas de `visitas`), solo `POST visitas/`
+- 2026-10-05 — Fotos, productos aplicados, coordenadas y planilla de ámbito `punto` cuelgan de `Revision`; `CampoPlanilla` lleva `ambito` (`punto`|`visita`); una pendiente no tiene revisiones — la evidencia es por punto — reemplaza a: 2026-10-04 (una pendiente no tiene fotos ni productos), que pasa a "no tiene revisiones"
+- 2026-10-05 — Decisiones de diseño 1 a 10 del plan (encabezado): PDF del plano con `pypdfium2` a PNG de 4000 px; `ubicacion_propuesta`; `revisiones/` recibe `qr_codigo`; `cerrar_visita` exige una revisión y el cierre por sistema; estado por punto y gravedad; carga manual por puntos; `abrir_visita` idempotente; throttle compartido `crear_visita`; historial de `Revision` sin coordenadas ni datos; sondeo HTMX pausado con `sondeo.js` — aprobadas con el plan — reemplaza a: (nada)
+- 2026-10-05 — El criterio del punto General pasa de T3 a T6 (commit 50822be, CONTRATO MODIFICADO) — el campo `Sitio.qr_codigo` recién se quita en T6 — reemplaza a: (nada)
+- 2026-10-05 — `POST /api/v1/visitas/abrir/` exige `qr_codigo` de un punto activo del sitio del proyecto, con el mismo 400 genérico que un proyecto inexistente; `abrir_visita(*, empleado, proyecto, qr_codigo)` — auditoría ola 2 H1: sin QR, abrir daba acceso a planos y puntos de cualquier sitio — reemplaza a: firma `abrir_visita(*, empleado, proyecto)` del contrato del plan
+- 2026-10-06 — El PDF del plano se rasteriza en un subproceso (`apps/sitios/rasterizar_pdf.py`) con `TIEMPO_MAXIMO_PDF = 15` s; si se pasa, se rechaza pidiendo PNG o JPG — auditoría ola 3 H1: un PDF de 907 B ocupaba un worker 62 s — reemplaza a: decisión 1 del plan, solo el lugar del render
+- 2026-10-06 — `cargar_demo` solo corre con `DEBUG`, `DJANGO_ENV=development` y SQLite, y muestra la contraseña demo solo de los usuarios que crea — auditoría T15 H1: con `DATABASE_URL` de producción sembraba un administrador con clave pública; una base "local" por HOST no se puede asegurar (túnel, `PGHOST`, `?host=`) — reemplaza a: "solo con DEBUG" de T15
+- 2026-10-06 — La prueba en navegador de T14 (arrastre, clic de alta, sondeo) se difiere a después de `cargar_demo` y es condición para fusionar en `main` (P-puntos-control-31) — decisión del usuario — reemplaza a: (nada)
 
 ### Cierra
 
