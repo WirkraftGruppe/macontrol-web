@@ -28,13 +28,15 @@ config/            settings/{__init__,base,dev,prod}.py · urls.py · asgi/wsgi
 apps/
   accounts/        User (rol: administrador | empleado), login del panel, JWT de la API
   clientes/        Cliente
-  sitios/          Sitio (lat/lng, sector, qr_codigo UUID), etiqueta QR
+  sitios/          Sitio (lat/lng, sector), PuntoControl (qr_codigo UUID, x/y en el plano), Plano
+                   estado.py (estado de un punto) · planos.py + rasterizar_pdf.py (JPG/PNG/PDF a PNG, PDF en subproceso) · qr.py (etiqueta QR del punto)
   servicios/       TipoServicio, CampoPlanilla (planilla dinámica por servicio)
   proyectos/       Proyecto (estado, frecuencia, próxima visita, encargados)
-  visitas/         Visita, Foto, ProductoAplicado; reglas que actualizan el proyecto
+  visitas/         Visita (jornada), Revision (escaneo de un punto), Foto, ProductoAplicado; abrir_visita, registrar_revision y cerrar_visita
+                   management/commands/cerrar_visitas_abiertas.py (cron diario: cierra por sistema las abiertas hace más de VISITA_ABIERTA_MAXIMO_HORAS)
   productos/       Producto (catálogo con registro ANMAT/SENASA)
   informes/        Certificado, informes PDF, historial del empleado
-  panel/           vistas del panel (Django + HTMX)
+  panel/           vistas del panel (Django + HTMX); estado.py (sondeo del estado de los puntos) y mapa.py (peor estado de los puntos de cada sitio)
   api/             DRF: serializers, viewsets, auth, `v1/`
   web/             sitio público: páginas de servicio, configuración, clientes destacados
 templates/         solo base.html y panel/base.html (el resto vive en cada app)
@@ -130,14 +132,16 @@ Para ver las rutas de una app: `grep -n "path(" apps/<app>/api_urls.py apps/<app
 
 ## Roles (`apps/accounts`)
 - `User.rol` ∈ {`administrador`, `empleado`}; properties `es_administrador`, `es_empleado`.
-- **Administrador**: panel completo. **Empleado**: solo la API; ve sus visitas asignadas, resuelve QR, crea visitas realizadas, consulta y descarga su historial.
+- **Administrador**: panel completo. **Empleado**: solo la API; ve sus visitas asignadas, resuelve QR de puntos, abre visitas, registra revisiones y las cierra, consulta y descarga su historial.
 - `is_staff` **solo** habilita `/admin/`; no significa "administrador del panel". El panel exige `rol == administrador` con su propio mixin; la API exige el rol en cada permission class.
 - Las cuentas se crean a mano desde el panel o el admin; sin autorregistro, sin recuperación de contraseña pública en etapa 1.
 
 ## Reglas de dominio que el código hace cumplir
-- Una visita con `origen=app` solo se crea a partir de un `qr_codigo` válido de un sitio activo, con geolocalización y al menos una foto. Sin QR válido la API responde 4xx; no hay ruta alternativa para el empleado.
+- El QR identifica un punto de control (`PuntoControl.qr_codigo`), no un sitio. Una visita con `origen=app` solo se abre (`abrir_visita`, `POST /api/v1/visitas/abrir/`) con `proyecto` y el `qr_codigo` de un punto activo del sitio del proyecto; un QR ajeno o inactivo da el mismo 400 que un proyecto inexistente. Cada escaneo es una `Revision` (`POST /api/v1/revisiones/`) con geolocalización y de 1 a 10 fotos, dentro de una visita abierta del empleado. No hay ruta alternativa para el empleado.
 - Una visita con `origen=manual` solo la crea un administrador y lleva `motivo_manual` obligatorio.
-- Al guardar una visita realizada: `proyecto.encargado_actual = visita.empleado`, `proyecto.actualizado = now()`, y si `frecuencia_dias` está definida, `proxima_visita = realizada_en + frecuencia_dias`. Esta regla vive en un servicio de `apps/visitas/` (no en la vista ni en el serializer) y tiene test.
+- Al cerrar una visita (`cerrar_visita`): exige al menos una revisión, pasa a `realizada` con `cierre` empleado, sistema o administrador, y actualiza el proyecto: `proyecto.encargado_actual = visita.empleado`, `proyecto.actualizado = now()`, y si `frecuencia_dias` está definida, `proxima_visita = cerrada_en + frecuencia_dias`. Esta regla vive en un servicio de `apps/visitas/` (no en la vista ni en el serializer) y tiene test. Abrir una visita o registrar una revisión no toca el proyecto.
+- El estado de un punto (`al_dia`, `proxima`, `vencida`, `sin_revisar`) sale de `apps/sitios/estado.py`; el color de un sitio en el mapa es el peor estado de sus puntos activos.
+- Las imágenes de planos y las fotos se sirven por vistas con permiso, nunca por `MEDIA_URL`: un plano exige una visita abierta o pendiente del empleado en ese sitio (con sitio y cliente activos).
 - `ProductoAplicado.producto` siempre apunta al catálogo; la API no acepta nombres libres de producto.
 - Un `Certificado` emitido no se edita; una corrección emite uno nuevo con `reemplaza_a`.
 - El sitio público no tiene formularios que envíen correo ni "pedir presupuesto"; el contacto es el teléfono y WhatsApp.
