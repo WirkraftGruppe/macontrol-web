@@ -7,9 +7,9 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| puntos-control | plan/puntos-control | 4 cerrada (T1–T17 hechas; verificación TODO: 104/105, FALLA formal de congelado.sh por 50822be) | prueba en navegador con `cargar_demo` (P-puntos-control-31) → decisión del usuario de fusionar en `main` (copiar `### Decisiones` a `docs/decisiones.md`) | sesión 2026-10-06 cerrada |
+| puntos-control | plan/puntos-control | 4 cerrada (T1–T17 hechas; verificación TODO: 104/105, FALLA formal de congelado.sh por 50822be) | plan `cierre-puntos` ramificado desde `plan/puntos-control`; la prueba en navegador (P-puntos-control-31, etiqueta `cierre-puntos`) se hace sobre esa rama y los dos planes entran juntos a `main` (copiar `### Decisiones` a `docs/decisiones.md`) | sesión 2026-10-06 cerrada |
 
-Siguiente: probar en navegador y fusionar `puntos-control` en `main`. Pendientes a decidir: P-puntos-control-18, -20, -21, -22, -25. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: plan `cierre-puntos` (ramifica desde `plan/puntos-control`; `pendientes.py --etiqueta cierre-puntos`), prueba en navegador sobre su rama y merge conjunto a `main`. Pendientes a decidir: P-puntos-control-18, -20, -21, -22, -25. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
