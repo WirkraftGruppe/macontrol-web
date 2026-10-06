@@ -279,12 +279,12 @@ commit_base: 9a284ed
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | pendiente |
-| T7 | pendiente |
-| T8 | pendiente |
+| T6 | hecha |
+| T7 | hecha |
+| T8 | hecha |
 | T9 | pendiente |
 | T10 | hecha |
-| T11 | pendiente |
+| T11 | hecha |
 
 ### Corridas
 
@@ -295,6 +295,8 @@ commit_base: 9a284ed
 | 2026-10-06 | T4 | 3c7d1b7 | FALLA formal: 0/8 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 433/500; integrada 2eb5000 |
 | 2026-10-06 | T3 | fa9176b | FALLA formal: 0/14 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 534/550; integrada 69b433b |
 | 2026-10-06 | T10 (+ 5 [test] de T4) | 660ab2c | FALLA formal: 0/11 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 133/250; integrada aa74093 |
+| 2026-10-06 | auditoría T6 (T3, T4, T10) | da33eb8 | aprobado con correcciones: 0 bloqueantes, 1 importante (→ T11), 3 menores y 4 observaciones (→ P-cierre-puntos-5 a 11) | auditor-seguridad |
+| 2026-10-06 | T6 (raíz), T7, T8, T11 | bea9b11, f1a72a0, f78cb8c, 06ebd5c | FALLA formal: 0/20 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8, bea9b11) | aceptado por el usuario; spot check presupuestos T7 253/400, T8 170/250, T11 23/80 y test de T11; integradas b3bdc5c, c612c13, dd94639 |
 
 ## Pendientes que deja este plan
 
@@ -310,6 +312,7 @@ commit_base: 9a284ed
 - P-cierre-puntos-8 [observación] `fijar_ubicacion_en_campo` y `fijar_ubicacion` guardan la instancia sin `select_for_update`: el historial puede registrar valores viejos de otros campos (auditoría T6).
 - P-cierre-puntos-9 [observación] `registrar_revision` bloquea la visita antes de comprobar el dueño: la demora distingue "existe y está activa" de "no existe"; filtrar por `empleado` dentro del `select_for_update` (auditoría T6).
 - P-cierre-puntos-10 [observación] El rol que decide si la visita cuenta como servicio se evalúa al cerrar, no al abrir (auditoría T6).
+- P-cierre-puntos-12 [observación] `registrar_revision_demo` usa el primer proyecto activo del sitio (por `pk`); con varios proyectos activos no se puede elegir otro (T7).
 - P-cierre-puntos-11 [observación] Altas de sitio y punto, ubicación, abrir, revisiones y cerrar comparten el cupo `crear_visita` (120/h): un alta de sitio grande en campo lo agota (auditoría T6).
 
 ### Decisiones
