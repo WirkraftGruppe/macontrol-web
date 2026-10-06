@@ -386,6 +386,23 @@ class ManualTests(BaseTests):
         datos.update(extra)
         return registrar_visita_manual(**datos)
 
+    def test_hora_futura_marca_el_campo_y_viene_cargada_la_actual(self):
+        respuesta = self.client.get(self.url)
+        campo = respuesta.context["form"].fields["realizada_en"]
+        inicial = campo.initial
+        self.assertEqual(campo.widget.attrs["max"], inicial)
+        self.assertEqual(inicial, timezone.localtime().strftime("%Y-%m-%dT%H:%M"))
+        futura = (timezone.localtime() + timedelta(minutes=30)).strftime(
+            "%Y-%m-%dT%H:%M"
+        )
+        respuesta = self.client.post(self.url, self._datos(realizada_en=futura))
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(
+            respuesta.context["form"].errors["realizada_en"],
+            ["La fecha y hora de la visita no puede ser posterior a la hora actual."],
+        )
+        self.assertEqual(Visita.objects.count(), 1)
+
     def test_exige_motivo_y_pasa_por_el_servicio(self):
         respuesta = self.client.post(self.url, self._datos(motivo=" "))
         self.assertEqual(respuesta.status_code, 200)

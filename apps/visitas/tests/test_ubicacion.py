@@ -111,8 +111,6 @@ class UbicacionTests(SinArchivosMixin, TestCase):
         self.assertIsNone(sin.distancia_m)
 
     def test_administrador_fija_coordenadas_del_punto(self):
-        self.punto.ubicacion_propuesta = {"latitud": "-1"}
-        self.punto.save()
         imprecisa = self._revisar(self.admin, precision_m=Decimal("80"))
         self.punto.refresh_from_db()
         self.assertIsNone(self.punto.latitud)
@@ -121,7 +119,6 @@ class UbicacionTests(SinArchivosMixin, TestCase):
         self.punto.refresh_from_db()
         self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
         self.assertEqual(self.punto.longitud, Decimal("-57.700000"))
-        self.assertIsNone(self.punto.ubicacion_propuesta)
         ultimo = self.punto.history.first()
         self.assertEqual(ultimo.history_user, self.admin)
         self.assertEqual(ultimo.history_change_reason, MOTIVO_UBICACION_FIJADA)
@@ -131,11 +128,12 @@ class UbicacionTests(SinArchivosMixin, TestCase):
         self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
         self.assertEqual(revision.visita.empleado, self.admin)
 
-    def test_empleado_solo_propone(self):
+    def test_empleado_fija_coordenadas_del_punto(self):
         revision = self._revisar(precision_m=Decimal("8.5"))
         self.punto.refresh_from_db()
-        self.assertIsNone(self.punto.latitud)
-        self.assertEqual(self.punto.ubicacion_propuesta["revision"], revision.pk)
+        self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
+        self.assertEqual(self.punto.longitud, Decimal("-57.700000"))
+        self.assertEqual(self.punto.history.first().history_user, self.empleado)
         self.assertEqual(
             Visita.objects.get(pk=revision.visita_id).empleado, self.empleado
         )

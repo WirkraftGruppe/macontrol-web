@@ -156,6 +156,10 @@ class FormularioManual(forms.Form):
     def __init__(self, *args, proyecto, **kwargs):
         super().__init__(*args, **kwargs)
         self.proyecto = proyecto
+        # La hora actual como valor inicial y como tope del campo.
+        ahora = timezone.localtime().strftime(FORMATO_FECHA_HORA)
+        self.fields["realizada_en"].initial = ahora
+        self.fields["realizada_en"].widget.attrs["max"] = ahora
         self.esquema = proyecto.tipo_servicio.esquema_planilla("punto")
         self.esquema_visita = proyecto.tipo_servicio.esquema_planilla("visita")
         self.fields["puntos"].queryset = PuntoControl.objects.filter(

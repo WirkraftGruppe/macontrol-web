@@ -248,29 +248,22 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         cerrada_otra = cerrar_visita(otra, quien=None, cierre=Visita.Cierre.SISTEMA)
         self.assertEqual(cerrada_otra.cerrada_en, ultima_otra.realizada_en)
 
-    def test_revision_propone_ubicacion_solo_sin_coordenadas_y_precisa(self):
+    def test_revision_fija_ubicacion_solo_sin_coordenadas_y_precisa(self):
         visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
-        # Precisión mala: no propone.
+        # Precisión mala: no fija.
         self.revisar(visita, precision_m=Decimal("80"))
         self.punto.refresh_from_db()
-        self.assertIsNone(self.punto.ubicacion_propuesta)
-        # Sin precisión informada: no propone.
+        self.assertIsNone(self.punto.latitud)
+        # Sin precisión informada: no fija.
         self.revisar(visita, precision_m=None)
         self.punto.refresh_from_db()
-        self.assertIsNone(self.punto.ubicacion_propuesta)
-        # Precisa: propone con la revisión de origen.
-        buena = self.revisar(visita, precision_m=Decimal("12.5"))
+        self.assertIsNone(self.punto.latitud)
+        # Precisa: fija las coordenadas de la revisión.
+        self.revisar(visita, precision_m=Decimal("12.5"))
         self.punto.refresh_from_db()
-        self.assertEqual(
-            self.punto.ubicacion_propuesta,
-            {
-                "latitud": "-35.100000",
-                "longitud": "-57.700000",
-                "precision_m": "12.5",
-                "revision": buena.pk,
-            },
-        )
-        # Ya hay una propuesta pendiente: no se pisa.
+        self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
+        self.assertEqual(self.punto.longitud, Decimal("-57.700000"))
+        # Ya fijadas: otro escaneo preciso no las mueve.
         self.revisar(
             visita,
             precision_m=Decimal("5"),
@@ -278,14 +271,8 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
             longitud=Decimal("-58"),
         )
         self.punto.refresh_from_db()
-        self.assertEqual(self.punto.ubicacion_propuesta["revision"], buena.pk)
-        # Con coordenadas ya cargadas por el administrador, tampoco propone.
-        self.punto.ubicacion_propuesta = None
-        self.punto.latitud, self.punto.longitud = Decimal("-35"), Decimal("-57")
-        self.punto.save()
-        self.revisar(visita, precision_m=Decimal("5"))
-        self.punto.refresh_from_db()
-        self.assertIsNone(self.punto.ubicacion_propuesta)
+        self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
+        self.assertEqual(self.punto.longitud, Decimal("-57.700000"))
 
     def test_qr_de_otro_sitio_se_rechaza(self):
         visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
@@ -688,6 +675,17 @@ class ManualPorPuntosTests(SinArchivosMixin, TestCase):
         }
         argumentos.update(extra)
         return registrar_visita_manual(**argumentos)
+
+    def test_hora_futura_se_rechaza_en_el_campo(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self.cargar(realizada_en=timezone.now() + timedelta(minutes=20))
+        self.assertEqual(
+            ctx.exception.message_dict["realizada_en"],
+            ["La fecha y hora de la visita no puede ser posterior a la hora actual."],
+        )
+        self.assertEqual(Visita.objects.count(), 1)
+        # Dentro de la tolerancia de 10 minutos se acepta.
+        self.cargar(realizada_en=timezone.now() + timedelta(minutes=5))
 
     def test_crea_una_revision_por_punto(self):
         item = {
