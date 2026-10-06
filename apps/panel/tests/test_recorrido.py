@@ -18,7 +18,7 @@ from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
-from apps.sitios.models import Sitio
+from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Foto, Visita
 
 MEDIA_RECORRIDO = tempfile.mkdtemp(prefix="macontrol-recorrido-test-")
@@ -138,4 +138,99 @@ class RecorridoTests(TestCase):
         self._get_200(url_visita)
         foto = Foto.objects.get(revision__visita=pendiente)
         self._get_200(reverse("panel:visitas:foto", args=[foto.codigo]))
-        self._get_200(url_proyecto)
+        # La ficha del proyecto muestra la revisión del punto con su foto.
+        ficha = self._get_200(url_proyecto)
+        self.assertContains(ficha, self.sitio.puntos.get(orden=0).nombre)
+        self.assertContains(ficha, reverse("panel:visitas:foto", args=[foto.codigo]))
+        # El estado del sitio refleja el punto revisado.
+        estado = self._get_200(reverse("panel:estado_sitio", args=[self.sitio.pk]))
+        self.assertContains(estado, 'id="estado-puntos"')
+
+    def test_administrador_recorre_puntos_y_planos(self):
+        sitio = self.sitio
+        for pestana in ("puntos", "planos", "mapa"):
+            self._get_200(
+                f"{reverse('panel:sitios:ficha', args=[sitio.pk])}?pestana={pestana}"
+            )
+
+        # Subir un plano: la ficha queda en la pestaña del plano nuevo.
+        url_plano = reverse("panel:sitios:plano_alta", args=[sitio.pk])
+        self._get_200(url_plano)
+        imagen = BytesIO()
+        Image.new("RGB", (80, 60), "gray").save(imagen, format="PNG")
+        respuesta = self.client.post(
+            url_plano,
+            {
+                "nombre": "Planta baja",
+                "orden": 0,
+                "imagen": SimpleUploadedFile(
+                    "p.png", imagen.getvalue(), content_type="image/png"
+                ),
+            },
+        )
+        plano = Plano.objects.get(sitio=sitio)
+        self.assertRedirects(
+            respuesta,
+            f"{reverse('panel:sitios:ficha', args=[sitio.pk])}"
+            f"?pestana=planos&plano={plano.pk}",
+        )
+        self._get_200(reverse("panel:sitios:plano_imagen", args=[plano.pk]))
+
+        # Un punto nuevo sobre el plano, y su marcador se mueve.
+        url_punto = reverse("panel:sitios:punto_alta", args=[sitio.pk])
+        self._get_200(url_punto)
+        respuesta = self.client.post(
+            url_punto,
+            {
+                "nombre": "Cocina",
+                "orden": 1,
+                "activo": "on",
+                "plano": plano.pk,
+                "x": "0.2000",
+                "y": "0.3000",
+            },
+        )
+        punto = PuntoControl.objects.get(sitio=sitio, nombre="Cocina")
+        self.assertEqual(respuesta.status_code, 302)
+        movido = self.client.post(
+            reverse("panel:sitios:punto_posicion", args=[punto.pk]),
+            {"x": "0.5000", "y": "0.2500"},
+        )
+        self.assertEqual(movido.status_code, 200)
+        punto.refresh_from_db()
+        self.assertEqual((punto.x, punto.y), (Decimal("0.5"), Decimal("0.25")))
+
+        # El estado del sitio lista los puntos activos con su posición.
+        estado = self._get_200(reverse("panel:estado_sitio", args=[sitio.pk]))
+        self.assertContains(estado, f'data-punto="{punto.pk}"')
+        self.assertContains(estado, 'data-x="0.5000"')
+
+        # Visita manual por dos puntos: una revisión por punto.
+        general = sitio.puntos.get(orden=0)
+        url_manual = reverse("panel:visitas:manual", args=[self.proyecto.pk])
+        respuesta = self.client.post(
+            url_manual,
+            {
+                "empleado": self.empleado.pk,
+                "puntos": [general.pk, punto.pk],
+                "motivo": "Carga de prueba por puntos",
+                "realizada_en": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+                "productos-TOTAL_FORMS": 0,
+                "productos-INITIAL_FORMS": 0,
+                "productos-MIN_NUM_FORMS": 0,
+                "productos-MAX_NUM_FORMS": 30,
+                "fotos": [
+                    SimpleUploadedFile("f.jpg", _jpeg(), content_type="image/jpeg")
+                ],
+            },
+        )
+        visita = Visita.objects.get(proyecto=self.proyecto)
+        self.assertRedirects(
+            respuesta, reverse("panel:visitas:ficha", args=[visita.pk])
+        )
+        self.assertEqual(visita.revisiones.count(), 2)
+
+        # La ficha del proyecto lista las revisiones de ambos puntos.
+        ficha = self._get_200(reverse("panel:proyectos:ficha", args=[self.proyecto.pk]))
+        self.assertContains(ficha, "Cocina")
+        self.assertContains(ficha, general.nombre)
