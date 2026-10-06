@@ -1,13 +1,14 @@
 """Formularios del panel de Visitas."""
 
 from django import forms
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.productos.models import Producto
 from apps.sitios.models import PuntoControl
 
-from .models import Visita
+from .models import Revision, Visita
 from .planillas import validar_datos
 from .serializers import MAX_BYTES_FOTO
 from .services import MAX_FOTOS, MAX_PRODUCTOS
@@ -160,9 +161,12 @@ class FormularioManual(forms.Form):
         self.fields["puntos"].queryset = PuntoControl.objects.filter(
             sitio_id=proyecto.sitio_id, activo=True
         )
-        pendientes = Visita.objects.filter(
-            proyecto=proyecto, estado=Visita.Estado.PENDIENTE
-        ).order_by("programada_para", "pk")
+        # Una pendiente con revisiones (evidencia migrada) no se completa a mano.
+        pendientes = (
+            Visita.objects.filter(proyecto=proyecto, estado=Visita.Estado.PENDIENTE)
+            .exclude(Exists(Revision.objects.filter(visita=OuterRef("pk"))))
+            .order_by("programada_para", "pk")
+        )
         self.fields["pendiente"].queryset = pendientes
         self.fields["pendiente"].label_from_instance = lambda v: (
             f"Pendiente {v.pk} de {v.empleado}"

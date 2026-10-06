@@ -576,11 +576,12 @@ def registrar_visita_manual(
     (ámbito `punto`); las fotos y los productos quedan en la revisión del primer
     punto por `orden`. Cierra la visita con `cierre=administrador` y `cerrada_en`
     igual a `realizada_en`; `datos_visita` es la planilla de ámbito `visita`. Crea
-    la visita, o completa `pendiente`, con `origen=manual`. Una carga con más de
-    `ATRASO_MAXIMO_HORAS` de atraso exige `confirmar_atraso` y deja la confirmación
-    en el historial. Todo ocurre en una transacción; si algo falla no queda nada,
-    tampoco los archivos. Levanta `ValidationError` con errores por campo. No debe
-    llamarse dentro de otro `atomic`.
+    la visita, o completa `pendiente` (sin revisiones previas), con
+    `origen=manual`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige
+    `confirmar_atraso` y deja la confirmación en el historial. Todo ocurre en una
+    transacción; si algo falla no queda nada, tampoco los archivos. Levanta
+    `ValidationError` con errores por campo. No debe llamarse dentro de otro
+    `atomic`.
     """
     with _transaccion_con_archivos() as guardadas:
         errores = {}
@@ -619,6 +620,10 @@ def registrar_visita_manual(
                 or visita.estado != Visita.Estado.PENDIENTE
             ):
                 errores["pendiente"] = ["La visita no es una pendiente del proyecto."]
+            elif visita.revisiones.exists():
+                errores["pendiente"] = [
+                    "La pendiente ya tiene revisiones: no se completa a mano."
+                ]
         if errores:
             raise ValidationError(errores)
 
