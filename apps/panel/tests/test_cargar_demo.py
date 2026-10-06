@@ -1,4 +1,4 @@
-"""Pruebas de ``cargar_demo``: datos genéricos, idempotente y solo con DEBUG."""
+"""Pruebas de ``cargar_demo``: datos genéricos, idempotente y solo con SQLite."""
 
 import os
 import shutil
@@ -12,7 +12,7 @@ from django.test import TestCase, override_settings
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
-from apps.panel.management.commands.cargar_demo import _base_local
+from apps.panel.management.commands.cargar_demo import _es_sqlite
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Foto, Revision, Visita
 
@@ -88,13 +88,24 @@ class CargarDemoTests(TestCase):
 
     def test_base_local_rechaza_host_remoto(self):
         postgres = "django.db.backends.postgresql"
-        self.assertFalse(_base_local({"ENGINE": postgres, "HOST": "db.remoto.com"}))
-        self.assertTrue(_base_local({"ENGINE": "django.db.backends.sqlite3"}))
-        self.assertTrue(_base_local({"ENGINE": postgres, "HOST": "localhost"}))
-        remota = mock.Mock(settings_dict={"ENGINE": postgres, "HOST": "db.remoto.com"})
+        self.assertTrue(_es_sqlite({"ENGINE": "django.db.backends.sqlite3"}))
+        self.assertFalse(_es_sqlite({"ENGINE": postgres, "HOST": "db.remoto.com"}))
+        self.assertFalse(_es_sqlite({"ENGINE": postgres, "HOST": "localhost"}))
+        self.assertFalse(
+            _es_sqlite({"ENGINE": postgres, "HOST": "", "OPTIONS": {"host": "remoto"}})
+        )
+        self._rechaza_con({"ENGINE": postgres, "HOST": "db.remoto.com"})
+
+    def test_rechaza_postgres_local(self):
+        postgres = "django.db.backends.postgresql"
+        self._rechaza_con({"ENGINE": postgres, "HOST": "localhost"})
+
+    def _rechaza_con(self, configuracion):
+        """El comando rechaza esa base con el mensaje de SQLite y sin escribir."""
+        falsa = mock.Mock(settings_dict=configuracion)
         ruta = "apps.panel.management.commands.cargar_demo.connection"
-        with override_settings(DEBUG=True), mock.patch(ruta, remota):
-            with self.assertRaisesMessage(CommandError, "base local"):
+        with override_settings(DEBUG=True), mock.patch(ruta, falsa):
+            with self.assertRaisesMessage(CommandError, "solo corre contra SQLite"):
                 self._cargar()
         self.assertEqual(Cliente.objects.count(), 0)
         self.assertFalse(User.objects.exists())

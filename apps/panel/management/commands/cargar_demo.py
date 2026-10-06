@@ -25,7 +25,6 @@ from apps.visitas.models import Visita
 CLAVE_DEMO = "demo1234"
 LATITUD_BASE = Decimal("-36.090000")
 LONGITUD_BASE = Decimal("-57.800000")
-HOSTS_LOCALES = {"", "localhost", "127.0.0.1", "::1"}
 
 # (cliente, sitio, nombres de los puntos además de "General")
 SITIOS = [
@@ -39,11 +38,9 @@ SITIOS = [
 ]
 
 
-def _base_local(config):
-    """True si la base es SQLite o su HOST es la propia máquina."""
-    return config.get("ENGINE", "").endswith("sqlite3") or (
-        config.get("HOST", "") in HOSTS_LOCALES
-    )
+def _es_sqlite(config):
+    """True solo si la base es SQLite: un HOST local puede ser un túnel a producción."""
+    return config.get("ENGINE", "").endswith("sqlite3")
 
 
 def _imagen(ancho, alto, color, formato, nombre):
@@ -60,7 +57,7 @@ class Command(BaseCommand):
     help = (
         "Carga datos de demostración genéricos (clientes, sitios, puntos, planos, "
         "proyectos, visitas con revisiones y fotos). Es idempotente y solo corre "
-        "con DEBUG, DJANGO_ENV=development y una base local (SQLite o HOST local), "
+        "con DEBUG, DJANGO_ENV=development y SQLite (sin DATABASE_URL), "
         "para no tocar nunca una base remota. Crea los usuarios demo-admin "
         "(administrador) y demo-empleado "
         f"(empleado) con la contraseña {CLAVE_DEMO}: existen solo en desarrollo."
@@ -71,10 +68,10 @@ class Command(BaseCommand):
             raise CommandError("cargar_demo solo se puede ejecutar con DEBUG activo.")
         if os.environ.get("DJANGO_ENV") != "development":
             raise CommandError("cargar_demo exige DJANGO_ENV=development.")
-        if not _base_local(connection.settings_dict):
+        if not _es_sqlite(connection.settings_dict):
             raise CommandError(
-                "cargar_demo solo corre contra una base local (SQLite o HOST local); "
-                "revise DATABASE_URL."
+                "cargar_demo solo corre contra SQLite (DJANGO_ENV=development sin "
+                "DATABASE_URL)."
             )
         with transaction.atomic():
             empleado = self._usuarios()
