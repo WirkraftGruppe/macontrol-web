@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
@@ -9,7 +10,7 @@ from apps.clientes.models import Cliente
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios import services
-from apps.sitios.models import PuntoControl, Sitio
+from apps.sitios.models import Plano, PuntoControl, Sitio
 
 
 class _BaseSitio(TestCase):
@@ -147,3 +148,19 @@ class RegenerarQrPuntoTests(_BaseSitio):
             punto.refresh_from_db()
             self.assertEqual(punto.qr_codigo, codigo)
         self.assertEqual(services.regenerar_qr_lote(puntos[:3]), 3)
+
+
+class UbicarEnPlanoTests(_BaseSitio):
+    def test_ubica_valida_sitio_y_rango(self):
+        punto = self.sitio.puntos.get()
+        plano = Plano.objects.create(sitio=self.sitio, nombre="PB", imagen="p.png")
+        otro = Sitio.objects.create(cliente=self.cliente, nombre="Otra")
+        ajeno = Plano.objects.create(sitio=otro, nombre="Aj", imagen="a.png")
+        services.ubicar_en_plano(punto, plano, Decimal("0.2"), Decimal("0.8"))
+        punto.refresh_from_db()
+        self.assertEqual(
+            (punto.plano, punto.x, punto.y), (plano, Decimal("0.2"), Decimal("0.8"))
+        )
+        for destino, x, y in ((ajeno, 0.5, 0.5), (plano, 1.5, 0.5), (plano, 0.5, -1)):
+            with self.assertRaises(ValidationError):
+                services.ubicar_en_plano(punto, destino, x, y)

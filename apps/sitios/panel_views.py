@@ -175,6 +175,16 @@ class SitioFicha(AdministradorRequeridoMixin, DetailView):
                 for p in puntos
                 if p.plano_id == plano.pk
             ],
+            "sin_ubicar": [
+                {
+                    "id": p.pk,
+                    "nombre": p.nombre,
+                    "url": reverse("panel:sitios:punto_posicion", args=[p.pk]),
+                }
+                for p in puntos
+                if not p.plano_id
+                or (p.plano_id == plano.pk and (p.x is None or p.y is None))
+            ],
         }
 
 
@@ -283,14 +293,33 @@ class _AccionPunto(_PuntoMixin, SingleObjectMixin, View):
 
 
 class PuntoPosicion(_AccionPunto):
-    """Guarda la posición (x, y en fracción 0 a 1) del marcador en el plano."""
+    """Guarda la posición (x, y en fracción 0 a 1) del marcador en el plano.
+
+    Con ``plano`` en el POST ubica en él un punto que no lo tenía.
+    """
 
     def post(self, request, pk):
         punto = self.get_object()
         form = PosicionForm(request.POST)
-        if not punto.plano_id or not form.is_valid():
+        if not form.is_valid():
             return JsonResponse({"error": "Posición inválida."}, status=400)
-        services.mover_en_plano(punto, form.cleaned_data["x"], form.cleaned_data["y"])
+        x, y = form.cleaned_data["x"], form.cleaned_data["y"]
+        if "plano" in request.POST:
+            plano = (
+                Plano.objects.filter(pk=request.POST["plano"]).first()
+                if request.POST["plano"].isdigit()
+                else None
+            )
+            try:
+                if plano is None:
+                    raise ValidationError("Plano inexistente.")
+                services.ubicar_en_plano(punto, plano, x, y)
+            except ValidationError:
+                return JsonResponse({"error": "Plano inválido."}, status=400)
+        elif not punto.plano_id:
+            return JsonResponse({"error": "Posición inválida."}, status=400)
+        else:
+            services.mover_en_plano(punto, x, y)
         return JsonResponse({"x": _numero(punto.x), "y": _numero(punto.y)})
 
 

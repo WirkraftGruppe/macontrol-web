@@ -110,6 +110,19 @@ def mover_en_plano(punto, x, y):
     punto.save(update_fields=["x", "y"])
 
 
+def ubicar_en_plano(punto, plano, x, y):
+    """Ubica el punto en un plano de su mismo sitio, con x e y entre 0 y 1."""
+    if plano.sitio_id != punto.sitio_id:
+        raise ValidationError("El plano es de otro sitio.")
+    if not (0 <= x <= 1 and 0 <= y <= 1):
+        raise ValidationError("La posición debe estar entre 0 y 1.")
+    punto.plano = plano
+    punto.x = x
+    punto.y = y
+    punto._change_reason = "Punto ubicado en el plano"
+    punto.save(update_fields=["plano", "x", "y"])
+
+
 def desactivar_punto(punto):
     """Da de baja el punto: conserva sus revisiones, pero deja de pedirse."""
     punto.activo = False

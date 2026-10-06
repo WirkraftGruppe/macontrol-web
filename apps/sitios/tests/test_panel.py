@@ -187,6 +187,52 @@ class PlanoPanelTests(_BaseAdminTests):
             self.client.post(url, {"x": "0.1", "y": "0.1"}).status_code, 403
         )
 
+    def test_ubicar_punto_sin_plano_con_clic(self):
+        suelto = PuntoControl.objects.create(sitio=self.sitio, nombre="Suelto")
+        url = reverse("panel:sitios:punto_posicion", args=[suelto.pk])
+        self.assertEqual(
+            self.client.post(url, {"x": "0.3", "y": "0.4"}).status_code, 400
+        )
+        r = self.client.post(url, {"plano": self.plano.pk, "x": "0.3", "y": "0.4"})
+        self.assertEqual(r.status_code, 200)
+        suelto.refresh_from_db()
+        self.assertEqual(
+            (suelto.plano, suelto.x, suelto.y),
+            (self.plano, Decimal("0.3"), Decimal("0.4")),
+        )
+
+    def test_plano_ofrece_crear_y_lista_sin_ubicar(self):
+        suelto = PuntoControl.objects.create(sitio=self.sitio, nombre="Suelto")
+        sin_xy = PuntoControl.objects.create(
+            sitio=self.sitio, nombre="Sin xy", plano=self.plano
+        )
+        inactivo = PuntoControl.objects.create(
+            sitio=self.sitio, nombre="Baja", activo=False
+        )
+        r = self.client.get(
+            reverse("panel:sitios:ficha", args=[self.sitio.pk]),
+            {"pestana": "planos", "plano": self.plano.pk},
+        )
+        self.assertContains(r, "Crear nuevo punto")
+        self.assertContains(r, "Sin ubicar en este plano")
+        self.assertContains(r, "Suelto")
+        sin_ubicar = {p["id"] for p in r.context["datos_plano"]["sin_ubicar"]}
+        self.assertEqual(sin_ubicar, {self.general.pk, suelto.pk, sin_xy.pk})
+        self.assertNotIn(inactivo.pk, sin_ubicar)
+
+    def test_ubicar_en_plano_de_otro_sitio_da_400(self):
+        otro = Sitio.objects.create(cliente=self.cliente, nombre="Otra")
+        ajeno = Plano.objects.create(
+            sitio=otro, nombre="Ajeno", imagen=SimpleUploadedFile("a.png", _png())
+        )
+        url = reverse("panel:sitios:punto_posicion", args=[self.general.pk])
+        for plano in (ajeno.pk, 999999, "x"):
+            r = self.client.post(url, {"plano": plano, "x": "0.9", "y": "0.9"})
+            self.assertEqual(r.status_code, 400)
+        self.general.refresh_from_db()
+        self.assertEqual(self.general.plano, self.plano)
+        self.assertIsNone(self.general.x)
+
     def test_subir_pdf_crea_plano_y_rechaza_otro_formato(self):
         r = self._subir(_pdf(), "plano.pdf")
         self.assertEqual(r.status_code, 302)
