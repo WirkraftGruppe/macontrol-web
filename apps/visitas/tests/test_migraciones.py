@@ -170,7 +170,10 @@ class MigracionRevisionesTests(TransactionTestCase):
 
         empleado = User.objects.get(pk=pendiente.empleado_id)
         real = VisitaReal.objects.get(pk=pendiente.pk)
-        abierta, _ = abrir_visita(empleado=empleado, proyecto=real.proyecto)
+        qr = real.proyecto.sitio.puntos.get(orden=0).qr_codigo
+        abierta, _ = abrir_visita(
+            empleado=empleado, proyecto=real.proyecto, qr_codigo=qr
+        )
         self.assertNotEqual(abierta.pk, real.pk)
 
     def test_vuelta_atras_devuelve_la_evidencia_a_la_visita(self):
