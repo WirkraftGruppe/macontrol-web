@@ -18,6 +18,7 @@ from .consultas import filtrar_por_estado_visita
 from .models import FILTRO_ENCARGADO, EstadoVisita, Proyecto
 from .panel_forms import FormularioProyectoAlta, FormularioProyectoEdicion
 
+FILTRO_MAXIMO_OPCIONES = 200
 FILTROS = ("cliente", "sitio", "servicio", "estado", "encargado", "estado_visita")
 
 
@@ -65,12 +66,17 @@ class ListadoProyectos(AdministradorRequeridoMixin, ListadoPanelMixin):
         parametros = {"q": contexto["q"], "orden": contexto["orden"], **filtros}
         contexto["querystring"] = urlencode({k: v for k, v in parametros.items() if v})
         contexto["filtros"] = filtros
-        contexto["clientes"] = Cliente.objects.order_by("razon_social")
-        contexto["sitios"] = Sitio.objects.order_by("nombre")
-        contexto["servicios"] = TipoServicio.objects.order_by("nombre")
+        tope = FILTRO_MAXIMO_OPCIONES
+        contexto["clientes"] = Cliente.objects.filter(activo=True).order_by(
+            "razon_social"
+        )[:tope]
+        contexto["sitios"] = Sitio.objects.filter(activo=True).order_by("nombre")[:tope]
+        contexto["servicios"] = TipoServicio.objects.filter(activo=True).order_by(
+            "nombre"
+        )[:tope]
         contexto["encargados"] = User.objects.filter(**FILTRO_ENCARGADO).order_by(
             "username"
-        )
+        )[:tope]
         contexto["estados"] = Proyecto.Estado.choices
         contexto["estados_visita"] = EstadoVisita.choices
         return contexto

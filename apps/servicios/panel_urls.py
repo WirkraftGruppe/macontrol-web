@@ -24,4 +24,9 @@ urlpatterns = [
         panel_views.CampoDesactivarView.as_view(),
         name="campo_desactivar",
     ),
+    path(
+        "campos/<int:pk>/reactivar/",
+        panel_views.CampoReactivarView.as_view(),
+        name="campo_reactivar",
+    ),
 ]

@@ -3,7 +3,7 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
-from django.views.generic import DetailView, FormView, TemplateView
+from django.views.generic import DetailView, FormView, TemplateView, View
 
 from apps.accounts.mixins import AdministradorRequeridoMixin
 from apps.panel.listados import ListadoPanelMixin
@@ -111,4 +111,17 @@ class CampoDesactivarView(AdministradorRequeridoMixin, TemplateView):
         campo.activo = False
         campo.save(update_fields=["activo"])
         messages.success(request, "Campo desactivado.")
+        return redirect("panel:servicios:campos", pk=campo.tipo_servicio_id)
+
+
+class CampoReactivarView(AdministradorRequeridoMixin, View):
+    """Solo POST: el campo vuelve al esquema; su clave ya le pertenecía."""
+
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        campo = get_object_or_404(CampoPlanilla, pk=kwargs["pk"])
+        campo.activo = True
+        campo.save(update_fields=["activo"])
+        messages.success(request, "Campo reactivado.")
         return redirect("panel:servicios:campos", pk=campo.tipo_servicio_id)

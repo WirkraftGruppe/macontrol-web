@@ -75,6 +75,20 @@ class PlanillaPanelTests(TestCase):
         self.assertEqual(self.tipo.esquema_planilla(), [])
         self.assertTrue(CampoPlanilla.objects.filter(pk=self.campo.pk).exists())
 
+    def test_reactivar_campo_vuelve_al_esquema(self):
+        self.campo.activo = False
+        self.campo.save(update_fields=["activo"])
+        self.assertEqual(self.tipo.esquema_planilla(), [])
+        url = reverse("panel:servicios:campo_reactivar", args=[self.campo.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        respuesta = self.client.post(url)
+        self.assertRedirects(
+            respuesta, reverse("panel:servicios:campos", args=[self.tipo.pk])
+        )
+        self.campo.refresh_from_db()
+        self.assertTrue(self.campo.activo)
+        self.assertEqual(self.tipo.esquema_planilla()[0]["clave"], "cebos")
+
     def test_clave_y_tipo_fijos_si_una_visita_los_uso(self):
         url = reverse("panel:servicios:campo_editar", args=[self.campo.pk])
         envio = {

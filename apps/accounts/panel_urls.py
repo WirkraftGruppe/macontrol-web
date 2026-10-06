@@ -16,6 +16,11 @@ urlpatterns = [
         name="desactivar",
     ),
     path(
+        "<int:pk>/reactivar/",
+        vistas.UsuarioReactivarView.as_view(),
+        name="reactivar",
+    ),
+    path(
         "<int:pk>/contrasena/",
         vistas.UsuarioContrasenaView.as_view(),
         name="contrasena",
