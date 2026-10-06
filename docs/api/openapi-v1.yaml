@@ -324,8 +324,9 @@ paths:
   /api/v1/visitas/abrir/:
     post:
       operationId: visitas_abrir_create
-      description: Abre la pendiente asignada o crea una visita nueva. Si el empleado
-        ya tiene una abierta en el proyecto la devuelve con 200.
+      description: Abre la pendiente asignada o crea una visita nueva. `qr_codigo`
+        es el de un punto activo del sitio del proyecto. Si el empleado ya tiene una
+        abierta en el proyecto la devuelve con 200.
       summary: Abrir una visita
       tags:
       - visitas
@@ -357,18 +358,22 @@ paths:
                 $ref: '#/components/schemas/VisitaActiva'
           description: ''
         '400':
-          description: Proyecto inexistente o no activo.
+          description: Proyecto inexistente o inactivo, o QR ajeno al sitio.
 components:
   schemas:
     AbrirVisitaRequest:
       type: object
-      description: 'Entrada de `POST visitas/abrir/`: el proyecto donde se abre la
-        jornada.'
+      description: 'Entrada de `POST visitas/abrir/`: el proyecto y el QR escaneado
+        en el sitio.'
       properties:
         proyecto:
           type: integer
+        qr_codigo:
+          type: string
+          format: uuid
       required:
       - proyecto
+      - qr_codigo
     CerrarVisitaRequest:
       type: object
       description: 'Entrada de `POST visitas/<pk>/cerrar/`: planilla de la visita
