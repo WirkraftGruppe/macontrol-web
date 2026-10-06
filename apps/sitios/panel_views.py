@@ -7,6 +7,7 @@ from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
@@ -190,9 +191,10 @@ class PuntoAlta(AdministradorRequeridoMixin, CreateView):
     form_class = PuntoForm
     template_name = "sitios/panel/punto_formulario.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.sitio = get_object_or_404(Sitio, pk=kwargs["pk"])
-        return super().dispatch(request, *args, **kwargs)
+    @cached_property
+    def sitio(self):
+        """Se busca recién tras la autorización: el anónimo no distingue ids."""
+        return get_object_or_404(Sitio, pk=self.kwargs["pk"])
 
     def get_form_kwargs(self):
         return {**super().get_form_kwargs(), "sitio": self.sitio}
@@ -328,9 +330,10 @@ class PlanoAlta(AdministradorRequeridoMixin, CreateView):
     form_class = PlanoForm
     template_name = "sitios/panel/plano_formulario.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        self.sitio = get_object_or_404(Sitio, pk=kwargs["pk"])
-        return super().dispatch(request, *args, **kwargs)
+    @cached_property
+    def sitio(self):
+        """Se busca recién tras la autorización: el anónimo no distingue ids."""
+        return get_object_or_404(Sitio, pk=self.kwargs["pk"])
 
     def form_valid(self, form):
         form.instance.sitio = self.sitio
