@@ -1,8 +1,10 @@
 """Pruebas de ``cargar_demo``: datos genéricos, idempotente y solo con DEBUG."""
 
+import os
 import shutil
 import tempfile
 from io import StringIO
+from unittest import mock
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -10,6 +12,7 @@ from django.test import TestCase, override_settings
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
+from apps.panel.management.commands.cargar_demo import _base_local
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Foto, Revision, Visita
 
@@ -70,7 +73,42 @@ class CargarDemoTests(TestCase):
 
     @override_settings(DEBUG=False)
     def test_rechaza_sin_debug_y_no_toca_la_base(self):
-        with self.assertRaises(CommandError):
+        with self.assertRaisesMessage(CommandError, "DEBUG activo"):
             self._cargar()
         self.assertEqual(Cliente.objects.count(), 0)
         self.assertFalse(User.objects.exists())
+
+    @override_settings(DEBUG=True)
+    def test_rechaza_entorno_que_no_es_development(self):
+        with mock.patch.dict(os.environ, {"DJANGO_ENV": "production"}):
+            with self.assertRaisesMessage(CommandError, "DJANGO_ENV=development"):
+                self._cargar()
+        self.assertEqual(Cliente.objects.count(), 0)
+        self.assertFalse(User.objects.exists())
+
+    def test_base_local_rechaza_host_remoto(self):
+        postgres = "django.db.backends.postgresql"
+        self.assertFalse(_base_local({"ENGINE": postgres, "HOST": "db.remoto.com"}))
+        self.assertTrue(_base_local({"ENGINE": "django.db.backends.sqlite3"}))
+        self.assertTrue(_base_local({"ENGINE": postgres, "HOST": "localhost"}))
+        remota = mock.Mock(settings_dict={"ENGINE": postgres, "HOST": "db.remoto.com"})
+        ruta = "apps.panel.management.commands.cargar_demo.connection"
+        with override_settings(DEBUG=True), mock.patch(ruta, remota):
+            with self.assertRaisesMessage(CommandError, "base local"):
+                self._cargar()
+        self.assertEqual(Cliente.objects.count(), 0)
+        self.assertFalse(User.objects.exists())
+
+    @override_settings(DEBUG=True)
+    def test_avisa_usuario_demo_existente_sin_modificarlo(self):
+        previo = User.objects.create_user(
+            "demo-admin", password="otra-clave", rol=User.Rol.EMPLEADO
+        )
+        salida, errores = StringIO(), StringIO()
+        call_command("cargar_demo", stdout=salida, stderr=errores)
+        previo.refresh_from_db()
+        self.assertEqual(previo.rol, User.Rol.EMPLEADO)
+        self.assertTrue(previo.check_password("otra-clave"))
+        self.assertIn("demo-admin", errores.getvalue())
+        self.assertNotIn("demo-admin", salida.getvalue())
+        self.assertIn("demo-empleado", salida.getvalue())

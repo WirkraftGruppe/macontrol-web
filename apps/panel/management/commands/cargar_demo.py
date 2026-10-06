@@ -1,5 +1,6 @@
 """Carga datos de demostración genéricos: clientes, sitios, puntos, planos y visitas."""
 
+import os
 import uuid
 from datetime import timedelta
 from decimal import Decimal
@@ -8,7 +9,7 @@ from io import BytesIO
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from PIL import Image, ImageDraw
 
@@ -24,6 +25,7 @@ from apps.visitas.models import Visita
 CLAVE_DEMO = "demo1234"
 LATITUD_BASE = Decimal("-36.090000")
 LONGITUD_BASE = Decimal("-57.800000")
+HOSTS_LOCALES = {"", "localhost", "127.0.0.1", "::1"}
 
 # (cliente, sitio, nombres de los puntos además de "General")
 SITIOS = [
@@ -35,6 +37,13 @@ SITIOS = [
     ("Cliente Demo 1", "Depósito Demo Sur", ["Pasillo", "Patio"]),
     ("Cliente Demo 2", "Oficina Demo Centro", ["Recepción"]),
 ]
+
+
+def _base_local(config):
+    """True si la base es SQLite o su HOST es la propia máquina."""
+    return config.get("ENGINE", "").endswith("sqlite3") or (
+        config.get("HOST", "") in HOSTS_LOCALES
+    )
 
 
 def _imagen(ancho, alto, color, formato, nombre):
@@ -51,15 +60,24 @@ class Command(BaseCommand):
     help = (
         "Carga datos de demostración genéricos (clientes, sitios, puntos, planos, "
         "proyectos, visitas con revisiones y fotos). Es idempotente y solo corre "
-        "con DEBUG. Crea los usuarios demo-admin (administrador) y demo-empleado "
+        "con DEBUG, DJANGO_ENV=development y una base local (SQLite o HOST local), "
+        "para no tocar nunca una base remota. Crea los usuarios demo-admin "
+        "(administrador) y demo-empleado "
         f"(empleado) con la contraseña {CLAVE_DEMO}: existen solo en desarrollo."
     )
 
     def handle(self, *args, **opciones):
         if not settings.DEBUG:
             raise CommandError("cargar_demo solo se puede ejecutar con DEBUG activo.")
+        if os.environ.get("DJANGO_ENV") != "development":
+            raise CommandError("cargar_demo exige DJANGO_ENV=development.")
+        if not _base_local(connection.settings_dict):
+            raise CommandError(
+                "cargar_demo solo corre contra una base local (SQLite o HOST local); "
+                "revise DATABASE_URL."
+            )
         with transaction.atomic():
-            admin, empleado = self._usuarios()
+            empleado = self._usuarios()
             tipo, _ = TipoServicio.objects.get_or_create(
                 slug="demo-control-de-plagas",
                 defaults={"nombre": "Control de plagas (demo)"},
@@ -69,12 +87,14 @@ class Command(BaseCommand):
         # Los servicios de visitas abren su propia transacción: van fuera.
         for orden, proyecto in enumerate(proyectos):
             self._visitas(proyecto, empleado, orden)
-        self.stdout.write(
-            f"Demo lista. Usuarios: {admin.username} y {empleado.username}, "
-            f"contraseña {CLAVE_DEMO}."
-        )
+        self.stdout.write("Demo lista.")
 
     def _usuarios(self):
+        """Crea los usuarios demo y devuelve el empleado.
+
+        Uno que ya existía con otro rol u otra contraseña no se modifica: se avisa
+        por stderr y la contraseña solo se informa de los recién creados.
+        """
         usuarios = []
         for nombre, rol in (
             ("demo-admin", User.Rol.ADMINISTRADOR),
@@ -86,8 +106,14 @@ class Command(BaseCommand):
             if creado:
                 usuario.set_password(CLAVE_DEMO)
                 usuario.save()
+                self.stdout.write(f"Usuario creado: {nombre}, contraseña {CLAVE_DEMO}.")
+            elif usuario.rol != rol or not usuario.check_password(CLAVE_DEMO):
+                self.stderr.write(
+                    f"El usuario {nombre} ya existía con otro rol u otra "
+                    "contraseña: no se modificó."
+                )
             usuarios.append(usuario)
-        return usuarios
+        return usuarios[1]
 
     def _sitio(self, razon_social, nombre, nombres_puntos):
         cliente, _ = Cliente.objects.get_or_create(razon_social=razon_social)
