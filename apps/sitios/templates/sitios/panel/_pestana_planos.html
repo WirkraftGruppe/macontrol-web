@@ -1,0 +1,30 @@
+<section>
+  <h2>Planos</h2>
+  <p>
+    <a class="boton boton-primario" href="{% url 'panel:sitios:plano_alta' object.pk %}">Subir plano</a>
+  </p>
+  {% if planos %}
+  <nav class="pestanas" aria-label="Planos del sitio">
+    {% for p in planos %}
+    <a href="?pestana=planos&amp;plano={{ p.pk }}"{% if p.pk == plano.pk %} aria-current="page"{% endif %}>{{ p.nombre }}</a>
+    {% endfor %}
+  </nav>
+  <p class="ayuda">Arrastre un marcador para moverlo: la posición se guarda sola. Haga clic en un lugar libre del plano para dar de alta un punto. Los puntos sin posición aparecen en el centro. Sin ratón, cargue x e y al editar el punto.</p>
+  <p id="plano-mensaje" role="status"></p>
+  <div id="plano-editor" class="mapa-leaflet"></div>
+  <form id="plano-alta" class="formulario" method="post" action="{% url 'panel:sitios:punto_alta' object.pk %}" hidden>
+    {% csrf_token %}
+    <h3>Nuevo punto en {{ plano.nombre }}</h3>
+    <input type="hidden" name="plano" value="{{ plano.pk }}">
+    <input type="hidden" name="activo" value="on">
+    <input type="hidden" name="x" id="plano-alta-x">
+    <input type="hidden" name="y" id="plano-alta-y">
+    <div class="campo"><label for="plano-alta-nombre">Nombre</label><input type="text" name="nombre" id="plano-alta-nombre" maxlength="100" required></div>
+    <div class="campo"><label for="plano-alta-sector">Sector</label><input type="text" name="sector" id="plano-alta-sector" maxlength="100"></div>
+    <div class="acciones"><button class="boton boton-primario" type="submit">Crear punto</button></div>
+  </form>
+  {{ datos_plano|json_script:"datos-plano" }}
+  {% else %}
+  <p>Este sitio no tiene planos. Suba un JPG, PNG o PDF para ubicar los puntos.</p>
+  {% endif %}
+</section>
