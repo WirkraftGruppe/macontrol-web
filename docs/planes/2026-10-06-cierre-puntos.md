@@ -268,7 +268,7 @@ commit_base: 9a284ed
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
-| T10 | pendiente |
+| T10 | hecha |
 
 ### Corridas
 
@@ -278,6 +278,7 @@ commit_base: 9a284ed
 | 2026-10-06 | T2, T5 | 8a774ff, 8a21588 | PASA (verificador 13/13, verificador-b 13/13) | spot check T2 test_filtros; integradas 6272a20 y 4036b5b |
 | 2026-10-06 | T4 | 3c7d1b7 | FALLA formal: 0/8 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 433/500; integrada 2eb5000 |
 | 2026-10-06 | T3 | fa9176b | FALLA formal: 0/14 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 534/550; integrada 69b433b |
+| 2026-10-06 | T10 (+ 5 [test] de T4) | 660ab2c | FALLA formal: 0/11 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8) | aceptado por el usuario; spot check presupuesto 133/250; integrada aa74093 |
 
 ## Pendientes que deja este plan
 
