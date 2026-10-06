@@ -85,3 +85,9 @@ class MiPuntoSerializer(serializers.Serializer):
     latitud = serializers.FloatField(allow_null=True)
     longitud = serializers.FloatField(allow_null=True)
     estado = serializers.CharField()
+
+
+class MisPuntosParametrosSerializer(serializers.Serializer):
+    """Parámetros de consulta de `GET me/puntos/`."""
+
+    sitio = serializers.IntegerField(required=False, min_value=1)

@@ -36,6 +36,13 @@ MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="visitas-test-")
 COORDENADAS = {"latitud": Decimal("-35.1"), "longitud": Decimal("-57.7")}
 
 
+def abrir(*, empleado, proyecto, **extra):
+    """`abrir_visita` con el QR del punto General del sitio (el empleado lo escaneó)."""
+    qr = proyecto.sitio.puntos.get(orden=0).qr_codigo
+    extra.setdefault("qr_codigo", qr)
+    return abrir_visita(empleado=empleado, proyecto=proyecto, **extra)
+
+
 def jpeg_chico():
     buffer = BytesIO()
     Image.new("RGB", (20, 20), "red").save(buffer, "JPEG")
@@ -90,7 +97,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         return registrar_revision(**argumentos)
 
     def test_revision_sin_coordenadas_se_rechaza(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         for campo in ("latitud", "longitud"):
             with self.subTest(campo=campo):
                 with self.assertRaises(ValidationError) as contexto:
@@ -104,7 +111,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
     def test_abrir_revisar_cerrar_actualiza_proyecto(self):
         self.proyecto.frecuencia_dias = 30
         self.proyecto.save()
-        visita, creada = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, creada = abrir(empleado=self.empleado, proyecto=self.proyecto)
         # Abre la pendiente asignada: no crea otra visita.
         self.assertTrue(creada)
         self.assertEqual(visita.pk, self.visita.pk)
@@ -145,13 +152,13 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         )
         self.visita.empleado = otro
         self.visita.save()
-        visita, creada = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, creada = abrir(empleado=self.empleado, proyecto=self.proyecto)
         self.assertTrue(creada)
         self.assertNotEqual(visita.pk, self.visita.pk)
         self.assertTrue(visita.incidencia_asignacion)
         self.visita.refresh_from_db()
         self.assertEqual(self.visita.estado, Visita.Estado.PENDIENTE)
-        otra, creada = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        otra, creada = abrir(empleado=self.empleado, proyecto=self.proyecto)
         self.assertFalse(creada)
         self.assertEqual(otra.pk, visita.pk)
         self.assertEqual(Visita.objects.count(), 2)
@@ -160,7 +167,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.proyecto.estado = Proyecto.Estado.PAUSADO
         self.proyecto.save()
         with self.assertRaises(ValidationError) as contexto:
-            abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+            abrir(empleado=self.empleado, proyecto=self.proyecto)
         self.assertIn("proyecto", contexto.exception.message_dict)
         self.proyecto.estado = Proyecto.Estado.ACTIVO
         self.proyecto.save()
@@ -168,10 +175,10 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         sitio.activo = False
         sitio.save()
         with self.assertRaises(ValidationError):
-            abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+            abrir(empleado=self.empleado, proyecto=self.proyecto)
 
     def test_revision_exige_punto_activo_coordenadas_y_foto(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         casos = {
             "latitud": {"latitud": Decimal("90.1")},
             "longitud": {"longitud": Decimal("-181")},
@@ -221,7 +228,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertEqual(Revision.objects.count(), 0)
 
     def test_mismo_punto_dos_veces_la_ultima_manda(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         primera = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=2))
         segunda = self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=1))
         self.assertEqual((primera.orden, segunda.orden), (1, 2))
@@ -241,7 +248,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertEqual(cerrada_otra.cerrada_en, ultima_otra.realizada_en)
 
     def test_revision_propone_ubicacion_solo_sin_coordenadas_y_precisa(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         # Precisión mala: no propone.
         self.revisar(visita, precision_m=Decimal("80"))
         self.punto.refresh_from_db()
@@ -280,7 +287,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertIsNone(self.punto.ubicacion_propuesta)
 
     def test_qr_de_otro_sitio_se_rechaza(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         otro_sitio = crear_visita().proyecto.sitio
         ajeno = PuntoControl.objects.filter(sitio=otro_sitio).first()
         for nombre, codigo in (
@@ -299,7 +306,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertEqual(Foto.objects.count(), 0)
 
     def test_cliente_uuid_repetido_levanta_revision_duplicada(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         codigo = uuid4()
         primera = self.revisar(visita, cliente_uuid=codigo)
         with self.assertRaises(RevisionDuplicada) as contexto:
@@ -311,7 +318,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertIn("cliente_uuid", contexto.exception.message_dict)
 
     def test_atraso_y_futuro_se_rechazan(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         horas = 169
         with self.assertRaises(ValidationError) as contexto:
             self.revisar(visita, realizada_en=timezone.now() - timedelta(hours=horas))
@@ -321,7 +328,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
         self.assertIn("realizada_en", contexto.exception.message_dict)
 
     def test_foto_invalida_revierte_la_revision_y_borra_archivos(self):
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         previos = set(Path(MEDIA_TEMPORAL).glob("visitas/fotos/*"))
         basura = SimpleUploadedFile("x.jpg", b"no es imagen", "image/jpeg")
         with self.assertRaises(ValidationError) as contexto:
@@ -347,7 +354,7 @@ class CicloVisitaTests(SinArchivosMixin, TestCase):
             tipo=CampoPlanilla.Tipo.TEXTO,
             ambito=CampoPlanilla.Ambito.VISITA,
         )
-        visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         with self.assertRaises(ValidationError) as contexto:
             self.revisar(visita, datos={"resumen": "x"})
         self.assertIn("datos", contexto.exception.message_dict)
@@ -399,7 +406,7 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
         punto = punto_de(crear_visita())
         proyecto = punto.sitio.proyectos.get()
         empleado = proyecto.encargado_actual
-        visita, _ = abrir_visita(empleado=empleado, proyecto=proyecto)
+        visita, _ = abrir(empleado=empleado, proyecto=proyecto)
         registrar_revision(
             visita=visita,
             empleado=empleado,
@@ -709,7 +716,7 @@ class RegistrarRevisionTests(SinArchivosMixin, TestCase):
         self.empleado = pendiente.empleado
         self.proyecto = pendiente.proyecto
         self.punto = punto_de(pendiente)
-        self.visita, _ = abrir_visita(empleado=self.empleado, proyecto=self.proyecto)
+        self.visita, _ = abrir(empleado=self.empleado, proyecto=self.proyecto)
         self.producto = Producto.objects.create(nombre_comercial="Cebo")
         self.archivos_previos = self.archivos_en_disco()
 
@@ -752,9 +759,7 @@ class RegistrarRevisionTests(SinArchivosMixin, TestCase):
         pendiente = crear_visita(
             origen=Visita.Origen.MANUAL, motivo_manual="Carga a mano"
         )
-        visita, _ = abrir_visita(
-            empleado=pendiente.empleado, proyecto=pendiente.proyecto
-        )
+        visita, _ = abrir(empleado=pendiente.empleado, proyecto=pendiente.proyecto)
         self.assertEqual(visita.pk, pendiente.pk)
         self.assertEqual(visita.origen, Visita.Origen.APP)
         self.assertEqual(visita.motivo_manual, "")
@@ -762,7 +767,7 @@ class RegistrarRevisionTests(SinArchivosMixin, TestCase):
     def test_abrir_sin_pendiente_crea_nueva_con_origen_app(self):
         otra = crear_visita()
         otra.delete()
-        visita, creada = abrir_visita(empleado=otra.empleado, proyecto=otra.proyecto)
+        visita, creada = abrir(empleado=otra.empleado, proyecto=otra.proyecto)
         self.assertTrue(creada)
         self.assertEqual(visita.origen, Visita.Origen.APP)
         self.assertFalse(visita.incidencia_asignacion)

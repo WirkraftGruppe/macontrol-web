@@ -329,6 +329,29 @@ class PlanoApiTests(TestCase):
         self.plano.imagen.storage.delete(self.plano.imagen.name)
         self.assertEqual(self._get(self.empleado).status_code, 404)
 
+    def test_cliente_inactivo_da_404(self):
+        self._visita(self.proyecto, self.empleado)
+        self.assertEqual(self._get(self.empleado).status_code, 200)
+        Cliente.objects.filter(pk=self.sitio.cliente_id).update(activo=False)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+        Cliente.objects.filter(pk=self.sitio.cliente_id).update(activo=True)
+        Sitio.objects.filter(pk=self.sitio.pk).update(activo=False)
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+
+    def test_abrir_sin_qr_no_da_acceso_al_plano(self):
+        api = APIClient()
+        api.force_authenticate(self.empleado)
+        qr_ajeno = str(self.otro_sitio.puntos.get().qr_codigo)
+        for cuerpo in (
+            {"proyecto": self.proyecto.id},
+            {"proyecto": self.proyecto.id, "qr_codigo": qr_ajeno},
+        ):
+            r = api.post("/api/v1/visitas/abrir/", cuerpo, format="json")
+            self.assertEqual(r.status_code, 400, r.content)
+        self.assertFalse(Visita.objects.exists())
+        self.assertEqual(api.get("/api/v1/me/puntos/").json(), [])
+        self.assertEqual(self._get(self.empleado).status_code, 404)
+
 
 class MisPuntosTests(TestCase):
     URL = "/api/v1/me/puntos/"
@@ -397,6 +420,13 @@ class MisPuntosTests(TestCase):
         ajeno = self.api.get(self.URL, {"sitio": self.sitio3.id}).json()
         self.assertEqual(ajeno, [])
         self.assertEqual(self.api.get(self.URL, {"sitio": "x"}).status_code, 400)
+
+    def test_sitio_invalido_da_400(self):
+        self._visita(self.sitio, self.empleado)
+        for valor in ("²", "abc", "0", "9" * 5000):
+            with self.subTest(valor=valor[:10]):
+                r = self.api.get(self.URL, {"sitio": valor})
+                self.assertEqual(r.status_code, 400, r.content)
 
     def test_realizada_o_sitio_inactivo_no_cuentan_y_solo_empleados(self):
         self._visita(self.sitio, self.empleado, Visita.Estado.REALIZADA)

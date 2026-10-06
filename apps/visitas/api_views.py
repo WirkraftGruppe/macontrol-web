@@ -85,14 +85,17 @@ class AbrirVisitaView(APIView):
     @extend_schema(
         summary="Abrir una visita",
         description=(
-            "Abre la pendiente asignada o crea una visita nueva. Si el empleado ya "
-            "tiene una abierta en el proyecto la devuelve con 200."
+            "Abre la pendiente asignada o crea una visita nueva. `qr_codigo` es el de "
+            "un punto activo del sitio del proyecto. Si el empleado ya tiene una "
+            "abierta en el proyecto la devuelve con 200."
         ),
         request=AbrirVisitaSerializer,
         responses={
             201: VisitaActivaSerializer,
             200: VisitaActivaSerializer,
-            400: OpenApiResponse(description="Proyecto inexistente o no activo."),
+            400: OpenApiResponse(
+                description="Proyecto inexistente o inactivo, o QR ajeno al sitio."
+            ),
         },
     )
     def post(self, request):
@@ -100,7 +103,9 @@ class AbrirVisitaView(APIView):
         entrada = AbrirVisitaSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
         visita, creada = abrir_visita(
-            empleado=request.user, proyecto=entrada.validated_data["proyecto"]
+            empleado=request.user,
+            proyecto=entrada.validated_data["proyecto"],
+            qr_codigo=entrada.validated_data["qr_codigo"],
         )
         return Response(
             VisitaActivaSerializer(visita).data,
