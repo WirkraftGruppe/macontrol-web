@@ -64,10 +64,11 @@ VISITA_ABIERTA_MAXIMO_HORAS = 16
 
 
 def leer_distancia_maxima_m():
-    """Distancia máxima, en metros, entre un escaneo y el punto antes de marcar incidencia.
+    """Metros entre un escaneo y el punto a partir de los cuales hay incidencia.
 
-    Entero entre 50 y 5000; default 300. Por debajo de 50 el error del GPS de un teléfono
-    marcaría incidencias falsas; por encima de 5000 la verificación deja de decir algo.
+    Entero entre 50 y 5000; default 300. Por debajo de 50 el error del GPS de un
+    teléfono marcaría incidencias falsas; por encima de 5000 la verificación deja de
+    decir algo.
     """
     crudo = env("DISTANCIA_MAXIMA_M", default="300")
     try:
@@ -82,7 +83,8 @@ def leer_distancia_maxima_m():
 
 
 # Una revisión o una apertura a más metros del punto (o del sitio, si el punto no
-# tiene coordenadas) marca `incidencia_ubicacion`; nunca se rechaza (plan cierre-puntos).
+# tiene coordenadas) marca `incidencia_ubicacion`; nunca se rechaza
+# (plan cierre-puntos).
 DISTANCIA_MAXIMA_M = leer_distancia_maxima_m()
 
 # Precisión del GPS, en metros, a partir de la cual una lectura ya no fija ni propone
