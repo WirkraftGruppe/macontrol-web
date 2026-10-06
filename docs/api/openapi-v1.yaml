@@ -47,8 +47,9 @@ paths:
   /api/v1/auth/token/refresh/:
     post:
       operationId: auth_token_refresh_create
-      description: Entrega un nuevo token de acceso a partir del token de renovación;
-        falla si el usuario ya no existe o cambió su contraseña.
+      description: Entrega un nuevo token de acceso y un nuevo token de renovación;
+        el token de renovación enviado queda invalidado, así que hay que guardar el
+        nuevo. Falla si el usuario ya no existe o cambió su contraseña.
       summary: Renovar el token de acceso
       tags:
       - auth
@@ -63,7 +64,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenAcceso'
+                $ref: '#/components/schemas/Tokens'
           description: ''
         '401':
           description: Token de renovación inválido o vencido.
@@ -1166,13 +1167,6 @@ components:
       required:
       - id
       - nombre
-    TokenAcceso:
-      type: object
-      properties:
-        access:
-          type: string
-      required:
-      - access
     TokenNormalizadoRequest:
       type: object
       description: Normaliza el usuario igual que el panel antes de autenticar.
