@@ -608,3 +608,26 @@ class ModoCampoTests(TestCase):
         r = self.api.get("/api/v1/me/puntos/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual([p["id"] for p in r.json()], [punto.id])
+
+    def test_administrador_resuelve_qr_y_abre_visita(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        punto = sitio.puntos.get()
+        tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=tipo,
+            titulo="Control",
+            encargado_inicial=self.empleado,
+            encargado_actual=self.empleado,
+        )
+        r = self.api.post(f"/api/v1/qr/{punto.qr_codigo}/resolver/")
+        self.assertEqual(r.status_code, 200, r.content)
+        r = self.api.post(
+            "/api/v1/visitas/abrir/",
+            {"proyecto": proyecto.id, "qr_codigo": str(punto.qr_codigo)},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        visita = Visita.objects.get(pk=r.json()["id"])
+        self.assertEqual(visita.empleado, self.admin)
+        self.assertEqual(visita.estado, Visita.Estado.ABIERTA)
