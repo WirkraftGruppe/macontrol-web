@@ -1,6 +1,7 @@
 """Panel de Proyectos: listado filtrable, alta, edición y ficha."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.db import connection
 from django.test import TestCase
@@ -55,6 +56,25 @@ class ProyectoPanelTests(TestCase):
         respuesta = self.client.get(reverse("panel:proyectos:listado"), parametros)
         self.assertEqual(respuesta.status_code, 200)
         return [p.titulo for p in respuesta.context["proyectos"]]
+
+    def test_filtros_solo_activos_con_tope(self):
+        Cliente.objects.create(razon_social="Inactivo SA", activo=False)
+        Sitio.objects.create(cliente=self.sitio.cliente, nombre="Cerrado", activo=False)
+        TipoServicio.objects.create(nombre="Viejo", slug="viejo-t2", activo=False)
+        respuesta = self.client.get(reverse("panel:proyectos:listado"))
+        self.assertEqual(
+            [c.razon_social for c in respuesta.context["clientes"]], ["ACME"]
+        )
+        self.assertEqual([s.nombre for s in respuesta.context["sitios"]], ["Planta 1"])
+        self.assertEqual(
+            [t.nombre for t in respuesta.context["servicios"]], ["Roedores"]
+        )
+        with patch("apps.proyectos.panel_views.FILTRO_MAXIMO_OPCIONES", 2):
+            Cliente.objects.bulk_create(
+                Cliente(razon_social=f"Extra {i}") for i in range(3)
+            )
+            respuesta = self.client.get(reverse("panel:proyectos:listado"))
+        self.assertEqual(len(respuesta.context["clientes"]), 2)
 
     def test_listado_filtra_vencidos(self):
         self._proyecto("vencido", -3)
