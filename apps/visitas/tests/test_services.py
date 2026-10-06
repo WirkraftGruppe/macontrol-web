@@ -25,6 +25,7 @@ from apps.visitas.services import (
     MAX_FOTOS,
     MAX_PRODUCTOS,
     RevisionDuplicada,
+    VisitaYaCerrada,
     abrir_visita,
     cerrar_visita,
     registrar_revision,
@@ -503,12 +504,21 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
         visita.refresh_from_db()
         self.assertEqual(visita.estado, Visita.Estado.CANCELADA)
 
-    def test_doble_cierre_con_lecturas_distintas_falla(self):
+    def test_doble_cierre_con_lecturas_distintas(self):
         creada = self.con_revision()
         primera = Visita.objects.get(pk=creada.pk)
         segunda = Visita.objects.get(pk=creada.pk)
-        cerrar_visita(primera, quien=primera.empleado, cierre=Visita.Cierre.EMPLEADO)
-        with self.assertRaises(ValidationError):
+        cerrada = cerrar_visita(
+            primera, quien=primera.empleado, cierre=Visita.Cierre.EMPLEADO
+        )
+        # El mismo empleado cierra de nuevo: idempotente, no cambia nada.
+        repetida = cerrar_visita(
+            segunda, quien=segunda.empleado, cierre=Visita.Cierre.EMPLEADO
+        )
+        self.assertEqual(repetida.cerrada_en, cerrada.cerrada_en)
+        # Si la había cerrado un administrador, el empleado no la cierra.
+        Visita.objects.filter(pk=creada.pk).update(cierre=Visita.Cierre.ADMINISTRADOR)
+        with self.assertRaises(VisitaYaCerrada):
             cerrar_visita(
                 segunda, quien=segunda.empleado, cierre=Visita.Cierre.EMPLEADO
             )
@@ -592,6 +602,37 @@ class CerrarVisitaTests(SinArchivosMixin, TestCase):
         self.assertIsNone(asignada.abierta_en)
         self.assertEqual(propia.estado, Visita.Estado.CANCELADA)
         self.assertEqual(propia.cierre, Visita.Cierre.SISTEMA)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class AdministradorEnCampoTests(SinArchivosMixin, TestCase):
+    """La visita de un administrador no cuenta como servicio."""
+
+    def setUp(self):
+        self.pendiente = crear_visita(programada_para=date(2026, 9, 1))
+        self.proyecto = self.pendiente.proyecto
+        self.proyecto.frecuencia_dias = 30
+        self.proyecto.save()
+        self.empleado = self.pendiente.empleado
+        self.admin = User.objects.create_user(
+            username="adm-campo", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+
+    def test_no_toma_pendiente_ni_toca_el_proyecto(self):
+        propia = crear_visita(proyecto=self.proyecto, empleado=self.admin)
+        visita, creada = abrir(empleado=self.admin, proyecto=self.proyecto)
+        self.assertTrue(creada)
+        self.assertNotIn(visita.pk, (self.pendiente.pk, propia.pk))
+        self.assertFalse(visita.incidencia_asignacion)
+        for pendiente in (self.pendiente, propia):
+            pendiente.refresh_from_db()
+            self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+        crear_revision(visita, realizada_en=timezone.now() - timedelta(minutes=5))
+        cerrada = cerrar_visita(visita, quien=self.admin, cierre=Visita.Cierre.EMPLEADO)
+        self.assertEqual(cerrada.estado, Visita.Estado.REALIZADA)
+        self.proyecto.refresh_from_db()
+        self.assertEqual(self.proyecto.encargado_actual, self.empleado)
+        self.assertIsNone(self.proyecto.proxima_visita)
 
 
 @override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)

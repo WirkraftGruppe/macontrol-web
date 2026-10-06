@@ -15,14 +15,14 @@ from apps.proyectos.models import Proyecto
 from apps.sitios.models import PuntoControl
 from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 from apps.visitas.planillas import validar_datos
+from apps.visitas.ubicacion import verificar
 
 # Topes de una revisión desde la app; los comparte el serializer de la API.
 MAX_FOTOS = 10
 MAX_PRODUCTOS = 30
 TOLERANCIA_FUTURO = timedelta(minutes=10)
 MENSAJE_QR_INVALIDO = "El código QR no corresponde a este proyecto."
-# Precisión máxima (metros) para que una revisión proponga la ubicación del punto.
-PRECISION_MAXIMA_PROPUESTA_M = 50
+MOTIVO_UBICACION_FIJADA = "Ubicación fijada por escaneo de administrador"
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,20 @@ class RevisionDuplicada(Exception):
     def __init__(self, revision):
         super().__init__("La revisión ya fue registrada.")
         self.revision = revision
+
+
+class VisitaNoEncontrada(ValidationError):
+    """La visita no existe o es de otro empleado: la API responde 404 en ambos casos."""
+
+    def __init__(self):
+        super().__init__({"visita": "La visita no existe."})
+
+
+class VisitaYaCerrada(ValidationError):
+    """La visita ya estaba cerrada y no por el mismo empleado: la API responde 409."""
+
+    def __init__(self):
+        super().__init__("La visita ya fue cerrada.")
 
 
 @contextmanager
@@ -196,8 +210,21 @@ def _pendiente_para(proyecto, empleado):
     return propia, pendientes.exclude(empleado=empleado).exists()
 
 
-def abrir_visita(*, empleado, proyecto, qr_codigo):
+def abrir_visita(
+    *,
+    empleado,
+    proyecto,
+    qr_codigo,
+    latitud=None,
+    longitud=None,
+    precision_m=None,
+):
     """Abre la jornada del empleado en el proyecto; devuelve `(visita, creada)`.
+
+    `latitud` y `longitud` (opcionales) verifican la ubicación: la distancia al punto
+    queda en la visita y nunca se rechaza. `precision_m` se acepta y no se guarda.
+    La visita de un administrador no cuenta como servicio: no toma pendientes ni
+    marca `incidencia_asignacion`.
 
     Es idempotente: si el empleado ya tiene una visita abierta para el proyecto la
     devuelve con `creada=False`. Si tiene una pendiente asignada, la abre. Si no,
@@ -214,7 +241,7 @@ def abrir_visita(*, empleado, proyecto, qr_codigo):
                 {"proyecto": "El proyecto no existe o no está activo."}
             )
         try:
-            _resolver_punto(proyecto, qr_codigo)
+            punto = _resolver_punto(proyecto, qr_codigo)
         except ValidationError:
             raise ValidationError(
                 {"proyecto": "El proyecto no existe o no está activo."}
@@ -229,9 +256,15 @@ def abrir_visita(*, empleado, proyecto, qr_codigo):
         )
         if abierta is not None:
             return abierta, False
-        propia, hay_de_otro = _pendiente_para(proyecto, empleado)
+        if empleado.es_administrador:
+            propia, hay_de_otro = None, False
+        else:
+            propia, hay_de_otro = _pendiente_para(proyecto, empleado)
+        distancia, incidencia_ubicacion = verificar(punto, latitud, longitud)
         ahora = timezone.now()
         if propia is not None:
+            propia.distancia_m = distancia
+            propia.incidencia_ubicacion = incidencia_ubicacion
             propia.estado = Visita.Estado.ABIERTA
             propia.abierta_en = ahora
             propia.origen = Visita.Origen.APP
@@ -245,6 +278,8 @@ def abrir_visita(*, empleado, proyecto, qr_codigo):
             estado=Visita.Estado.ABIERTA,
             abierta_en=ahora,
             incidencia_asignacion=hay_de_otro,
+            distancia_m=distancia,
+            incidencia_ubicacion=incidencia_ubicacion,
         )
         return visita, True
 
@@ -252,15 +287,16 @@ def abrir_visita(*, empleado, proyecto, qr_codigo):
 def _proponer_ubicacion(punto, revision):
     """Guarda las coordenadas de la revisión como ubicación propuesta del punto.
 
-    Solo si el punto no tiene lat/lng, la precisión es de a lo sumo 50 m y no hay
-    otra propuesta pendiente (la actualización condicional lo decide en la base).
+    Solo si el punto no tiene lat/lng, la precisión es de a lo sumo
+    `PRECISION_MAXIMA_M` y no hay otra propuesta pendiente (la actualización
+    condicional lo decide en la base).
     """
     precision = revision.precision_m
     if (
         revision.latitud is None
         or revision.longitud is None
         or precision is None
-        or precision > PRECISION_MAXIMA_PROPUESTA_M
+        or precision > settings.PRECISION_MAXIMA_M
     ):
         return
     PuntoControl.objects.filter(
@@ -275,6 +311,27 @@ def _proponer_ubicacion(punto, revision):
             "revision": revision.pk,
         }
     )
+
+
+def _fijar_ubicacion_por_escaneo(punto, revision, administrador):
+    """Un administrador que escanea un punto sin coordenadas las fija con las suyas.
+
+    Bloquea el punto; con precisión peor que `PRECISION_MAXIMA_M` no fija nada y
+    la revisión igual se registra. Limpia la propuesta pendiente y deja al
+    administrador en el historial del punto.
+    """
+    precision = revision.precision_m
+    if precision is None or precision > settings.PRECISION_MAXIMA_M:
+        return
+    bloqueado = PuntoControl.objects.select_for_update().get(pk=punto.pk)
+    if bloqueado.latitud is not None and bloqueado.longitud is not None:
+        return
+    bloqueado.latitud = revision.latitud
+    bloqueado.longitud = revision.longitud
+    bloqueado.ubicacion_propuesta = None
+    bloqueado._history_user = administrador
+    bloqueado._change_reason = MOTIVO_UBICACION_FIJADA
+    bloqueado.save(update_fields=["latitud", "longitud", "ubicacion_propuesta"])
 
 
 def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
@@ -293,6 +350,7 @@ def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
 def _guardar_revision(
     *,
     visita,
+    empleado,
     qr_codigo,
     cliente_uuid,
     realizada_en,
@@ -331,6 +389,7 @@ def _guardar_revision(
     if errores:
         raise ValidationError(errores)
 
+    distancia, incidencia_ubicacion = verificar(punto, latitud, longitud)
     revision = Revision.objects.create(
         visita=visita,
         punto=punto,
@@ -341,6 +400,8 @@ def _guardar_revision(
         latitud=latitud,
         longitud=longitud,
         precision_m=precision_m,
+        distancia_m=distancia,
+        incidencia_ubicacion=incidencia_ubicacion,
         datos=datos,
         esquema_planilla=esquema,
         observaciones=observaciones,
@@ -348,7 +409,10 @@ def _guardar_revision(
         incidencia_detalle=incidencia_detalle,
     )
     _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas)
-    _proponer_ubicacion(punto, revision)
+    if empleado.es_administrador:
+        _fijar_ubicacion_por_escaneo(punto, revision, empleado)
+    else:
+        _proponer_ubicacion(punto, revision)
     return revision
 
 
@@ -383,10 +447,13 @@ def registrar_revision(
     resuelve y exige que sea de un punto activo del sitio del proyecto);
     `productos_aplicados` es una lista de dicts con `producto` como id; `fotos`, una
     lista de archivos. Valida coordenadas, de 1 a `MAX_FOTOS` fotos, planilla de
-    ámbito `punto` y el atraso. Si el punto no tiene ubicación, propone la de la
-    revisión. Todo ocurre en una transacción (y sin fotos huérfanas si falla).
+    ámbito `punto` y el atraso. Guarda la distancia al punto sin rechazar por ella.
+    Si el punto no tiene ubicación, un empleado propone la de la revisión y un
+    administrador la fija. Todo ocurre en una transacción (y sin fotos huérfanas si
+    falla).
     Levanta `RevisionDuplicada` si el `cliente_uuid` ya existe y `ValidationError`
-    con errores por campo. No debe llamarse dentro de otro `atomic`.
+    con errores por campo; `VisitaNoEncontrada` si la visita no existe o es ajena.
+    No debe llamarse dentro de otro `atomic`.
     """
     if cliente_uuid is None:
         raise ValidationError({"cliente_uuid": "Este campo es obligatorio."})
@@ -400,16 +467,14 @@ def registrar_revision(
                     pk=getattr(visita, "pk", visita)
                 )
             except (Visita.DoesNotExist, TypeError, ValueError):
-                raise ValidationError({"visita": "La visita no existe."})
-            if (
-                visita_bd.estado != Visita.Estado.ABIERTA
-                or visita_bd.empleado_id != empleado.pk
-            ):
-                raise ValidationError(
-                    {"visita": "La visita no está abierta o no es suya."}
-                )
+                raise VisitaNoEncontrada()
+            if visita_bd.empleado_id != empleado.pk:
+                raise VisitaNoEncontrada()
+            if visita_bd.estado != Visita.Estado.ABIERTA:
+                raise ValidationError({"visita": "La visita no está abierta."})
             return _guardar_revision(
                 visita=visita_bd,
+                empleado=empleado,
                 qr_codigo=qr_codigo,
                 cliente_uuid=cliente_uuid,
                 realizada_en=realizada_en,
@@ -467,7 +532,10 @@ def cerrar_visita(
     `_cerrar_sin_revisiones`). `datos` es la planilla de ámbito `visita` (se valida,
     salvo en el cierre por sistema). `cerrada_en` es la hora de cierre: por defecto
     ahora, o la de la última revisión en el cierre por sistema. Solo la visita más
-    reciente del proyecto fija `encargado_actual` y `proxima_visita`.
+    reciente del proyecto fija `encargado_actual` y `proxima_visita`, salvo que la
+    visita sea de un administrador (no cuenta como servicio). Cerrar de nuevo por
+    el mismo empleado es idempotente; si la cerró el sistema o un administrador,
+    levanta `VisitaYaCerrada`.
     """
     if cierre not in Visita.Cierre.values:
         raise ValidationError({"cierre": "Tipo de cierre inválido."})
@@ -479,8 +547,6 @@ def cerrar_visita(
             .get(pk=visita_bd.proyecto_id)
         )
 
-        if visita_bd.estado != Visita.Estado.ABIERTA:
-            raise ValidationError("Solo se puede cerrar una visita abierta.")
         if cierre == Visita.Cierre.EMPLEADO and (
             quien is None or quien.pk != visita_bd.empleado_id
         ):
@@ -489,6 +555,12 @@ def cerrar_visita(
             quien is not None and quien.es_administrador
         ):
             raise ValidationError("Solo un administrador puede cerrar de este modo.")
+        if visita_bd.estado == Visita.Estado.REALIZADA:
+            if cierre == visita_bd.cierre == Visita.Cierre.EMPLEADO:
+                return visita_bd
+            raise VisitaYaCerrada()
+        if visita_bd.estado != Visita.Estado.ABIERTA:
+            raise ValidationError("Solo se puede cerrar una visita abierta.")
         revisiones = visita_bd.revisiones.all()
         if cierre != Visita.Cierre.ADMINISTRADOR:
             # Cuentan las recibidas durante esta jornada (hora del servidor, no la
@@ -540,7 +612,7 @@ def cerrar_visita(
             .exclude(pk=visita_bd.pk)
             .exists()
         )
-        if not hay_posterior:
+        if not hay_posterior and not visita_bd.empleado.es_administrador:
             proyecto.encargado_actual = visita_bd.empleado
             if proyecto.frecuencia_dias:
                 proyecto.proxima_visita = timezone.localdate(cerrada_en) + timedelta(

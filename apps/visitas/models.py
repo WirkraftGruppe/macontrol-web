@@ -43,7 +43,7 @@ class Visita(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="visitas",
-        limit_choices_to={"rol": User.Rol.EMPLEADO},
+        limit_choices_to={"rol__in": [User.Rol.EMPLEADO, User.Rol.ADMINISTRADOR]},
         verbose_name="empleado",
     )
     origen = models.CharField("origen", max_length=10, choices=Origen.choices)
@@ -86,10 +86,14 @@ class Visita(models.Model):
     incidencia_revisada_en = models.DateTimeField(
         "incidencia revisada en", null=True, blank=True
     )
+    distancia_m = models.PositiveIntegerField(
+        "distancia al punto (m)", null=True, blank=True
+    )
+    incidencia_ubicacion = models.BooleanField("incidencia de ubicación", default=False)
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
-    history = HistoricalRecords(excluded_fields=["datos"])
+    history = HistoricalRecords(excluded_fields=["datos", "distancia_m"])
 
     class Meta:
         verbose_name = "visita"
@@ -152,6 +156,10 @@ class Revision(models.Model):
     precision_m = models.DecimalField(
         "precisión (m)", max_digits=7, decimal_places=1, null=True, blank=True
     )
+    distancia_m = models.PositiveIntegerField(
+        "distancia al punto (m)", null=True, blank=True
+    )
+    incidencia_ubicacion = models.BooleanField("incidencia de ubicación", default=False)
     datos = models.JSONField("datos de la planilla", default=dict, blank=True)
     esquema_planilla = models.JSONField(
         "esquema de la planilla", default=list, blank=True
@@ -161,7 +169,7 @@ class Revision(models.Model):
     incidencia_detalle = models.TextField("detalle de la incidencia", blank=True)
 
     history = HistoricalRecords(
-        excluded_fields=["latitud", "longitud", "precision_m", "datos"]
+        excluded_fields=["latitud", "longitud", "precision_m", "distancia_m", "datos"]
     )
 
     class Meta:

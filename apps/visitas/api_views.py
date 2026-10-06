@@ -7,7 +7,6 @@ from django.core.exceptions import (
 )
 from django.db.models import F
 from django.http import FileResponse
-from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics, serializers, status
@@ -33,6 +32,8 @@ from .serializers import (
 )
 from .services import (
     RevisionDuplicada,
+    VisitaNoEncontrada,
+    VisitaYaCerrada,
     abrir_visita,
     cerrar_visita,
     registrar_revision,
@@ -53,10 +54,16 @@ class PedidoDemasiadoGrande(APIException):
     default_code = "pedido_demasiado_grande"
 
 
-class MisVisitasView(generics.ListAPIView):
-    """Visitas pendientes y abiertas del empleado autenticado."""
+class VisitaYaCerradaError(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "La visita ya fue cerrada."
+    default_code = "visita_ya_cerrada"
 
-    permission_classes = [EsEmpleado]
+
+class MisVisitasView(generics.ListAPIView):
+    """Visitas pendientes y abiertas del usuario autenticado."""
+
+    permission_classes = [EsEmpleado | EsAdministrador]
     serializer_class = VisitaActivaSerializer
 
     def get_queryset(self):
@@ -76,9 +83,9 @@ class MisVisitasView(generics.ListAPIView):
 
 
 class AbrirVisitaView(APIView):
-    """Abre la jornada del empleado en un proyecto (idempotente)."""
+    """Abre la jornada del empleado o del administrador en un proyecto (idempotente)."""
 
-    permission_classes = [EsEmpleado]
+    permission_classes = [EsEmpleado | EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "crear_visita"
 
@@ -87,7 +94,10 @@ class AbrirVisitaView(APIView):
         description=(
             "Abre la pendiente asignada o crea una visita nueva. `qr_codigo` es el de "
             "un punto activo del sitio del proyecto. Si el empleado ya tiene una "
-            "abierta en el proyecto la devuelve con 200."
+            "abierta en el proyecto la devuelve con 200. `latitud`, `longitud` y "
+            "`precision_m` son opcionales: con coordenadas se guarda la distancia al "
+            "punto y la incidencia de ubicación, sin rechazar nunca por distancia. La "
+            "visita de un administrador no toma pendientes."
         ),
         request=AbrirVisitaSerializer,
         responses={
@@ -106,6 +116,9 @@ class AbrirVisitaView(APIView):
             empleado=request.user,
             proyecto=entrada.validated_data["proyecto"],
             qr_codigo=entrada.validated_data["qr_codigo"],
+            latitud=entrada.validated_data["latitud"],
+            longitud=entrada.validated_data["longitud"],
+            precision_m=entrada.validated_data["precision_m"],
         )
         return Response(
             VisitaActivaSerializer(visita).data,
@@ -116,7 +129,7 @@ class AbrirVisitaView(APIView):
 class CrearRevisionView(APIView):
     """Registra el escaneo de un punto en una visita abierta (multipart)."""
 
-    permission_classes = [EsEmpleado]
+    permission_classes = [EsEmpleado | EsAdministrador]
     parser_classes = [MultiPartParser]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "crear_visita"
@@ -127,7 +140,9 @@ class CrearRevisionView(APIView):
             "Multipart. `qr_codigo` es el del punto escaneado. `datos` y "
             "`productos_aplicados` son texto JSON; `fotos` se repite de 1 a 10 veces "
             "(hasta 8 MB cada una). Un `cliente_uuid` ya registrado responde 409; "
-            "`revision` y `visita` solo vienen si son del mismo empleado."
+            "`revision` y `visita` solo vienen si son del mismo empleado. Un "
+            "administrador que escanea un punto sin coordenadas, con precisión de a lo "
+            "sumo 50 m, las fija."
         ),
         request={"multipart/form-data": CrearRevisionSerializer},
         responses={
@@ -135,10 +150,12 @@ class CrearRevisionView(APIView):
             400: OpenApiResponse(
                 description=(
                     "Validación: QR que no es de un punto del sitio, visita no "
-                    "abierta o ajena, coordenadas o foto faltantes, planilla "
-                    "inválida o revisión con más horas de atraso que el máximo "
-                    "(168 por defecto)."
+                    "abierta, coordenadas o foto faltantes, planilla inválida o "
+                    "revisión con más horas de atraso que el máximo (168 por defecto)."
                 )
+            ),
+            404: OpenApiResponse(
+                description="La visita no existe o es de otro usuario."
             ),
             409: OpenApiResponse(description="El `cliente_uuid` ya fue registrado."),
             413: OpenApiResponse(description="El pedido supera el tamaño permitido."),
@@ -163,6 +180,8 @@ class CrearRevisionView(APIView):
             revision = registrar_revision(
                 empleado=request.user, **entrada.validated_data
             )
+        except VisitaNoEncontrada:
+            raise NotFound("La visita no existe.")
         except RevisionDuplicada as duplicada:
             cuerpo = {"detalle": MENSAJE_DUPLICADA, "campos": {}}
             # Solo el dueño recibe los ids: no se expone lo de otro empleado.
@@ -178,13 +197,18 @@ class CrearRevisionView(APIView):
 class CerrarVisitaView(APIView):
     """Cierra una visita abierta propia, con al menos una revisión."""
 
-    permission_classes = [EsEmpleado]
+    permission_classes = [EsEmpleado | EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "crear_visita"
 
     @extend_schema(
         summary="Cerrar una visita",
-        description="`datos` es la planilla de ámbito visita; todo es opcional.",
+        description=(
+            "`datos` es la planilla de ámbito visita; todo es opcional. Cerrar de "
+            "nuevo una visita que ya cerró el mismo usuario devuelve 200 con la "
+            "visita; si la cerró el sistema o un administrador, 409. Cerrar la "
+            "visita de un administrador no modifica el proyecto."
+        ),
         request=CerrarVisitaSerializer,
         responses={
             200: VisitaRealizadaSerializer,
@@ -193,21 +217,29 @@ class CerrarVisitaView(APIView):
                 "es inválida."
             ),
             404: OpenApiResponse(
-                description="La visita no existe o es de otro empleado."
+                description="La visita no existe o es de otro usuario."
+            ),
+            409: OpenApiResponse(
+                description="La visita ya la cerró el sistema o un administrador."
             ),
         },
     )
     def post(self, request, pk):
         """Cierra con `cierre=empleado`; la visita de otro empleado da 404."""
-        visita = get_object_or_404(Visita, pk=pk, empleado=request.user)
+        visita = Visita.objects.filter(pk=pk, empleado=request.user).first()
+        if visita is None:
+            raise NotFound("La visita no existe.")
         entrada = CerrarVisitaSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
-        cerrada = cerrar_visita(
-            visita,
-            quien=request.user,
-            cierre=Visita.Cierre.EMPLEADO,
-            **entrada.validated_data,
-        )
+        try:
+            cerrada = cerrar_visita(
+                visita,
+                quien=request.user,
+                cierre=Visita.Cierre.EMPLEADO,
+                **entrada.validated_data,
+            )
+        except VisitaYaCerrada:
+            raise VisitaYaCerradaError()
         cerrada = (
             Visita.objects.select_related("proyecto__sitio")
             .prefetch_related(*PRECARGA_REVISIONES)
