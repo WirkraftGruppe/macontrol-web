@@ -298,6 +298,7 @@ commit_base: 9a284ed
 | 2026-10-06 | auditoría T6 (T3, T4, T10) | da33eb8 | aprobado con correcciones: 0 bloqueantes, 1 importante (→ T11), 3 menores y 4 observaciones (→ P-cierre-puntos-5 a 11) | auditor-seguridad |
 | 2026-10-06 | T6 (raíz), T7, T8, T11 | bea9b11, f1a72a0, f78cb8c, 06ebd5c | FALLA formal: 0/20 criterios en FALLA en ambos; contrato MODIFICADO (27b13f8, bea9b11) | aceptado por el usuario; spot check presupuestos T7 253/400, T8 170/250, T11 23/80 y test de T11; integradas b3bdc5c, c612c13, dd94639 |
 | 2026-10-06 | auditoría final T9 | d3f3972 | apto con correcciones: 0 bloqueantes, 2 importantes (token → T8b; incidencias de ubicación → P-cierre-puntos-13), 2 menores (→ P-cierre-puntos-14 y 15) | auditor-seguridad; contrato regenerado idéntico |
+| 2026-10-06 | T8 (con T8b) | f68fe6d | FALLA formal: 0 criterios en FALLA en ambos (4 de T8 + test apps.api); contrato MODIFICADO | aceptado por el usuario; spot check test_token y presupuesto T8 181/250; integrada e79fdef; contrato regenerado dd86327 |
 
 ## Pendientes que deja este plan
 
