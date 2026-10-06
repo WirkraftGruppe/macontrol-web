@@ -27,7 +27,6 @@ from .panel_forms import (
     PuntoAltaForm,
     PuntoForm,
     SitioForm,
-    UbicacionForm,
 )
 
 PESTANAS = ("mapa", "planos", "puntos")
@@ -129,31 +128,23 @@ class SitioFicha(AdministradorRequeridoMixin, DetailView):
             pestanas=(("puntos", "Puntos"), ("mapa", "Mapa"), ("planos", "Planos")),
             puntos=puntos,
             puntos_activos=activos,
-            con_propuesta=[p for p in activos if p.ubicacion_propuesta],
             planos=planos,
             plano=plano,
         )
         if pestana == "mapa":
-            contexto["datos_mapa"] = self._datos_mapa(sitio, activos)
+            contexto["datos_mapa"] = self._datos_mapa(sitio)
         if pestana == "planos" and plano:
             contexto["datos_plano"] = self._datos_plano(plano, activos)
         return contexto
 
     @staticmethod
-    def _datos_mapa(sitio, puntos):
+    def _datos_mapa(sitio):
         return {
-            "centro": [_numero(sitio.latitud), _numero(sitio.longitud)],
-            "puntos": [
-                {
-                    "id": p.pk,
-                    "nombre": p.nombre,
-                    "lat": _numero(p.latitud),
-                    "lng": _numero(p.longitud),
-                    "estado": p.estado,
-                    "url": reverse("panel:sitios:punto_ubicacion", args=[p.pk]),
-                }
-                for p in puntos
-            ],
+            "sitio": {
+                "nombre": sitio.nombre,
+                "lat": _numero(sitio.latitud),
+                "lng": _numero(sitio.longitud),
+            }
         }
 
     @staticmethod
@@ -321,43 +312,6 @@ class PuntoPosicion(_AccionPunto):
         else:
             services.mover_en_plano(punto, x, y)
         return JsonResponse({"x": _numero(punto.x), "y": _numero(punto.y)})
-
-
-class PuntoUbicacion(_AccionPunto):
-    """Fija lat/lng del punto con el clic en el mapa."""
-
-    def post(self, request, pk):
-        punto = self.get_object()
-        form = UbicacionForm(request.POST)
-        if not form.is_valid():
-            return JsonResponse({"error": "Coordenadas inválidas."}, status=400)
-        services.fijar_ubicacion(
-            punto, form.cleaned_data["latitud"], form.cleaned_data["longitud"]
-        )
-        return JsonResponse(
-            {"lat": _numero(punto.latitud), "lng": _numero(punto.longitud)}
-        )
-
-
-class PuntoPropuesta(_AccionPunto):
-    """Acepta o descarta la ubicación propuesta por una revisión."""
-
-    def post(self, request, pk):
-        punto = self.get_object()
-        accion = request.POST.get("accion")
-        if accion not in ("aceptar", "descartar"):
-            return JsonResponse({"error": "Acción inválida."}, status=400)
-        if accion == "aceptar":
-            try:
-                services.aceptar_ubicacion_propuesta(punto)
-            except ValidationError as error:
-                messages.error(request, error.messages[0])
-            else:
-                messages.success(request, "Ubicación aceptada.")
-        else:
-            services.descartar_ubicacion_propuesta(punto)
-            messages.success(request, "Ubicación descartada.")
-        return redirect(_url_ficha(punto.sitio_id, "mapa"))
 
 
 class PlanoAlta(AdministradorRequeridoMixin, CreateView):

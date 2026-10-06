@@ -32,14 +32,4 @@ urlpatterns = [
         vistas.PuntoPosicion.as_view(),
         name="punto_posicion",
     ),
-    path(
-        "puntos/<int:pk>/ubicacion/",
-        vistas.PuntoUbicacion.as_view(),
-        name="punto_ubicacion",
-    ),
-    path(
-        "puntos/<int:pk>/propuesta/",
-        vistas.PuntoPropuesta.as_view(),
-        name="punto_propuesta",
-    ),
 ]

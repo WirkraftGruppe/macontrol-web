@@ -201,12 +201,9 @@ class PuntoControl(models.Model):
     longitud = models.DecimalField(
         "longitud", max_digits=9, decimal_places=6, null=True, blank=True
     )
-    ubicacion_propuesta = models.JSONField(
-        "ubicación propuesta", null=True, blank=True, editable=False
-    )
     foto = models.ImageField("foto", upload_to=ruta_foto_punto, null=True, blank=True)
 
-    history = HistoricalRecords(excluded_fields=["ubicacion_propuesta"])
+    history = HistoricalRecords()
 
     class Meta:
         verbose_name = "punto de control"

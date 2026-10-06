@@ -61,6 +61,35 @@ class SitioPanelTests(TestCase):
         r = self.client.get(reverse("panel:sitios:alta"))
         self.assertContains(r, "https://www.openstreetmap.org/copyright")
 
+    def test_pestana_mapa_muestra_el_sitio_y_no_los_puntos(self):
+        url = reverse("panel:sitios:ficha", args=[self.sitio.pk])
+        r = self.client.get(url, {"pestana": "mapa"})
+        self.assertContains(r, "El sitio no tiene ubicación cargada.")
+        self.assertNotContains(r, 'id="mapa-sitio"')
+        self.sitio.latitud = Decimal("-35.123456")
+        self.sitio.longitud = Decimal("-57.654321")
+        self.sitio.save()
+        r = self.client.get(url, {"pestana": "mapa"})
+        self.assertContains(r, "Ubicación del sitio")
+        self.assertContains(r, 'id="mapa-sitio"')
+        self.assertContains(r, "sitios/sitio_ficha_mapa.js")
+        self.assertContains(
+            r,
+            reverse("panel:sitios:editar", args=[self.sitio.pk]) + '">Editar ubicación',
+        )
+        self.assertEqual(
+            r.context["datos_mapa"],
+            {
+                "sitio": {
+                    "nombre": "Planta Ñandú 1",
+                    "lat": -35.123456,
+                    "lng": -57.654321,
+                }
+            },
+        )
+        for ausente in ("mapa-punto", "puntos_mapa.js", "propuesta"):
+            self.assertNotContains(r, ausente)
+
     def test_descargar_qr_png_con_nombre(self):
         r = self.client.get(
             reverse("panel:sitios:punto_qr_png", args=[self.sitio.puntos.get().pk])
@@ -299,41 +328,6 @@ class PuntoPanelTests(_BaseAdminTests):
             reverse("panel:sitios:punto_editar", args=[self.general.pk])
         )
         self.assertIn("latitud", r.context["form"].fields)
-
-    def test_aceptar_ubicacion_propuesta(self):
-        propuesta = {
-            "latitud": "-35.100000",
-            "longitud": "-57.500000",
-            "precision_m": "8.0",
-            "revision": 1,
-        }
-        self.general.ubicacion_propuesta = propuesta
-        self.general.save()
-        url = reverse("panel:sitios:punto_propuesta", args=[self.general.pk])
-        self.assertEqual(self.client.post(url, {"accion": "aceptar"}).status_code, 302)
-        self.general.refresh_from_db()
-        self.assertEqual(self.general.latitud, Decimal("-35.1"))
-        self.assertEqual(self.general.longitud, Decimal("-57.5"))
-        self.assertIsNone(self.general.ubicacion_propuesta)
-        self.general.ubicacion_propuesta = propuesta
-        self.general.save()
-        self.client.post(url, {"accion": "descartar"})
-        self.general.refresh_from_db()
-        self.assertIsNone(self.general.ubicacion_propuesta)
-        self.assertEqual(self.general.latitud, Decimal("-35.1"))
-        self.assertEqual(self.client.post(url, {"accion": "otra"}).status_code, 400)
-
-    def test_fijar_ubicacion_valida_el_rango(self):
-        url = reverse("panel:sitios:punto_ubicacion", args=[self.general.pk])
-        r = self.client.post(url, {"latitud": "-35.5", "longitud": "-57.25"})
-        self.assertEqual(r.status_code, 200)
-        self.general.refresh_from_db()
-        self.assertEqual(self.general.latitud, Decimal("-35.5"))
-        for lat, lng in (("91", "0"), ("0", "-181"), ("a", "0"), ("", "")):
-            r = self.client.post(url, {"latitud": lat, "longitud": lng})
-            self.assertEqual(r.status_code, 400)
-        self.general.refresh_from_db()
-        self.assertEqual(self.general.longitud, Decimal("-57.25"))
 
     def test_qr_png_por_punto_y_regenerar(self):
         punto = PuntoControl.objects.create(
