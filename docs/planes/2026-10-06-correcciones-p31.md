@@ -171,7 +171,7 @@ T3 va después de T1 porque `apps/visitas/services.py` escribe `ubicacion_propue
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): correcciones-p31>
+commit_base: 6510a35
 
 ### Estado de subtareas
 
