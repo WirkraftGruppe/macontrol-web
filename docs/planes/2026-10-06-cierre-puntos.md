@@ -31,7 +31,7 @@
 - **Settings primero (T1, principal, en la rama del plan)**: `config/settings/` es del principal y T3 lee `DISTANCIA_MAXIMA_M` y `PRECISION_MAXIMA_M`. La ola 2 ramifica de T1.
 - **Ola 2 = B, C1, C2 y D** (cuatro worktrees). C se parte en API (T4) y panel (T5), con archivos disjuntos; solo T4 crea migración. La atribución de la ficha de sitio va a T5 (plantillas de `sitios`).
 - **A pasa a la ola 3 como la única subtarea transversal de `apps/panel` (T7)**: la tabla de propiedad admite una por plan, y el tablero necesita los campos de T3. Junta OSM del mapa general, el helper de guardas, el contador del tablero y `registrar_revision_demo`.
-- **Permisos de abrir, revisiones, cerrar y `me/visitas`, y "el administrador fija coordenadas al escanear"** los hace T3 (son de `apps/visitas`); resolver y `me/puntos` los hace T4. Se compone `EsEmpleado | EsAdministrador`; nadie toca `apps/accounts/permisos.py`.
+- **Permisos de abrir, revisiones, cerrar y `me/visitas`, y "el administrador fija coordenadas al escanear"** los hace T3 (son de `apps/visitas`); resolver y `me/puntos` los hace T10. Se compone `EsEmpleado | EsAdministrador`; nadie toca `apps/accounts/permisos.py`.
 - **`test_administrador_resuelve_qr_y_abre_visita`, el flujo de punta a punta y el `extend_schema` del token** van a T8 (ola 3, transversal de api): necesitan T3 y T4 integradas. El yaml lo regenera el principal en T9.
 - `CerrarVisitaTests` y `VisitaAjenaTests` son clases nuevas en `apps/visitas/tests/test_api.py` (nombres del pedido); reemplazan `CerrarVisitaApiTests.test_doble_cierre_da_400` y `test_visita_ajena_da_404`.
 
@@ -48,7 +48,8 @@
 - **`abrir_visita(*, empleado, proyecto, qr_codigo, latitud=None, longitud=None, precision_m=None)`**; `POST visitas/abrir/` suma esos tres campos opcionales.
 - **Fijado por escaneo (T3)**: dentro de `registrar_revision`, con el punto bloqueado (`select_for_update`) y sin coordenadas, guarda lat/lng, limpia `ubicacion_propuesta`, `_history_user` = administrador, `_change_reason = "Ubicación fijada por escaneo de administrador"`. No llama a servicios nuevos de `sitios`.
 - **Modelo y servicios (T4, `sitios/0006`)**: `PuntoControl.foto` (`ImageField`, opcional, nombre aleatorio, validación igual a la de `Foto` de visitas). `crear_sitio_en_campo(*, administrador, cliente, nombre, direccion, localidad, latitud, longitud, precision_m)`, `crear_punto_en_campo(*, administrador, sitio, nombre, sector, latitud=None, longitud=None, precision_m=None, foto=None)`, `fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m)`; los tres registran `history_user` y `_change_reason`, y el último limpia `ubicacion_propuesta`. `fijar_ubicacion` no cambia de firma.
-- **Rutas nuevas (T4)**: `POST sitios/` (`api:sitios:alta-sitio`), `POST sitios/<int:pk>/puntos/` (`api:sitios:alta-punto`), `POST puntos/<int:pk>/ubicacion/` (`api:sitios:ubicacion-punto`); solo `EsAdministrador`; throttle scope `crear_visita`; cliente y sitio activos.
+- **Rutas nuevas (T4 y T10)**: `POST sitios/` (`api:sitios:alta-sitio`, T4), `POST sitios/<int:pk>/puntos/` (`api:sitios:alta-punto`, T4), `POST puntos/<int:pk>/ubicacion/` (`api:sitios:ubicacion-punto`, T10, responde 200); solo `EsAdministrador`; throttle scope `crear_visita`; cliente y sitio activos.
+- **Partición de T4** (modificación del 2026-10-06, decisión del usuario): T4 excedió su presupuesto (567/500) y se parte. T4 conserva modelo, migración, `crear_sitio_en_campo`, `crear_punto_en_campo` y las dos rutas de alta; T10 hace `fijar_ubicacion_en_campo`, `ubicacion-punto` y el permiso de administrador en resolver QR y `me/puntos`.
 - **Helper de guardas (T7)**: `apps/panel/demo.py::exigir_entorno_demo()` lanza `CommandError` sin DEBUG, sin `DJANGO_ENV=development` o sin SQLite; lo usan `cargar_demo` y `registrar_revision_demo`.
 
 ## Olas
@@ -56,10 +57,10 @@
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
 | 1 | T1 (principal: settings) | — |
-| 2 | T2 (accounts, servicios, proyectos: panel) ∥ T3 (visitas) ∥ T4 (sitios API) ∥ T5 (sitios panel), T6 (integración y auditoría) | visitas (0008), sitios (0006) |
+| 2 | T2 (accounts, servicios, proyectos: panel) ∥ T3 (visitas) ∥ T4 (sitios API) ∥ T5 (sitios panel), T10 (sitios API, después de integrar T4), T6 (integración y auditoría) | visitas (0008), sitios (0006) |
 | 3 | T7 (panel: OSM, guardas, tablero, demo) ∥ T8 (api: flujo modo campo y token), T9 (integración, contrato, auditoría, navegador) | — |
 
-T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migración.
+T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migración. T10 toca los archivos de T4 y ramifica de `plan/cierre-puntos` con T4 integrada.
 
 ## Subtareas
 
@@ -98,7 +99,7 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
 ### T3 — Visitas: verificación de ubicación, administrador en campo, P-20 y P-21
 
 - **Ola**: 2 · **Depende de**: T1
-- **Puede tocar**: `apps/visitas/models.py`, `apps/visitas/migrations/0008_*.py`, `apps/visitas/ubicacion.py`, `apps/visitas/services.py`, `apps/visitas/serializers.py`, `apps/visitas/api_views.py`, `apps/visitas/admin.py`, `apps/visitas/tests/test_ubicacion.py`, `apps/visitas/tests/test_api.py`, `apps/visitas/tests/test_services.py`
+- **Puede tocar**: `apps/visitas/models.py`, `apps/visitas/migrations/0008_*.py`, `apps/visitas/ubicacion.py`, `apps/visitas/services.py`, `apps/visitas/serializers.py`, `apps/visitas/api_views.py`, `apps/visitas/admin.py`, `apps/visitas/tests/test_ubicacion.py`, `apps/visitas/tests/test_api.py`, `apps/visitas/tests/test_services.py`, `apps/visitas/tests/test_migraciones.py`, `apps/visitas/tests/test_models.py` (los dos últimos agregados el 2026-10-06 por decisión del usuario: 0008 y la decisión 1 invalidan `DESPUES = 0007` y `test_empleado_debe_tener_rol_empleado`)
 - **No puede tocar**: `docs/planes/`, `config/`, `apps/sitios/**`, `apps/accounts/permisos.py`, `apps/visitas/management/**`
 - **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Models y § Services; `.agents/skills/django-rest-framework/SKILL.md` § Permissions
 - **Presupuesto**: 550 líneas agregadas
@@ -130,15 +131,13 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
 - **No puede tocar**: `docs/planes/`, `config/`, `apps/sitios/panel_*.py`, `apps/sitios/templates/**`, `apps/sitios/static/**`, `apps/visitas/**`, `apps/accounts/permisos.py`
 - **Skill a leer antes**: `.agents/skills/django-rest-framework/SKILL.md` § Permissions y § Serializers
 - **Presupuesto**: 500 líneas agregadas
-- **Qué hacer**: modelo, servicios y rutas del contrato; precisión según la decisión 2; resolver QR y `me/puntos` con `EsEmpleado | EsAdministrador`, adaptando `test_administrador_no_resuelve_qr` (`test_api.py:205`) y el 403 de `:438`.
+- **Qué hacer**: modelo, `crear_sitio_en_campo`, `crear_punto_en_campo` y las rutas `alta-sitio` y `alta-punto` del contrato; precisión según la decisión 2. La ruta de ubicación, `fijar_ubicacion_en_campo` y los permisos de resolver QR y `me/puntos` son de T10.
 - **Criterios**:
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_administrador_crea_sitio_y_punto_con_coordenadas --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_empleado_no_puede_crear_sitio_ni_punto --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_precision_insuficiente_da_400 --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_punto_sin_coordenadas_se_crea --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_fijar_ubicacion_registra_quien --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_cliente_inactivo_da_400 --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_administrador_resuelve_qr_y_ve_mis_puntos --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 500 --subtarea T4`
@@ -161,16 +160,33 @@ T4 y T5 son de `sitios` en paralelo con archivos disjuntos; solo T4 crea migraci
   - `[cmd]` `node --check apps/sitios/static/sitios/sitio_mapa.js`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T5`
 
+### T10 — Sitios API: ubicación del punto en campo y lectura del administrador
+
+- **Ola**: 2 · **Depende de**: T4 (integrada; worktree desde `plan/cierre-puntos`)
+- **Puede tocar**: `apps/sitios/services.py`, `apps/sitios/serializers.py`, `apps/sitios/api_views.py`, `apps/sitios/api_urls.py`, `apps/sitios/tests/test_api.py`, `apps/sitios/tests/test_services.py`
+- **No puede tocar**: `docs/planes/`, `config/`, `apps/sitios/models.py`, `apps/sitios/migrations/**`, `apps/sitios/panel_*.py`, `apps/sitios/templates/**`, `apps/sitios/static/**`, `apps/visitas/**`, `apps/accounts/permisos.py`
+- **Skill a leer antes**: `.agents/skills/django-rest-framework/SKILL.md` § Permissions y § Serializers
+- **Presupuesto**: 250 líneas agregadas
+- **Qué hacer**: `fijar_ubicacion_en_campo` y `POST puntos/<int:pk>/ubicacion/` según el contrato (responde 200 con el punto; precisión peor, 400; punto, sitio o cliente inactivo, 400; inexistente, 404; solo `EsAdministrador`); resolver QR y `me/puntos` con `EsEmpleado | EsAdministrador`, adaptando `test_administrador_no_resuelve_qr` y el 403 de `me/puntos` en `apps/sitios/tests/test_api.py`.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_fijar_ubicacion_registra_quien --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_ubicacion_exige_administrador_precision_y_activos --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_api.ModoCampoTests.test_administrador_resuelve_qr_y_ve_mis_puntos --keepdb`
+  - `[grep-1]` `grep -n "ubicacion-punto" apps/sitios/api_urls.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios apps.api --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T10`
+
 ### T6 — Integración ola 2 y auditoría (principal)
 
-- **Ola**: 2 · **Depende de**: T2–T5
-- **Pasos**: `verificador` y `verificador-b` por subtarea (refutador si discrepan); `cambios.sh`; integrar T2, T5, T4, T3 con `worktree-integrar.sh` y sus rutas; `auditor-seguridad` sobre T3 y T4 (permisos de administrador, coordenadas, foto); correcciones en `T3b`/`T4b` dentro de su presupuesto; crear worktrees T7 y T8 desde `plan/cierre-puntos`.
+- **Ola**: 2 · **Depende de**: T2–T5, T10
+- **Pasos**: `verificador` y `verificador-b` por subtarea (refutador si discrepan); `cambios.sh`; integrar T2, T5, T4, T3 con `worktree-integrar.sh` y sus rutas; crear el worktree de T10 desde `plan/cierre-puntos` e integrarlo; `auditor-seguridad` sobre T3, T4 y T10 (permisos de administrador, coordenadas, foto); correcciones en `T3b`/`T4b`/`T10b` dentro de su presupuesto; crear worktrees T7 y T8 desde `plan/cierre-puntos`.
 - **Presupuesto**: no aplica (solo merges y commits `registro:`)
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T2: integra cierre-puntos-T2"`
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T3: integra cierre-puntos-T3"`
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T4: integra cierre-puntos-T4"`
   - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T5: integra cierre-puntos-T5"`
+  - `[cmd]` `git log --oneline plan/cierre-puntos | grep -q "T10: integra cierre-puntos-T10"`
 
 ### T7 — Panel: mapa con OSM, guardas de demo, tablero y `registrar_revision_demo`
 
@@ -252,6 +268,7 @@ commit_base: 9a284ed
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
+| T10 | pendiente |
 
 ### Corridas
 
