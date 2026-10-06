@@ -11,8 +11,8 @@ from apps.clientes.models import Cliente
 from apps.panel.mapa import ORIGEN_TESELAS
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
-from apps.sitios.models import Sitio
-from apps.visitas.models import Visita
+from apps.sitios.models import PuntoControl, Sitio
+from apps.visitas.models import Revision, Visita
 
 DATOS = "/panel/mapa/datos/"
 
@@ -54,39 +54,65 @@ class MapaTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         return {s["nombre"]: s for s in respuesta.json()["sitios"]}
 
-    def test_datos_colorea_por_peor_estado(self):
+    def revisar(self, sitio, proyecto, dias_atras, punto=None):
+        """Revisa un punto (por defecto el "General") hace `dias_atras` días."""
+        punto = punto or sitio.puntos.get(nombre="General")
+        momento = timezone.now() - timedelta(days=dias_atras)
+        visita = Visita.objects.create(
+            proyecto=proyecto,
+            empleado=self.empleado,
+            origen=Visita.Origen.APP,
+            estado=Visita.Estado.REALIZADA,
+            abierta_en=momento,
+            cerrada_en=momento,
+        )
+        Revision.objects.create(
+            visita=visita, punto=punto, realizada_en=momento, recibida_en=momento
+        )
+        return punto
+
+    def test_color_es_peor_estado_de_puntos(self):
+        sitio = self.sitio("Mezclado")
+        proyecto = self.proyecto(sitio, 60, frecuencia_dias=30)
+        self.revisar(sitio, proyecto, 1)
+        self.assertEqual(self.datos()["Mezclado"]["estado"], "al_dia")
+        cercano = PuntoControl.objects.create(sitio=sitio, nombre="Cercano")
+        self.revisar(sitio, proyecto, 28, cercano)
+        self.assertEqual(self.datos()["Mezclado"]["estado"], "proxima")
+        atrasado = PuntoControl.objects.create(sitio=sitio, nombre="Atrasado")
+        self.revisar(sitio, proyecto, 40, atrasado)
+        self.assertEqual(self.datos()["Mezclado"]["estado"], "vencida")
+        PuntoControl.objects.create(sitio=sitio, nombre="Nuevo")
+        self.assertEqual(self.datos()["Mezclado"]["estado"], "vencida")
+        self.assertEqual(set(self.datos(estado="vencida")), {"Mezclado"})
+        self.assertEqual(set(self.datos(estado="al_dia")), set())
+        PuntoControl.objects.filter(nombre__in=["Atrasado", "Cercano"]).update(
+            activo=False
+        )
+        self.assertEqual(self.datos()["Mezclado"]["estado"], "sin_revisar")
+        self.assertEqual(set(self.datos(estado="sin_revisar")), {"Mezclado"})
+
+    def test_datos_lista_sitios_activos_con_coordenadas(self):
         mezclado = self.sitio("Mezclado")
         self.proyecto(mezclado, 60)
         self.proyecto(mezclado, -1)
         self.proyecto(mezclado, None)
-        cercano = self.sitio("Cercano")
-        self.proyecto(cercano, 60)
-        self.proyecto(cercano, 3)
-        al_dia = self.sitio("AlDia")
-        self.proyecto(al_dia, 60)
-        self.proyecto(al_dia, None)
-        sin_fecha = self.sitio("SinFecha")
-        self.proyecto(sin_fecha, None)
-        self.proyecto(sin_fecha, -9, estado=Proyecto.Estado.PAUSADO)
         self.sitio("SinProyectos")
         self.sitio("Inactivo", activo=False)
         self.sitio("SinCoordenadas", latitud=None, longitud=None)
 
         sitios = self.datos()
 
+        # Sin proyectos con frecuencia el punto no vence; el estado de cada
+        # proyecto sigue yendo en su detalle.
         self.assertEqual(
             {n: s["estado"] for n, s in sitios.items()},
-            {
-                "Mezclado": "vencida",
-                "Cercano": "proxima",
-                "AlDia": "al_dia",
-                "SinFecha": "sin_programar",
-                "SinProyectos": "sin_programar",
-            },
+            {"Mezclado": "sin_revisar", "SinProyectos": "al_dia"},
         )
         self.assertEqual(sitios["Mezclado"]["lat"], -35.1)
         self.assertEqual(sitios["Mezclado"]["lng"], -57.7)
         self.assertEqual(len(sitios["Mezclado"]["proyectos"]), 3)
+        self.assertIn("vencida", {p["estado"] for p in sitios["Mezclado"]["proyectos"]})
 
     def test_datos_incluye_ultima_visita_encargado_y_ficha(self):
         sitio = self.sitio()
@@ -117,13 +143,14 @@ class MapaTests(TestCase):
     def test_datos_filtra_por_cliente_servicio_y_estado(self):
         otro = Cliente.objects.create(razon_social="Otro SA")
         a = self.sitio("A")
-        self.proyecto(a, -1)
+        self.revisar(a, self.proyecto(a, -1, frecuencia_dias=30), 40)
         b = self.sitio("B", cliente=otro)
         self.proyecto(b, 60, servicio=self.otro_servicio)
 
         self.assertEqual(set(self.datos(cliente=otro.pk)), {"B"})
         self.assertEqual(set(self.datos(servicio=self.otro_servicio.pk)), {"B"})
         self.assertEqual(set(self.datos(estado="vencida")), {"A"})
+        self.assertEqual(set(self.datos(estado="sin_revisar")), {"B"})
         self.assertEqual(set(self.datos(estado="no_existe", cliente="x")), {"A", "B"})
 
     def test_datos_exige_administrador(self):
@@ -136,17 +163,19 @@ class MapaTests(TestCase):
     def test_datos_consultas_constantes(self):
         def consultas():
             self.client.force_login(self.admin)
-            with self.assertNumQueries(4):
-                # sesión, usuario, sitios y proyectos prefetch
+            with self.assertNumQueries(7):
+                # sesión, usuario, sitios, proyectos y puntos prefetch, y los
+                # proyectos activos y revisiones de `estados_de_puntos`
                 self.client.get(DATOS)
 
         sitio = self.sitio("Uno")
-        self.proyecto(sitio, 1)
+        self.revisar(sitio, self.proyecto(sitio, 1, frecuencia_dias=30), 1)
         consultas()
         for n in range(5):
             otro = self.sitio(f"Sitio {n}")
-            self.proyecto(otro, n)
+            proyecto = self.proyecto(otro, n, frecuencia_dias=30)
             self.proyecto(otro, None)
+            self.revisar(otro, proyecto, n)
         consultas()
 
     def test_mapa_permite_teselas_osm_en_csp(self):
