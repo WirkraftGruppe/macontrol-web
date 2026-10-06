@@ -535,7 +535,7 @@ commit_base: 4e2c496
 | T14 | hecha |
 | T15 | hecha |
 | T16 | hecha |
-| T17 | en curso |
+| T17 | hecha |
 
 ### Corridas
 
@@ -558,6 +558,7 @@ commit_base: 4e2c496
 | 2026-10-06 | T14 | 598d2cb | FALLA formal (0/3 criterios en FALLA) | verificador; única FALLA congelado.sh por el contrato modificado 50822be. Paso 2 (prueba en `runserver`) diferido por decisión del usuario: P-puntos-control-31. Orden de integración T13 → T12 → T11 (T12 antes que T11 por rutas disjuntas) |
 | 2026-10-06 | T16 | 6c2740e | FALLA formal (0/6 criterios en FALLA) | verificador en el worktree; única FALLA congelado.sh por el contrato modificado 50822be. Control de exactitud de docs/01 contra el código: 5/5 coinciden. Integrada en 5c69216 (suite 466 OK) |
 | 2026-10-06 | T15 (con T15b) | 7279c6e | FALLA formal (0/4 criterios en FALLA) | verificador en el worktree (corrido en 34d3410, e3c085e y 7279c6e); única FALLA congelado.sh por el contrato modificado 50822be. auditor-seguridad T15 (34d3410): H1 importante (la guarda de DEBUG no impedía sembrar `demo-admin`/`demo1234` en una base remota vía `DATABASE_URL`), H2 menor (anunciaba contraseña y rol de usuarios existentes), test de DEBUG sin mensaje; T15b ronda 1 (e3c085e): `DJANGO_ENV=development` + base local por HOST, H2 cerrado; re-auditoría: H1 abierto en parte (`?host=`, `?hostaddr=`, `?service=`, `PGHOST`); T15b ronda 2 (7279c6e, decisión del usuario): solo SQLite; re-auditoría final: H1 cerrado. Las guardas de entorno y SQLite exceden el "solo con DEBUG" del contrato por decisión del usuario. Integrada en 596f2fc (suite 473 OK) |
+| 2026-10-06 | TODO + cierre global | d781f25 | FALLA formal (1/105: congelado.sh) | verificador y verificador-b coinciden: 104/105 PASA; la única FALLA es congelado.sh por el contrato modificado 50822be (decisión del usuario). Sin discrepancias: no corre refutador. Suite 473 OK. Condición para `main`: P-puntos-control-31 (prueba en navegador) |
 
 ## Pendientes que deja este plan
 

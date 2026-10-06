@@ -7,13 +7,22 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| puntos-control | plan/puntos-control | 2 (T8 integrada; T9 implementada en worktrees/puntos-control-T9, commit f678582, sin verificar) | verificador sobre T9 en su worktree → integrar T9 (`apps/visitas apps/api/tests`) → T10: regenerar openapi, auditor-seguridad ola 2 → ola 3 | sesión 2026-10-05 cerrada |
+| puntos-control | plan/puntos-control | 4 cerrada (T1–T17 hechas; verificación TODO: 104/105, FALLA formal de congelado.sh por 50822be) | prueba en navegador con `cargar_demo` (P-puntos-control-31) → decisión del usuario de fusionar en `main` (copiar `### Decisiones` a `docs/decisiones.md`) | sesión 2026-10-06 cerrada |
 
-Siguiente: terminar `puntos-control` (olas 2 a 4). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: probar en navegador y fusionar `puntos-control` en `main`. Pendientes a decidir: P-puntos-control-18, -20, -21, -22, -25. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-06 — Plan `puntos-control`: olas 2 a 4 integradas, verificación final
+Hecho:
+- Ola 2: T9 verificada e integrada; auditoría ola 2 → T9b (decisión del usuario: `visitas/abrir/` exige `qr_codigo`, cambia `/api/v1/`; `me/puntos?sitio=` validado; plano filtra sitio y cliente activos); T10: openapi regenerado (e03c8db, 654a6f4).
+- Ola 3: T11, T12 (con P-17) y T13 en paralelo, integradas T13 → T12 → T11; auditoría ola 3 → T11b (PDF en subproceso con 15 s; tooltips con textContent). T14 hecha; la prueba en navegador queda diferida (P-31).
+- Ola 4: T16 (docs/01 y convenciones) y T15 (`cargar_demo` y recorrido); auditoría T15 → T15b en dos rondas (decisión del usuario: `cargar_demo` solo con DEBUG, `DJANGO_ENV=development` y SQLite).
+- Verificación TODO con `verificador` y `verificador-b`: 104/105 PASA en d781f25; única FALLA formal congelado.sh por 50822be. Suite 473 OK.
+- Decisiones del plan escritas en `### Decisiones` (9 líneas); pendientes nuevos P-puntos-control-24 a -35.
+Sigue: prueba en navegador (P-31) y merge a `main` por decisión del usuario.
 
 ### 2026-10-05 — Plan `puntos-control`: ola 1 integrada, T8 integrada, T9 implementada
 Hecho:
