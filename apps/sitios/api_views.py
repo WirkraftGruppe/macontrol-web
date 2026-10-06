@@ -5,7 +5,7 @@ from django.http import FileResponse
 from django.urls import reverse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound
 from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -17,7 +17,11 @@ from apps.visitas.models import Visita
 
 from .estado import estados_de_puntos
 from .models import Plano, PuntoControl
-from .serializers import MiPuntoSerializer, ResolverQRSerializer
+from .serializers import (
+    MiPuntoSerializer,
+    MisPuntosParametrosSerializer,
+    ResolverQRSerializer,
+)
 
 ESTADOS_CON_TRABAJO = (Visita.Estado.PENDIENTE, Visita.Estado.ABIERTA)
 
@@ -167,6 +171,8 @@ class PlanoImagenView(APIView):
                 empleado=request.user,
                 estado__in=ESTADOS_CON_TRABAJO,
                 proyecto__sitio_id=plano.sitio_id,
+                proyecto__sitio__activo=True,
+                proyecto__sitio__cliente__activo=True,
             ).exists()
         ):
             raise NotFound("El plano no existe.")
@@ -198,9 +204,9 @@ class MisPuntosView(APIView):
         responses={200: MiPuntoSerializer(many=True)},
     )
     def get(self, request):
-        sitio = request.query_params.get("sitio")
-        if sitio is not None and not sitio.isdigit():
-            raise ValidationError({"sitio": "Debe ser un número entero."})
+        parametros = MisPuntosParametrosSerializer(data=request.query_params)
+        parametros.is_valid(raise_exception=True)
+        sitio = parametros.validated_data.get("sitio")
         sitios = Visita.objects.filter(
             empleado=request.user,
             estado__in=ESTADOS_CON_TRABAJO,
@@ -208,7 +214,7 @@ class MisPuntosView(APIView):
             proyecto__sitio__cliente__activo=True,
         )
         if sitio is not None:
-            sitios = sitios.filter(proyecto__sitio_id=int(sitio))
+            sitios = sitios.filter(proyecto__sitio_id=sitio)
         puntos = list(
             PuntoControl.objects.filter(
                 activo=True, sitio_id__in=sitios.values("proyecto__sitio_id")

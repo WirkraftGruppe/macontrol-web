@@ -196,18 +196,26 @@ def _pendiente_para(proyecto, empleado):
     return propia, pendientes.exclude(empleado=empleado).exists()
 
 
-def abrir_visita(*, empleado, proyecto):
+def abrir_visita(*, empleado, proyecto, qr_codigo):
     """Abre la jornada del empleado en el proyecto; devuelve `(visita, creada)`.
 
     Es idempotente: si el empleado ya tiene una visita abierta para el proyecto la
     devuelve con `creada=False`. Si tiene una pendiente asignada, la abre. Si no,
     crea una nueva, con `incidencia_asignacion` cuando otro empleado tiene la
     pendiente. Levanta `ValidationError` si el proyecto, su sitio o su cliente no
-    están activos.
+    están activos, o si `qr_codigo` no es el de un punto activo del sitio del
+    proyecto (prueba de que el empleado escaneó el QR): mismo error para ambos casos,
+    antes de tomar locks y de crear nada.
     """
     with transaction.atomic():
         proyecto = _cargar_proyecto(proyecto)
         if not (proyecto.sitio.activo and proyecto.sitio.cliente.activo):
+            raise ValidationError(
+                {"proyecto": "El proyecto no existe o no está activo."}
+            )
+        try:
+            _resolver_punto(proyecto, qr_codigo)
+        except ValidationError:
             raise ValidationError(
                 {"proyecto": "El proyecto no existe o no está activo."}
             )

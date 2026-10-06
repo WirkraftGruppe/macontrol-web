@@ -45,9 +45,10 @@ class CampoJSON(serializers.CharField):
 
 
 class AbrirVisitaSerializer(serializers.Serializer):
-    """Entrada de `POST visitas/abrir/`: el proyecto donde se abre la jornada."""
+    """Entrada de `POST visitas/abrir/`: el proyecto y el QR escaneado en el sitio."""
 
     proyecto = serializers.IntegerField()
+    qr_codigo = serializers.UUIDField()
 
 
 class CrearRevisionSerializer(serializers.Serializer):

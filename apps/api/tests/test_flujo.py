@@ -111,7 +111,9 @@ class FlujoEmpleadoTests(TestCase):
             }
         ]
         abierta = api.post(
-            "/api/v1/visitas/abrir/", {"proyecto": proyecto["id"]}, format="json"
+            "/api/v1/visitas/abrir/",
+            {"proyecto": proyecto["id"], "qr_codigo": str(self.punto.qr_codigo)},
+            format="json",
         )
         self.assertEqual(abierta.status_code, 201, abierta.content)
         cuerpo = {

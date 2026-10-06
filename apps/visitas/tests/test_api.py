@@ -154,13 +154,17 @@ class FlujoRevisionesTests(ApiVisitasBase):
         galpon = PuntoControl.objects.create(sitio=self.sitio, nombre="Galpón")
 
         r = self.api.post(
-            "/api/v1/visitas/abrir/", {"proyecto": self.proyecto.id}, format="json"
+            "/api/v1/visitas/abrir/",
+            {"proyecto": self.proyecto.id, "qr_codigo": str(self.punto.qr_codigo)},
+            format="json",
         )
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(r.data["id"], pendiente.id)
         self.assertEqual(r.data["estado"], "abierta")
         r = self.api.post(
-            "/api/v1/visitas/abrir/", {"proyecto": self.proyecto.id}, format="json"
+            "/api/v1/visitas/abrir/",
+            {"proyecto": self.proyecto.id, "qr_codigo": str(self.punto.qr_codigo)},
+            format="json",
         )
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.data["id"], pendiente.id)
@@ -227,7 +231,9 @@ class FlujoRevisionesTests(ApiVisitasBase):
         self.assertEqual(self._post(visita, api=admin).status_code, 403)
         self.assertEqual(self._cerrar(visita, api=admin).status_code, 403)
         r = admin.post(
-            "/api/v1/visitas/abrir/", {"proyecto": self.proyecto.id}, format="json"
+            "/api/v1/visitas/abrir/",
+            {"proyecto": self.proyecto.id, "qr_codigo": str(self.punto.qr_codigo)},
+            format="json",
         )
         self.assertEqual(r.status_code, 403)
         self.assertEqual(APIClient().post("/api/v1/revisiones/").status_code, 401)
@@ -236,6 +242,7 @@ class FlujoRevisionesTests(ApiVisitasBase):
 class AbrirVisitaTests(ApiVisitasBase):
     def _abrir(self, **cuerpo):
         cuerpo.setdefault("proyecto", self.proyecto.id)
+        cuerpo.setdefault("qr_codigo", str(self.punto.qr_codigo))
         return self.api.post("/api/v1/visitas/abrir/", cuerpo, format="json")
 
     def test_sin_pendiente_crea_con_origen_app(self):
@@ -266,6 +273,33 @@ class AbrirVisitaTests(ApiVisitasBase):
         self.proyecto.save()
         self.assertEqual(self._abrir().status_code, 400)
         self.assertEqual(self._abrir(proyecto="x").status_code, 400)
+        self.assertFalse(Visita.objects.exists())
+
+    def test_sin_qr_del_sitio_da_400(self):
+        otro_sitio = Sitio.objects.create(cliente=self.sitio.cliente, nombre="Otra")
+        inactivo = PuntoControl.objects.create(
+            sitio=self.sitio, nombre="Baja", activo=False
+        )
+        inexistente = self._abrir(proyecto=999999)
+        sin_qr = self.api.post(
+            "/api/v1/visitas/abrir/", {"proyecto": self.proyecto.id}, format="json"
+        )
+        self.assertEqual(sin_qr.status_code, 400, sin_qr.content)
+        self.assertIn("qr_codigo", sin_qr.data["campos"])
+        ajeno = self._abrir(qr_codigo=str(otro_sitio.puntos.get().qr_codigo))
+        self.assertEqual(ajeno.status_code, 400, ajeno.content)
+        # Mismo mensaje que un proyecto inexistente: no se distingue el motivo.
+        self.assertEqual(
+            ajeno.data["campos"]["proyecto"], inexistente.data["campos"]["proyecto"]
+        )
+        inactivo_r = self._abrir(qr_codigo=str(inactivo.qr_codigo))
+        self.assertEqual(inactivo_r.status_code, 400, inactivo_r.content)
+        self.assertEqual(
+            inactivo_r.data["campos"]["proyecto"],
+            inexistente.data["campos"]["proyecto"],
+        )
+        inexistente_qr = self._abrir(qr_codigo=str(uuid4()))
+        self.assertEqual(inexistente_qr.status_code, 400, inexistente_qr.content)
         self.assertFalse(Visita.objects.exists())
 
 
