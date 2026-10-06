@@ -71,6 +71,13 @@ class MapaTests(TestCase):
         )
         return punto
 
+    def test_muestra_atribucion_osm(self):
+        self.client.force_login(self.admin)
+        respuesta = self.client.get("/panel/mapa/")
+
+        self.assertContains(respuesta, "colaboradores de OpenStreetMap")
+        self.assertContains(respuesta, "https://www.openstreetmap.org/copyright")
+
     def test_color_es_peor_estado_de_puntos(self):
         sitio = self.sitio("Mezclado")
         proyecto = self.proyecto(sitio, 60, frecuencia_dias=30)

@@ -11,6 +11,7 @@ from apps.proyectos.models import UMBRAL_PROXIMA_DIAS, Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
 from apps.visitas.models import Visita
+from apps.visitas.tests.test_models import crear_revision
 
 
 class TableroTests(TestCase):
@@ -67,8 +68,31 @@ class TableroTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(
             respuesta.context["contadores"],
-            {"vencidos": 2, "proximos": 2, "pendientes_hoy": 1, "incidencias": 2},
+            {
+                "vencidos": 2,
+                "proximos": 2,
+                "pendientes_hoy": 1,
+                "incidencias": 2,
+                "incidencias_ubicacion": 0,
+            },
         )
+
+    def test_cuenta_incidencias_de_ubicacion(self):
+        self.visita(incidencia_ubicacion=True)
+        en_revision = self.visita()
+        for _ in range(2):  # dos revisiones con incidencia: la visita cuenta una vez
+            crear_revision(en_revision, incidencia_ubicacion=True)
+        revisada = self.visita(
+            incidencia_ubicacion=True, incidencia_revisada_en=timezone.now()
+        )
+        crear_revision(revisada, incidencia_ubicacion=True)
+        self.visita()  # sin incidencia
+
+        self.client.force_login(self.admin)
+        respuesta = self.client.get("/panel/")
+
+        self.assertEqual(respuesta.context["contadores"]["incidencias_ubicacion"], 2)
+        self.assertContains(respuesta, "Incidencias de ubicación")
 
     def test_diez_mas_urgentes_en_orden(self):
         for dias in range(12, 0, -1):
