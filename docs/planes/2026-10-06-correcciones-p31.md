@@ -193,12 +193,27 @@ commit_base: 6510a35
 | 2026-10-06 | T3 (verificador) | 91b2773 | PASA 9/9 | worktree correcciones-p31-T3 |
 | 2026-10-06 | T3 (verificador-b) | 91b2773 | PASA 9/9 | |
 | 2026-10-06 | T4 paso 3: spectacular --validate | 9ac7257 | sin cambios | el YAML no cambia (diff=0) |
+| 2026-10-06 | T4 paso 4: auditor-seguridad | 9ac7257 | 0 bloqueantes, 2 importantes, 1 menor, 3 observaciones | todo a pendientes por decisión del usuario |
 
 ## Pendientes que deja este plan
 
 ### Problemas
 
+- P-correcciones-p31-1 [importante] El primer escaneo fija las coordenadas del punto aunque la revisión tenga `incidencia_ubicacion` (`apps/visitas/services.py`, `_fijar_ubicacion_por_escaneo`; la precisión la declara el cliente): un empleado puede anclar un punto lejos del sitio y desde ahí sus revisiones dan distancia ≈ 0 sin incidencia. Corrección propuesta: no fijar si `revision.incidencia_ubicacion`, con un test (empleado a más de `DISTANCIA_MAXIMA_M` → `latitud is None`). Si el sitio no tiene coordenadas, el escaneo fija igual (decisión del usuario del 2026-10-06). Auditoría T4.
+- P-correcciones-p31-2 [importante] La migración `sitios/0007` aplica las propuestas pendientes sin crear una fila en `HistoricalPuntoControl` y pierde `propuesta["revision"]` (quién originó la coordenada). Corrección propuesta: crear la fila histórica en el `RunPython`, con un motivo que cite la revisión, y saltear las propuestas cuya revisión tuvo `incidencia_ubicacion`. **Hay que resolverlo antes de aplicar 0007 en producción**: después el dato se pierde. Auditoría T4.
+- P-correcciones-p31-3 [menor] El docstring de `registrar_revision` (`apps/visitas/services.py`) sigue diciendo que el empleado propone y el administrador fija. Auditoría T4.
+- P-correcciones-p31-4 [observación] La migración `0007` aborta ante una propuesta con `NaN` o fuera de rango (`Decimal` no levanta en la conversión, falla en `save()`); solo con datos manipulados. Auditoría T4.
+- P-correcciones-p31-5 [observación] `PuntoPosicion` (`apps/sitios/panel_views.py`): `isdigit()` deja pasar dígitos Unicode (`²`) que dan 500, y acepta planos inactivos con un POST armado a mano; usar `ModelChoiceField(Plano.objects.filter(activo=True))` en `PosicionForm`. Solo administradores. Auditoría T4.
+- P-correcciones-p31-6 [observación] `apps/sitios/qr.py` lee una `.woff2`, que exige FreeType con brotli, y Pillow no tiene la versión fijada en `requirements.txt`: si en producción falta, la descarga del QR da 500. Alternativas: fijar Pillow, versionar un TTF o volver a `load_default` con un aviso en el log. Auditoría T4.
+
 ### Decisiones
+
+- 2026-10-06 — El primer escaneo de un punto sin coordenadas, sea de un empleado o de un administrador, las fija directamente con precisión de hasta `PRECISION_MAXIMA_M`; desaparecen la ubicación propuesta y el Aceptar/Descartar — el usuario lo pidió tras la prueba en navegador — reemplaza a: 2026-10-06 (`puntos-control`, el empleado propone y el administrador acepta; y la decisión 2 de `cierre-puntos` en "Empleado: sigue proponiendo")
+- 2026-10-06 — La pestaña Mapa de la ficha del sitio muestra solo la ubicación del sitio, de solo lectura con enlace "Editar ubicación"; la de los puntos se corrige en Editar punto — prueba en navegador — reemplaza a: (nada)
+- 2026-10-06 — Plano con modos explícitos: "Crear nuevo punto" y "Ubicar" activan un modo; el siguiente clic hace la acción; Escape o el mismo botón cancelan — el clic suelto creaba puntos sin querer — reemplaza a: (nada)
+- 2026-10-06 — Visita manual: una hora más de 10 minutos posterior a la actual se rechaza en el campo; el campo viene con la hora actual y `max` — el error salía como "fecha de cierre" — reemplaza a: (nada)
+- 2026-10-06 — Las propuestas pendientes al migrar se aplican si el punto sigue sin coordenadas, y después se elimina el campo — ya cumplían la precisión — reemplaza a: (nada)
+- 2026-10-06 — Los hallazgos de la auditoría de T4 quedan como pendientes (P-correcciones-p31-1 a 6), sin corregir en este plan; si se corrige el 1, con el sitio sin coordenadas el escaneo de un empleado fija igual — decisión del usuario — reemplaza a: (nada)
 
 ### Cierra
 
