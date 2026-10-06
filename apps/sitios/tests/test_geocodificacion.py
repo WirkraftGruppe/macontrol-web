@@ -27,11 +27,22 @@ class GeocodificacionTests(TestCase):
 
     def test_exige_administrador(self):
         with mock.patch(ABRIR) as abrir:
-            self.assertEqual(self.client.get(self.url, {"q": "x"}).status_code, 302)
+            self.assertEqual(self.client.post(self.url, {"q": "x"}).status_code, 302)
             empleado = User.objects.create_user("emp", password="clave-segura-123")
             self.client.force_login(empleado)
-            self.assertEqual(self.client.get(self.url, {"q": "x"}).status_code, 403)
+            self.assertEqual(self.client.post(self.url, {"q": "x"}).status_code, 403)
         abrir.assert_not_called()
+
+    def test_solo_post_y_texto_fuera_de_la_url(self):
+        self.client.force_login(self.admin)
+        with mock.patch(ABRIR, return_value=b"[]") as abrir:
+            self.assertEqual(self.client.get(self.url, {"q": "x"}).status_code, 405)
+            abrir.assert_not_called()
+            self.assertEqual(self.client.post(self.url, {"q": "x"}).status_code, 200)
+        self.assertNotIn("?q=", self.url)
+        cliente = self.client_class(enforce_csrf_checks=True)
+        cliente.force_login(self.admin)
+        self.assertEqual(cliente.post(self.url, {"q": "x"}).status_code, 403)
 
     def test_devuelve_candidatos_validados(self):
         datos = _respuesta(
@@ -41,7 +52,7 @@ class GeocodificacionTests(TestCase):
         )
         self.client.force_login(self.admin)
         with mock.patch(ABRIR, return_value=datos):
-            r = self.client.get(self.url, {"q": "Castelli"})
+            r = self.client.post(self.url, {"q": "Castelli"})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(
             r.json()["resultados"],
@@ -51,7 +62,7 @@ class GeocodificacionTests(TestCase):
     def test_url_usa_host_fijo_y_solo_el_texto(self):
         self.client.force_login(self.admin)
         with mock.patch(ABRIR, return_value=b"[]") as abrir:
-            self.client.get(self.url, {"q": "Calle 1 & x=y"})
+            self.client.post(self.url, {"q": "Calle 1 & x=y"})
         solicitud = abrir.call_args.args[0]
         self.assertTrue(
             solicitud.full_url.startswith(
@@ -65,15 +76,15 @@ class GeocodificacionTests(TestCase):
     def test_texto_vacio_o_largo_responde_400(self):
         self.client.force_login(self.admin)
         with mock.patch(ABRIR) as abrir:
-            self.assertEqual(self.client.get(self.url, {"q": "  "}).status_code, 400)
-            largo = self.client.get(self.url, {"q": "a" * 201})
+            self.assertEqual(self.client.post(self.url, {"q": "  "}).status_code, 400)
+            largo = self.client.post(self.url, {"q": "a" * 201})
             self.assertEqual(largo.status_code, 400)
         abrir.assert_not_called()
 
     def test_sin_red_responde_503_con_mensaje(self):
         self.client.force_login(self.admin)
         with mock.patch(ABRIR, side_effect=urllib.error.URLError("sin red")):
-            r = self.client.get(self.url, {"q": "Castelli"})
+            r = self.client.post(self.url, {"q": "Castelli"})
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
 
@@ -81,16 +92,16 @@ class GeocodificacionTests(TestCase):
         self.client.force_login(self.admin)
         datos = _respuesta({"display_name": "Castelli", "lat": "-36", "lon": "-57"})
         with mock.patch(ABRIR, return_value=datos) as abrir:
-            primera = self.client.get(self.url, {"q": "Castelli"})
-            segunda = self.client.get(self.url, {"q": "  CASTELLI "})
+            primera = self.client.post(self.url, {"q": "Castelli"})
+            segunda = self.client.post(self.url, {"q": "  CASTELLI "})
         self.assertEqual(abrir.call_count, 1)
         self.assertEqual(primera.json(), segunda.json())
 
     def test_limite_de_una_consulta_por_segundo(self):
         self.client.force_login(self.admin)
         with mock.patch(ABRIR, return_value=b"[]") as abrir:
-            self.client.get(self.url, {"q": "uno"})
-            r = self.client.get(self.url, {"q": "dos"})
+            self.client.post(self.url, {"q": "uno"})
+            r = self.client.post(self.url, {"q": "dos"})
         self.assertEqual(r.status_code, 503)
         self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
         self.assertEqual(abrir.call_count, 1)

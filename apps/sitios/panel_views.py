@@ -21,7 +21,14 @@ from apps.panel.mapa import ORIGEN_TESELAS
 from . import geocodificacion, qr, services
 from .estado import EstadoPunto, estados_de_puntos
 from .models import Plano, PuntoControl, Sitio
-from .panel_forms import PlanoForm, PosicionForm, PuntoForm, SitioForm, UbicacionForm
+from .panel_forms import (
+    PlanoForm,
+    PosicionForm,
+    PuntoAltaForm,
+    PuntoForm,
+    SitioForm,
+    UbicacionForm,
+)
 
 PESTANAS = ("mapa", "planos", "puntos")
 CLASE_ESTADO = {
@@ -188,7 +195,7 @@ class _PuntoMixin(AdministradorRequeridoMixin):
 class PuntoAlta(AdministradorRequeridoMixin, CreateView):
     """Alta de un punto; con ``plano``, ``x`` e ``y`` es el clic sobre el plano."""
 
-    form_class = PuntoForm
+    form_class = PuntoAltaForm
     template_name = "sitios/panel/punto_formulario.html"
 
     @cached_property
@@ -204,7 +211,7 @@ class PuntoAlta(AdministradorRequeridoMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        contexto.update(titulo="Nuevo punto", sitio=self.sitio)
+        contexto.update(titulo="Nuevo punto", sitio=self.sitio, es_alta=True)
         return contexto
 
     def get_success_url(self):
@@ -364,11 +371,13 @@ class PlanoImagen(AdministradorRequeridoMixin, View):
 
 
 class Geocodificar(AdministradorRequeridoMixin, View):
-    """Candidatos de Nominatim para ``?q=``; solo se envía el texto de dirección."""
+    """Candidatos de Nominatim; solo POST (con CSRF) y el texto va en el cuerpo."""
 
-    def get(self, request):
+    http_method_names = ["post", "options"]
+
+    def post(self, request):
         try:
-            candidatos = geocodificacion.buscar(request.GET.get("q", ""))
+            candidatos = geocodificacion.buscar(request.POST.get("q", ""))
         except geocodificacion.TextoInvalido:
             return JsonResponse(
                 {"error": "Escriba una dirección de hasta 200 caracteres."}, status=400
