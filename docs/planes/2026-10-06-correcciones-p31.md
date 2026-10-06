@@ -177,8 +177,8 @@ commit_base: 6510a35
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
+| T1 | hecha (integrada 2f4ad1b) |
+| T2 | hecha (integrada 16cec24) |
 | T3 | pendiente |
 | T4 | pendiente |
 
@@ -186,6 +186,10 @@ commit_base: 6510a35
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-06 | T1 (verificador) | 556d341 | PASA 7/7 | worktree correcciones-p31-T1 |
+| 2026-10-06 | T1 (verificador-b) | 556d341 | PASA 7/7 | |
+| 2026-10-06 | T2 (verificador) | 0a8cdda | PASA 10/10 | worktree correcciones-p31-T2 |
+| 2026-10-06 | T2 (verificador-b) | 0a8cdda | PASA 10/10 | |
 
 ## Pendientes que deja este plan
 
