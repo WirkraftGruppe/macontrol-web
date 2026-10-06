@@ -51,3 +51,19 @@ class SchemaTests(TestCase):
         rutas = respuesta.json()["paths"]
         for ruta in RUTAS_DE_DOMINIO:
             self.assertIn(ruta, rutas)
+
+    def test_token_documenta_cuerpo_y_415(self):
+        """El token declara 200 con sus tokens, 401, 415 y 429; la renovación, 415."""
+        usuario = User.objects.create_user(
+            "emp", password="clave-segura-123", rol=User.Rol.EMPLEADO
+        )
+        api = APIClient()
+        api.force_authenticate(usuario)
+        rutas = api.get("/api/v1/schema/", {"format": "json"}).json()["paths"]
+        obtener = rutas["/api/v1/auth/token/"]["post"]
+        self.assertTrue(set(obtener["responses"]) >= {"200", "401", "415", "429"})
+        cuerpo = obtener["responses"]["200"]["content"]["application/json"]["schema"]
+        self.assertIn("$ref", cuerpo)
+        renovar = rutas["/api/v1/auth/token/refresh/"]["post"]
+        self.assertIn("415", renovar["responses"])
+        self.assertTrue(renovar["description"])
