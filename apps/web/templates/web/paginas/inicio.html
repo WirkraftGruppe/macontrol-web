@@ -1,0 +1,127 @@
+{% extends "web/paginas/publica.html" %}
+{% block contenido %}
+<section class="hero" id="hero">
+  <div class="contenedor">
+    <div class="hero-texto">
+      <span class="eyebrow">{{ config.razon_social }}</span>
+      <h1>{{ config.eslogan }}</h1>
+      <p>{{ config.presentacion }}</p>
+      <div class="hero-botones">
+        {% if config.telefono_href %}<a class="btn btn-primario" href="{{ config.telefono_href }}">Llamar ahora</a>{% endif %}
+        <a class="btn btn-secundario" href="#servicios">Ver servicios</a>
+      </div>
+    </div>
+    <div class="hero-imagen">
+      <img src="{{ hero.url }}" width="{{ hero.ancho }}" height="{{ hero.alto }}" alt="Operario pulverizando con mochila en un quincho">
+    </div>
+  </div>
+</section>
+<div class="franja" aria-hidden="true"></div>
+
+<section id="respaldos" aria-label="Respaldos de la empresa">
+  {% include "web/paginas/_respaldos.html" %}
+</section>
+
+<section class="seccion" id="servicios">
+  <div class="contenedor">
+    <div class="seccion-titulo">
+      <span class="eyebrow">Servicios</span>
+      <h2>Qué hacemos</h2>
+    </div>
+    <div class="grilla grilla-3">
+      {% for pagina in paginas_nav %}
+      <a class="tarjeta-enlace" href="{{ pagina.get_absolute_url }}">
+        <div class="tarjeta">
+          <span class="tarjeta-numero">{{ forloop.counter|stringformat:"02d" }}</span>
+          <h3 class="tarjeta-titulo">{{ pagina.tipo.nombre }}</h3>
+          <p class="tarjeta-texto">{{ pagina.resumen }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="seccion" id="mantenimiento">
+  <div class="contenedor banda-edilicia">
+    <div>
+      <span class="eyebrow">Mantenimiento edilicio</span>
+      <h2>Espacios recuperados</h2>
+      <p class="texto-suave">MAControl S.A. cuenta además con un equipo de profesionales calificados en el área de mantenimiento edilicio: recuperamos y mantenemos en condiciones espacios/sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.</p>
+      {% for pagina in paginas_nav %}{% if pagina.tipo.slug == "mantenimiento-edilicio" %}<a class="btn btn-secundario" href="{{ pagina.get_absolute_url }}">Ver mantenimiento edilicio</a>{% endif %}{% endfor %}
+    </div>
+    <div class="banda-edilicia-imagen">
+      <img src="{{ edilicia.url }}" width="{{ edilicia.ancho }}" height="{{ edilicia.alto }}" alt="Hidrolavado de una fachada desde un andamio, con arnés" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<section class="seccion seccion-amarilla" id="sectores">
+  <div class="contenedor">
+    <div class="seccion-titulo">
+      <span class="eyebrow">Sector público y privado</span>
+      <h2>¿Dónde trabajamos?</h2>
+    </div>
+    <div class="grilla grilla-4">
+      {% for valor, etiqueta in sectores %}
+      <div class="tarjeta"><h3 class="tarjeta-titulo">{{ etiqueta }}</h3></div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="seccion" id="como-trabajamos">
+  <div class="contenedor dos-columnas">
+    <div>
+      <span class="eyebrow">Cómo trabajamos</span>
+      <h2>Control integral</h2>
+      <p class="texto-suave">Manejamos el control de plagas de forma integral: no termina al finalizar el trabajo, continuamos con el monitoreo determinando la efectividad del tratamiento empleado y conociendo la satisfacción de los clientes.</p>
+    </div>
+    <ol class="pasos">
+      <li class="paso"><h3 class="tarjeta-titulo">Monitoreo</h3></li>
+      <li class="paso"><h3 class="tarjeta-titulo">Detección</h3></li>
+      <li class="paso"><h3 class="tarjeta-titulo">Exclusión</h3></li>
+      <li class="paso"><h3 class="tarjeta-titulo">Prevención</h3></li>
+    </ol>
+  </div>
+</section>
+
+<section class="seccion" id="empresa">
+  <div class="contenedor">
+    <div class="seccion-titulo">
+      <span class="eyebrow">La empresa</span>
+      <h2>Nuestros valores</h2>
+    </div>
+    <div class="circulos">
+      <div class="circulo"><h3>Bioseguridad</h3></div>
+      <div class="circulo"><h3>Vanguardia</h3></div>
+      <div class="circulo"><h3>Compromiso</h3></div>
+    </div>
+    <p class="centrado"><a class="enlace" href="{% url 'web:empresa' %}">Conocer la empresa</a></p>
+  </div>
+</section>
+
+<section class="seccion" id="clientes">
+  <div class="contenedor">
+    <div class="seccion-titulo">
+      <span class="eyebrow">Clientes</span>
+      <h2>Quienes confían en nosotros</h2>
+    </div>
+    <ul class="logos-clientes">
+      {% for cliente in clientes %}
+      <li class="logo-cliente">{% if cliente.logo %}<img src="{{ cliente.logo.url }}" width="160" height="56" alt="{{ cliente.nombre }}" loading="lazy">{% else %}{{ cliente.nombre }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="contacto">
+  <div class="contenedor">
+    <div class="seccion-titulo">
+      <span class="eyebrow">Contacto</span>
+      <h2>Hablemos</h2>
+    </div>
+    {% include "web/paginas/_contacto.html" %}
+  </div>
+</section>
+{% endblock %}
