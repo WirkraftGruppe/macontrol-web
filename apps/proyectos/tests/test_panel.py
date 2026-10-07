@@ -1,6 +1,7 @@
 """Panel de Proyectos: listado filtrable, alta, edición y ficha."""
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.db import connection
 from django.test import TestCase
@@ -14,8 +15,8 @@ from apps.productos.models import Producto
 from apps.proyectos.consultas import filtrar_por_estado_visita
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
-from apps.sitios.models import Sitio
-from apps.visitas.models import Foto, ProductoAplicado, Visita
+from apps.sitios.models import PuntoControl, Sitio
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 
 ESQUEMA = [
     {"clave": "cebaderos", "etiqueta": "Cebaderos revisados", "tipo": "numero"},
@@ -55,6 +56,25 @@ class ProyectoPanelTests(TestCase):
         respuesta = self.client.get(reverse("panel:proyectos:listado"), parametros)
         self.assertEqual(respuesta.status_code, 200)
         return [p.titulo for p in respuesta.context["proyectos"]]
+
+    def test_filtros_solo_activos_con_tope(self):
+        Cliente.objects.create(razon_social="Inactivo SA", activo=False)
+        Sitio.objects.create(cliente=self.sitio.cliente, nombre="Cerrado", activo=False)
+        TipoServicio.objects.create(nombre="Viejo", slug="viejo-t2", activo=False)
+        respuesta = self.client.get(reverse("panel:proyectos:listado"))
+        self.assertEqual(
+            [c.razon_social for c in respuesta.context["clientes"]], ["ACME"]
+        )
+        self.assertEqual([s.nombre for s in respuesta.context["sitios"]], ["Planta 1"])
+        self.assertEqual(
+            [t.nombre for t in respuesta.context["servicios"]], ["Roedores"]
+        )
+        with patch("apps.proyectos.panel_views.FILTRO_MAXIMO_OPCIONES", 2):
+            Cliente.objects.bulk_create(
+                Cliente(razon_social=f"Extra {i}") for i in range(3)
+            )
+            respuesta = self.client.get(reverse("panel:proyectos:listado"))
+        self.assertEqual(len(respuesta.context["clientes"]), 2)
 
     def test_listado_filtra_vencidos(self):
         self._proyecto("vencido", -3)
@@ -127,20 +147,29 @@ class ProyectoPanelTests(TestCase):
         self.assertEqual((proyecto.titulo, proyecto.estado), ("cambiado", "pausado"))
 
     def _visita(self, proyecto, producto, **extra):
+        ahora = timezone.now()
         visita = Visita.objects.create(
             proyecto=proyecto,
             empleado=self.empleado,
             origen=Visita.Origen.APP,
             estado=Visita.Estado.REALIZADA,
-            realizada_en=timezone.now(),
-            esquema_planilla=ESQUEMA,
-            datos={"cebaderos": 12, "hubo_consumo": True},
+            abierta_en=ahora,
+            cerrada_en=ahora,
             **extra,
         )
-        Foto.objects.create(visita=visita, imagen="visitas/fotos/x.jpg")
-        Foto.objects.create(visita=visita, imagen="visitas/fotos/y.jpg")
+        revision = Revision.objects.create(
+            visita=visita,
+            punto=proyecto.sitio.puntos.get(orden=0),
+            orden=1,
+            realizada_en=ahora,
+            recibida_en=ahora,
+            esquema_planilla=ESQUEMA,
+            datos={"cebaderos": 12, "hubo_consumo": True},
+        )
+        Foto.objects.create(revision=revision, imagen="visitas/fotos/x.jpg")
+        Foto.objects.create(revision=revision, imagen="visitas/fotos/y.jpg")
         ProductoAplicado.objects.create(
-            visita=visita, producto=producto, lote="L1", dosis=1, unidad="ml/l"
+            revision=revision, producto=producto, lote="L1", dosis=1, unidad="ml/l"
         )
         return visita
 
@@ -172,3 +201,41 @@ class ProyectoPanelTests(TestCase):
             self._visita(proyecto, producto)
         with self.assertNumQueries(base):
             self.client.get(url)
+
+    def test_ficha_lista_revisiones_consultas_constantes(self):
+        proyecto = self._proyecto("revisiones")
+        producto = Producto.objects.create(nombre_comercial="Cebo W")
+        url = reverse("panel:proyectos:ficha", args=[proyecto.pk])
+
+        def visita_con_revisiones(cantidad):
+            visita = self._visita(proyecto, producto)
+            for orden in range(2, cantidad + 1):
+                punto = PuntoControl.objects.create(
+                    sitio=self.sitio, nombre=f"Punto {visita.pk}-{orden}", orden=orden
+                )
+                ahora = timezone.now()
+                revision = Revision.objects.create(
+                    visita=visita,
+                    punto=punto,
+                    orden=orden,
+                    realizada_en=ahora,
+                    recibida_en=ahora,
+                    esquema_planilla=ESQUEMA,
+                    datos={"cebaderos": orden},
+                )
+                Foto.objects.create(revision=revision, imagen="visitas/fotos/w.jpg")
+                ProductoAplicado.objects.create(
+                    revision=revision, producto=producto, lote="L", dosis=1, unidad="u"
+                )
+
+        visita_con_revisiones(2)
+        self.client.get(url)  # calienta cachés (sesión, contenttypes)
+        with CaptureQueriesContext(connection) as contador:
+            respuesta = self.client.get(url)
+        base = len(contador)
+        self.assertContains(respuesta, "<details")
+        for _ in range(3):
+            visita_con_revisiones(3)
+        with self.assertNumQueries(base):
+            respuesta = self.client.get(url)
+        self.assertContains(respuesta, "<summary>Punto ", count=7)

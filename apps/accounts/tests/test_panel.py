@@ -100,6 +100,16 @@ class UsuarioPanelTests(TestCase):
         self.empleado.refresh_from_db()
         self.assertFalse(self.empleado.is_active)
 
+    def test_reactivar_usuario_desactivado(self):
+        self.empleado.is_active = False
+        self.empleado.save(update_fields=["is_active"])
+        url = reverse("panel:usuarios:reactivar", args=[self.empleado.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        respuesta = self.client.post(url)
+        self.assertRedirects(respuesta, reverse("panel:usuarios:listado"))
+        self.empleado.refresh_from_db()
+        self.assertTrue(self.empleado.is_active)
+
     def test_no_puede_desactivarse_a_si_mismo(self):
         self.client.post(reverse("panel:usuarios:desactivar", args=[self.admin.pk]))
         self.admin.refresh_from_db()

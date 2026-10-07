@@ -18,6 +18,7 @@ from .consultas import filtrar_por_estado_visita
 from .models import FILTRO_ENCARGADO, EstadoVisita, Proyecto
 from .panel_forms import FormularioProyectoAlta, FormularioProyectoEdicion
 
+FILTRO_MAXIMO_OPCIONES = 200
 FILTROS = ("cliente", "sitio", "servicio", "estado", "encargado", "estado_visita")
 
 
@@ -65,12 +66,17 @@ class ListadoProyectos(AdministradorRequeridoMixin, ListadoPanelMixin):
         parametros = {"q": contexto["q"], "orden": contexto["orden"], **filtros}
         contexto["querystring"] = urlencode({k: v for k, v in parametros.items() if v})
         contexto["filtros"] = filtros
-        contexto["clientes"] = Cliente.objects.order_by("razon_social")
-        contexto["sitios"] = Sitio.objects.order_by("nombre")
-        contexto["servicios"] = TipoServicio.objects.order_by("nombre")
+        tope = FILTRO_MAXIMO_OPCIONES
+        contexto["clientes"] = Cliente.objects.filter(activo=True).order_by(
+            "razon_social"
+        )[:tope]
+        contexto["sitios"] = Sitio.objects.filter(activo=True).order_by("nombre")[:tope]
+        contexto["servicios"] = TipoServicio.objects.filter(activo=True).order_by(
+            "nombre"
+        )[:tope]
         contexto["encargados"] = User.objects.filter(**FILTRO_ENCARGADO).order_by(
             "username"
-        )
+        )[:tope]
         contexto["estados"] = Proyecto.Estado.choices
         contexto["estados_visita"] = EstadoVisita.choices
         return contexto
@@ -108,11 +114,19 @@ class FichaProyecto(AdministradorRequeridoMixin, DetailView):
         proyecto = contexto["proyecto"]
         visitas = list(
             proyecto.visitas.select_related("empleado")
-            .prefetch_related("fotos", "productos__producto")
+            .prefetch_related(
+                "revisiones__punto",
+                "revisiones__fotos",
+                "revisiones__productos__producto",
+            )
             .order_by("-creado")
         )
         for visita in visitas:
             visita.filas = filas_planilla(visita.esquema_planilla, visita.datos)
+            for revision in visita.revisiones.all():
+                revision.filas = filas_planilla(
+                    revision.esquema_planilla, revision.datos
+                )
         contexto["visitas"] = visitas
         contexto["etiqueta_visita"] = EstadoVisita(proyecto.estado_visita).label
         return contexto

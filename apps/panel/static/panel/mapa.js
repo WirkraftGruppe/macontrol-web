@@ -7,12 +7,14 @@
     proxima: "#ffc600",
     al_dia: "#2e9e5b",
     sin_programar: "#7f8890",
+    sin_revisar: "#7f8890",
   };
   var ETIQUETAS = {
     vencida: "Vencida",
     proxima: "Próxima a vencer",
     al_dia: "Al día",
     sin_programar: "Sin programar",
+    sin_revisar: "Sin revisar",
   };
 
   var contenedor = document.getElementById("mapa");
@@ -24,6 +26,7 @@
   var mapa = L.map(contenedor).setView([-36.1, -57.8], 8);
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
+    referrerPolicy: "strict-origin-when-cross-origin",
     attribution: "&copy; colaboradores de OpenStreetMap",
   }).addTo(mapa);
   var capa = L.layerGroup().addTo(mapa);
@@ -87,7 +90,7 @@
         capa.clearLayers();
         var puntos = [];
         datos.sitios.forEach(function (sitio) {
-          var color = COLORES[sitio.estado] || COLORES.sin_programar;
+          var color = COLORES[sitio.estado] || COLORES.sin_revisar;
           L.circleMarker([sitio.lat, sitio.lng], {
             radius: 9,
             color: "#1b1f23",

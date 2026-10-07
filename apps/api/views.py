@@ -2,7 +2,12 @@
 
 from django.contrib.auth import get_user_model
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import (
+    OpenApiResponse,
+    extend_schema,
+    inline_serializer,
+)
+from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed, Throttled
 from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
@@ -71,6 +76,25 @@ class RaizView(APIView):
         return Response({"usuario": request.user.username, "rol": request.user.rol})
 
 
+TOKENS = inline_serializer(
+    "Tokens",
+    {"access": serializers.CharField(), "refresh": serializers.CharField()},
+)
+RESPUESTAS_DE_CONTRATO = {
+    415: OpenApiResponse(description="El cuerpo no es JSON (`Content-Type`)."),
+    429: OpenApiResponse(description="Demasiados intentos; reintentar más tarde."),
+}
+
+
+@extend_schema(
+    summary="Obtener tokens",
+    description="Intercambia usuario y contraseña por un par de tokens JWT.",
+    responses={
+        200: TOKENS,
+        401: OpenApiResponse(description="Credenciales inválidas o cuenta inactiva."),
+        **RESPUESTAS_DE_CONTRATO,
+    },
+)
 class ObtenerToken(TokenObtainPairView):
     """Obtiene el token; comparte con el panel los baldes de fallos por usuario."""
 
@@ -94,6 +118,20 @@ class ObtenerToken(TokenObtainPairView):
         return respuesta
 
 
+@extend_schema(
+    summary="Renovar el token de acceso",
+    description=(
+        "Entrega un nuevo token de acceso y un nuevo token de renovación; el "
+        "token de renovación enviado queda invalidado, así que hay que guardar "
+        "el nuevo. Falla si el usuario ya no existe o cambió su contraseña."
+    ),
+    responses={
+        200: TOKENS,
+        401: OpenApiResponse(description="Token de renovación inválido o vencido."),
+        415: RESPUESTAS_DE_CONTRATO[415],
+        429: RESPUESTAS_DE_CONTRATO[429],
+    },
+)
 class RenovarToken(TokenRefreshView):
     serializer_class = RenovacionSerializer
     parser_classes = [JSONParser]

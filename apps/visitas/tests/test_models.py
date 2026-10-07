@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, models, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
 from PIL import Image
@@ -18,16 +18,17 @@ from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
-from apps.visitas.models import Foto, ProductoAplicado, Visita, ruta_foto
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita, ruta_foto
 
 
 def crear_visita(**extra):
     """Visita guardada con proyecto, empleado y administrador propios."""
     cliente = Cliente.objects.create(razon_social="ACME")
     sitio = Sitio.objects.create(cliente=cliente, nombre="Planta 1")
-    tipo = TipoServicio.objects.create(nombre="Roedores", slug="roedores-vis")
+    sufijo = uuid4().hex[:8]
+    tipo = TipoServicio.objects.create(nombre="Roedores", slug=f"roedores-{sufijo}")
     empleado = User.objects.create_user(
-        username="emp-vis", password="x", rol=User.Rol.EMPLEADO
+        username=f"emp-{sufijo}", password="x", rol=User.Rol.EMPLEADO
     )
     proyecto = Proyecto.objects.create(
         sitio=sitio,
@@ -41,6 +42,25 @@ def crear_visita(**extra):
     return Visita.objects.create(**datos)
 
 
+def punto_de(visita):
+    """Punto "General" del sitio de la visita (su QR es `punto.qr_codigo`)."""
+    return visita.proyecto.sitio.puntos.get(orden=0)
+
+
+def crear_revision(visita, **extra):
+    """Revisión guardada en el punto General del sitio de la visita."""
+    ahora = timezone.now()
+    datos = {
+        "visita": visita,
+        "punto": punto_de(visita),
+        "orden": visita.revisiones.count() + 1,
+        "realizada_en": ahora,
+        "recibida_en": ahora,
+    }
+    datos.update(extra)
+    return Revision.objects.create(**datos)
+
+
 class VisitaTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -49,54 +69,90 @@ class VisitaTests(TestCase):
             username="admin-vis", password="x", rol=User.Rol.ADMINISTRADOR
         )
 
-    def test_empleado_debe_tener_rol_empleado(self):
+    def test_empleado_acepta_empleado_o_administrador_y_rechaza_otro_rol(self):
         self.visita.empleado = self.admin
+        self.visita.full_clean()
+        self.visita.empleado = User.objects.create_user(
+            username="otro-rol", password="x", rol="visitante"
+        )
         with self.assertRaises(ValidationError) as ctx:
             self.visita.full_clean()
         self.assertIn("empleado", ctx.exception.message_dict)
 
-    def test_realizada_exige_realizada_en(self):
+    def test_realizada_exige_cerrada_en(self):
         self.visita.estado = Visita.Estado.REALIZADA
-        self.visita.realizada_en = None
+        self.visita.cerrada_en = None
         with self.assertRaises(ValidationError) as ctx:
             self.visita.full_clean()
-        self.assertIn("realizada_en", ctx.exception.message_dict)
+        self.assertIn("cerrada_en", ctx.exception.message_dict)
 
-    def test_cancelada_no_admite_realizada_en(self):
+    def test_cancelada_no_admite_cerrada_en(self):
         self.visita.estado = Visita.Estado.CANCELADA
-        self.visita.realizada_en = timezone.now()
+        self.visita.cerrada_en = timezone.now()
         with self.assertRaises(ValidationError) as ctx:
             self.visita.full_clean()
-        self.assertIn("realizada_en", ctx.exception.message_dict)
+        self.assertIn("cerrada_en", ctx.exception.message_dict)
 
-    def test_pendiente_no_admite_fotos_ni_productos(self):
-        media = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
-        configuracion = override_settings(MEDIA_ROOT=media)
-        configuracion.enable()
-        self.addCleanup(configuracion.disable)
-        self.visita.full_clean()
-        Foto.objects.create(visita=self.visita, imagen=imagen_real())
-        with self.assertRaises(ValidationError):
+    def test_abierta_exige_abierta_en(self):
+        self.visita.estado = Visita.Estado.ABIERTA
+        with self.assertRaises(ValidationError) as ctx:
             self.visita.full_clean()
-        with self.captureOnCommitCallbacks(execute=True):
-            Foto.objects.all().delete()
-        self.visita.full_clean()
-        producto = Producto.objects.create(nombre_comercial="Cebo pend")
-        ProductoAplicado.objects.create(
-            visita=self.visita, producto=producto, lote="L", dosis=1, unidad="ml"
-        )
-        with self.assertRaises(ValidationError):
-            self.visita.full_clean()
-        self.visita.estado = Visita.Estado.REALIZADA
-        self.visita.realizada_en = timezone.now()
+        self.assertIn("abierta_en", ctx.exception.message_dict)
+        self.visita.abierta_en = timezone.now()
         self.visita.full_clean()
 
-    def test_historial_excluye_coordenadas_y_datos(self):
+    def test_realizada_en_es_la_fecha_de_cierre(self):
+        ahora = timezone.now()
+        self.visita.cerrada_en = ahora
+        self.assertEqual(self.visita.realizada_en, ahora)
+
+    def test_pendiente_no_admite_revisiones(self):
+        visita = crear_visita()
+        visita.full_clean()
+        crear_revision(visita)
+        with self.assertRaises(ValidationError):
+            visita.full_clean()
+        visita.estado = Visita.Estado.REALIZADA
+        visita.cerrada_en = timezone.now()
+        visita.full_clean()
+
+    def test_historial_excluye_datos_y_ya_no_tiene_la_evidencia(self):
         campos = {f.name for f in Visita.history.model._meta.get_fields()}
-        for excluido in ("latitud", "longitud", "precision_m", "datos"):
+        for excluido in ("datos", "latitud", "longitud", "precision_m", "cliente_uuid"):
             self.assertNotIn(excluido, campos)
         self.assertIn("estado", campos)
+        self.assertIn("cierre", campos)
+
+
+class RevisionTests(TestCase):
+    def test_historial_excluye_coordenadas_y_datos(self):
+        campos = {f.name for f in Revision.history.model._meta.get_fields()}
+        for excluido in ("latitud", "longitud", "precision_m", "datos"):
+            self.assertNotIn(excluido, campos)
+        self.assertIn("realizada_en", campos)
+
+    def test_cliente_uuid_es_unico_y_admite_varias_sin_valor(self):
+        visita = crear_visita()
+        identificador = uuid4()
+        crear_revision(visita, cliente_uuid=identificador)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            crear_revision(visita, cliente_uuid=identificador)
+        crear_revision(visita)
+        crear_revision(visita)
+
+    def test_un_punto_puede_revisarse_mas_de_una_vez_en_la_visita(self):
+        visita = crear_visita()
+        crear_revision(visita)
+        crear_revision(visita)
+        self.assertEqual(
+            list(visita.revisiones.values_list("orden", flat=True)), [1, 2]
+        )
+
+    def test_el_punto_con_revisiones_no_se_borra(self):
+        visita = crear_visita()
+        crear_revision(visita)
+        with self.assertRaises(models.ProtectedError):
+            punto_de(visita).delete()
 
 
 class FotoModeloTests(TestCase):
@@ -124,9 +180,10 @@ class FotoArchivoTests(TestCase):
         configuracion.enable()
         self.addCleanup(configuracion.disable)
         self.visita = crear_visita()
+        self.revision = crear_revision(self.visita)
 
     def _crear_foto(self):
-        return Foto.objects.create(visita=self.visita, imagen=imagen_real())
+        return Foto.objects.create(revision=self.revision, imagen=imagen_real())
 
     def test_borrar_foto_borra_el_archivo(self):
         foto = self._crear_foto()
@@ -157,10 +214,10 @@ class FotoArchivoTests(TestCase):
 
 class ProductoAplicadoTests(TestCase):
     def test_historial_registra_cambio_de_lote(self):
-        visita = crear_visita()
+        revision = crear_revision(crear_visita())
         producto = Producto.objects.create(nombre_comercial="Cebo X")
         aplicado = ProductoAplicado.objects.create(
-            visita=visita,
+            revision=revision,
             producto=producto,
             lote="L-1",
             dosis=Decimal("1.500"),
@@ -174,31 +231,17 @@ class ProductoAplicadoTests(TestCase):
 
 
 class CamposAppTests(TestCase):
-    def test_cliente_uuid_es_unico(self):
-        identificador = uuid4()
-        visita = crear_visita(cliente_uuid=identificador)
-        self.assertIsNone(visita.recibida_en)
+    def test_visita_nueva_no_es_incidencia_de_asignacion_ni_esta_cerrada(self):
+        visita = crear_visita()
         self.assertFalse(visita.incidencia_asignacion)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            Visita.objects.create(
-                proyecto=visita.proyecto,
-                empleado=visita.empleado,
-                origen=Visita.Origen.APP,
-                cliente_uuid=identificador,
-            )
-        # Varias visitas sin cliente_uuid conviven (NULL no choca).
-        Visita.objects.create(
-            proyecto=visita.proyecto, empleado=visita.empleado, origen="app"
-        )
-        Visita.objects.create(
-            proyecto=visita.proyecto, empleado=visita.empleado, origen="app"
-        )
+        self.assertEqual(visita.cierre, "")
+        self.assertIsNone(visita.abierta_en)
 
     def test_codigo_de_foto_se_genera_y_es_unico(self):
-        visita = crear_visita()
+        revision = crear_revision(crear_visita())
         with override_settings(MEDIA_ROOT=tempfile.mkdtemp()):
-            primera = Foto.objects.create(visita=visita, imagen=imagen_real())
-            segunda = Foto.objects.create(visita=visita, imagen=imagen_real("blue"))
+            primera = Foto.objects.create(revision=revision, imagen=imagen_real())
+            segunda = Foto.objects.create(revision=revision, imagen=imagen_real("blue"))
         self.assertIsInstance(primera.codigo, UUID)
         self.assertNotEqual(primera.codigo, segunda.codigo)
         segunda.codigo = primera.codigo

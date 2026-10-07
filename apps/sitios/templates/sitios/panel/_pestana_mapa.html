@@ -1,0 +1,11 @@
+<section>
+  <h2>Ubicación del sitio</h2>
+  {% if sitio.latitud is not None and sitio.longitud is not None %}
+  <div id="mapa-sitio" class="mapa-leaflet"></div>
+  {% else %}
+  <p>El sitio no tiene ubicación cargada.</p>
+  {% endif %}
+  <p><a href="{% url 'panel:sitios:editar' sitio.pk %}">Editar ubicación</a></p>
+  <p class="ayuda">&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">colaboradores de OpenStreetMap</a></p>
+  {{ datos_mapa|json_script:"datos-mapa" }}
+</section>

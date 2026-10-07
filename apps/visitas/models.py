@@ -1,4 +1,4 @@
-"""Modelos de Visitas: Visita, Foto y ProductoAplicado."""
+"""Modelos de Visitas: Visita (jornada), Revision (escaneo), Foto y ProductoAplicado."""
 
 import logging
 from uuid import uuid4
@@ -22,8 +22,14 @@ class Visita(models.Model):
         APP = "app", "App móvil"
         MANUAL = "manual", "Manual"
 
+    class Cierre(models.TextChoices):
+        EMPLEADO = "empleado", "Empleado"
+        SISTEMA = "sistema", "Sistema"
+        ADMINISTRADOR = "administrador", "Administrador"
+
     class Estado(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
+        ABIERTA = "abierta", "Abierta"
         REALIZADA = "realizada", "Realizada"
         CANCELADA = "cancelada", "Cancelada"
 
@@ -37,7 +43,7 @@ class Visita(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="visitas",
-        limit_choices_to={"rol": User.Rol.EMPLEADO},
+        limit_choices_to={"rol__in": [User.Rol.EMPLEADO, User.Rol.ADMINISTRADOR]},
         verbose_name="empleado",
     )
     origen = models.CharField("origen", max_length=10, choices=Origen.choices)
@@ -51,18 +57,13 @@ class Visita(models.Model):
         related_name="visitas_asignadas",
         verbose_name="asignada por",
     )
-    realizada_en = models.DateTimeField("realizada en", null=True, blank=True)
+    abierta_en = models.DateTimeField("abierta en", null=True, blank=True)
+    cerrada_en = models.DateTimeField("cerrada en", null=True, blank=True)
+    cierre = models.CharField(
+        "cierre", max_length=15, choices=Cierre.choices, blank=True
+    )
     estado = models.CharField(
         "estado", max_length=10, choices=Estado.choices, default=Estado.PENDIENTE
-    )
-    latitud = models.DecimalField(
-        "latitud", max_digits=9, decimal_places=6, null=True, blank=True
-    )
-    longitud = models.DecimalField(
-        "longitud", max_digits=9, decimal_places=6, null=True, blank=True
-    )
-    precision_m = models.DecimalField(
-        "precisión (m)", max_digits=7, decimal_places=1, null=True, blank=True
     )
     datos = models.JSONField("datos de la planilla", default=dict, blank=True)
     esquema_planilla = models.JSONField(
@@ -85,16 +86,14 @@ class Visita(models.Model):
     incidencia_revisada_en = models.DateTimeField(
         "incidencia revisada en", null=True, blank=True
     )
-    cliente_uuid = models.UUIDField(
-        "identificador del cliente", unique=True, null=True, blank=True
+    distancia_m = models.PositiveIntegerField(
+        "distancia al punto (m)", null=True, blank=True
     )
-    recibida_en = models.DateTimeField("recibida en", null=True, blank=True)
+    incidencia_ubicacion = models.BooleanField("incidencia de ubicación", default=False)
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
-    history = HistoricalRecords(
-        excluded_fields=["latitud", "longitud", "precision_m", "datos"]
-    )
+    history = HistoricalRecords(excluded_fields=["datos", "distancia_m"])
 
     class Meta:
         verbose_name = "visita"
@@ -104,22 +103,82 @@ class Visita(models.Model):
     def __str__(self):
         return f"Visita {self.pk} - {self.proyecto_id}"
 
+    @property
+    def realizada_en(self):
+        """Fecha de realización: el momento en que se cerró la jornada."""
+        return self.cerrada_en
+
     def clean(self):
         super().clean()
-        if self.estado == self.Estado.REALIZADA and not self.realizada_en:
-            raise ValidationError({"realizada_en": "Falta la fecha de realización."})
-        if self.estado == self.Estado.CANCELADA and self.realizada_en:
+        if self.estado == self.Estado.REALIZADA and not self.cerrada_en:
+            raise ValidationError({"cerrada_en": "Falta la fecha de cierre."})
+        if self.estado == self.Estado.CANCELADA and self.cerrada_en:
             raise ValidationError(
-                {"realizada_en": "Una cancelada no lleva fecha de realización."}
+                {"cerrada_en": "Una cancelada no lleva fecha de cierre."}
             )
+        if self.estado == self.Estado.ABIERTA and not self.abierta_en:
+            raise ValidationError({"abierta_en": "Falta la fecha de apertura."})
         if (
             self.pk
             and self.estado == self.Estado.PENDIENTE
-            and (self.fotos.exists() or self.productos.exists())
+            and self.revisiones.exists()
         ):
-            raise ValidationError(
-                "Una visita pendiente no lleva fotos ni productos aplicados."
-            )
+            raise ValidationError("Una visita pendiente no tiene revisiones.")
+
+
+class Revision(models.Model):
+    """Un escaneo de un punto de control dentro de una visita."""
+
+    visita = models.ForeignKey(
+        Visita,
+        on_delete=models.CASCADE,
+        related_name="revisiones",
+        verbose_name="visita",
+    )
+    punto = models.ForeignKey(
+        "sitios.PuntoControl",
+        on_delete=models.PROTECT,
+        related_name="revisiones",
+        verbose_name="punto de control",
+    )
+    orden = models.PositiveSmallIntegerField("orden", default=0)
+    realizada_en = models.DateTimeField("realizada en")
+    recibida_en = models.DateTimeField("recibida en")
+    cliente_uuid = models.UUIDField(
+        "identificador del cliente", unique=True, null=True, blank=True
+    )
+    latitud = models.DecimalField(
+        "latitud", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    longitud = models.DecimalField(
+        "longitud", max_digits=9, decimal_places=6, null=True, blank=True
+    )
+    precision_m = models.DecimalField(
+        "precisión (m)", max_digits=7, decimal_places=1, null=True, blank=True
+    )
+    distancia_m = models.PositiveIntegerField(
+        "distancia al punto (m)", null=True, blank=True
+    )
+    incidencia_ubicacion = models.BooleanField("incidencia de ubicación", default=False)
+    datos = models.JSONField("datos de la planilla", default=dict, blank=True)
+    esquema_planilla = models.JSONField(
+        "esquema de la planilla", default=list, blank=True
+    )
+    observaciones = models.TextField("observaciones", blank=True)
+    incidencia = models.BooleanField("incidencia", default=False)
+    incidencia_detalle = models.TextField("detalle de la incidencia", blank=True)
+
+    history = HistoricalRecords(
+        excluded_fields=["latitud", "longitud", "precision_m", "distancia_m", "datos"]
+    )
+
+    class Meta:
+        verbose_name = "revisión"
+        verbose_name_plural = "revisiones"
+        ordering = ["visita_id", "orden", "id"]
+
+    def __str__(self):
+        return f"Revisión {self.pk} de visita {self.visita_id}"
 
 
 def ruta_foto(instancia, nombre):
@@ -128,11 +187,11 @@ def ruta_foto(instancia, nombre):
 
 
 class Foto(models.Model):
-    visita = models.ForeignKey(
-        Visita,
+    revision = models.ForeignKey(
+        Revision,
         on_delete=models.CASCADE,
         related_name="fotos",
-        verbose_name="visita",
+        verbose_name="revisión",
     )
     codigo = models.UUIDField("código", default=uuid4, unique=True, editable=False)
     imagen = models.ImageField("imagen", upload_to=ruta_foto)
@@ -145,7 +204,7 @@ class Foto(models.Model):
         ordering = ["orden", "id"]
 
     def __str__(self):
-        return f"Foto {self.pk} de visita {self.visita_id}"
+        return f"Foto {self.pk} de revisión {self.revision_id}"
 
     def save(self, *args, **kwargs):
         anterior = None
@@ -184,11 +243,11 @@ def borrar_archivo_de_foto(sender, instance, **kwargs):
 
 
 class ProductoAplicado(models.Model):
-    visita = models.ForeignKey(
-        Visita,
+    revision = models.ForeignKey(
+        Revision,
         on_delete=models.CASCADE,
         related_name="productos",
-        verbose_name="visita",
+        verbose_name="revisión",
     )
     producto = models.ForeignKey(
         "productos.Producto",
@@ -209,4 +268,4 @@ class ProductoAplicado(models.Model):
         verbose_name_plural = "productos aplicados"
 
     def __str__(self):
-        return f"{self.producto_id} en visita {self.visita_id}"
+        return f"{self.producto_id} en revisión {self.revision_id}"

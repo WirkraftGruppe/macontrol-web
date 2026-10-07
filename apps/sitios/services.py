@@ -1,14 +1,15 @@
-"""Servicios de Sitios: supresión de datos y regeneración del código QR."""
+"""Servicios de Sitios: supresión de datos, QR y ubicación de los puntos."""
 
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError
 
 from apps.proyectos.models import Proyecto
 
-from .models import Sitio
+from .models import Plano, PuntoControl, Sitio
 
 TOPE_REGENERAR_QR = 20
 
@@ -23,6 +24,8 @@ def suprimir_sitio(sitio):
         sitio.delete()
         Sitio.history.filter(id=pk).delete()
         Proyecto.history.filter(sitio_id=pk).delete()
+        PuntoControl.history.filter(sitio_id=pk).delete()
+        Plano.history.filter(sitio_id=pk).delete()
 
 
 def suprimir_sitios(sitios):
@@ -43,28 +46,152 @@ def suprimir_sitios(sitios):
     return suprimidos, con_proyectos
 
 
-def regenerar_qr(sitio):
-    """Genera un nuevo ``qr_codigo`` (invalida la etiqueta impresa).
+def regenerar_qr(punto):
+    """Genera un nuevo ``qr_codigo`` del punto (invalida la etiqueta impresa).
 
     Deja el motivo en el historial.
     """
-    sitio.qr_codigo = uuid.uuid4()
-    sitio.qr_impreso_el = None
-    sitio._change_reason = "Regeneración de QR"
-    sitio.save(update_fields=["qr_codigo", "qr_impreso_el", "actualizado"])
-    return sitio.qr_codigo
+    punto.qr_codigo = uuid.uuid4()
+    punto.qr_impreso_el = None
+    punto._change_reason = "Regeneración de QR"
+    punto.save(update_fields=["qr_codigo", "qr_impreso_el"])
+    return punto.qr_codigo
 
 
-def regenerar_qr_lote(sitios):
-    """Regenera el QR de varios sitios; rechaza el lote si supera ``TOPE_REGENERAR_QR``.
+def regenerar_qr_lote(puntos):
+    """Regenera el QR de varios puntos; rechaza el lote si supera ``TOPE_REGENERAR_QR``.
 
-    Devuelve la cantidad de sitios regenerados.
+    Devuelve la cantidad de puntos regenerados.
     """
-    if len(sitios) > TOPE_REGENERAR_QR:
+    if len(puntos) > TOPE_REGENERAR_QR:
         raise ValidationError(
             f"No se pueden regenerar más de {TOPE_REGENERAR_QR} códigos QR a la vez "
-            f"(se seleccionaron {len(sitios)})."
+            f"(se seleccionaron {len(puntos)})."
         )
-    for sitio in sitios:
-        regenerar_qr(sitio)
-    return len(sitios)
+    with transaction.atomic():
+        for punto in puntos:
+            regenerar_qr(punto)
+    return len(puntos)
+
+
+def fijar_ubicacion(punto, latitud, longitud):
+    """Fija lat/lng del punto (clic en el mapa) y deja el motivo en el historial."""
+    punto.latitud = latitud
+    punto.longitud = longitud
+    punto._change_reason = "Ubicación fijada en el mapa"
+    punto.save(update_fields=["latitud", "longitud"])
+
+
+def mover_en_plano(punto, x, y):
+    """Guarda la posición del marcador en el plano (fracción 0 a 1)."""
+    punto.x = x
+    punto.y = y
+    punto._change_reason = "Marcador movido en el plano"
+    punto.save(update_fields=["x", "y"])
+
+
+def ubicar_en_plano(punto, plano, x, y):
+    """Ubica el punto en un plano de su mismo sitio, con x e y entre 0 y 1."""
+    if plano.sitio_id != punto.sitio_id:
+        raise ValidationError("El plano es de otro sitio.")
+    if not (0 <= x <= 1 and 0 <= y <= 1):
+        raise ValidationError("La posición debe estar entre 0 y 1.")
+    punto.plano = plano
+    punto.x = x
+    punto.y = y
+    punto._change_reason = "Punto ubicado en el plano"
+    punto.save(update_fields=["plano", "x", "y"])
+
+
+def desactivar_punto(punto):
+    """Da de baja el punto: conserva sus revisiones, pero deja de pedirse."""
+    punto.activo = False
+    punto._change_reason = "Punto desactivado"
+    punto.save(update_fields=["activo"])
+
+
+def _exigir_precision(precision_m):
+    """El modo campo solo fija coordenadas con una precisión de GPS suficiente."""
+    if precision_m is None or precision_m > settings.PRECISION_MAXIMA_M:
+        raise ValidationError(
+            "La precisión del GPS debe ser de "
+            f"{settings.PRECISION_MAXIMA_M} m o mejor para fijar la ubicación."
+        )
+
+
+def _exigir_activo(sitio):
+    if not sitio.activo or not sitio.cliente.activo:
+        raise ValidationError("El sitio o su cliente están inactivos.")
+
+
+def crear_sitio_en_campo(
+    *,
+    administrador,
+    cliente,
+    nombre,
+    direccion,
+    localidad,
+    latitud,
+    longitud,
+    precision_m,
+):
+    """Alta de un sitio (con su punto General) hecha por un administrador en campo."""
+    if not cliente.activo:
+        raise ValidationError("El cliente está inactivo.")
+    _exigir_precision(precision_m)
+    sitio = Sitio(
+        cliente=cliente,
+        nombre=nombre,
+        direccion=direccion,
+        localidad=localidad,
+        latitud=latitud,
+        longitud=longitud,
+    )
+    sitio._history_user = administrador
+    sitio._change_reason = "Alta en campo desde la app"
+    sitio.save()
+    return sitio
+
+
+def crear_punto_en_campo(
+    *,
+    administrador,
+    sitio,
+    nombre,
+    sector,
+    latitud=None,
+    longitud=None,
+    precision_m=None,
+    foto=None,
+):
+    """Alta de un punto hecha por un administrador; con coordenadas exige precisión."""
+    _exigir_activo(sitio)
+    if latitud is not None or longitud is not None:
+        _exigir_precision(precision_m)
+    ultimo = sitio.puntos.order_by("-orden").values_list("orden", flat=True).first()
+    punto = PuntoControl(
+        sitio=sitio,
+        nombre=nombre,
+        sector=sector,
+        orden=(ultimo or 0) + 1,
+        latitud=latitud,
+        longitud=longitud,
+        foto=foto,
+    )
+    punto._history_user = administrador
+    punto._change_reason = "Alta en campo desde la app"
+    punto.save()
+    return punto
+
+
+def fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m):
+    """Fija lat/lng del punto desde el GPS de un administrador."""
+    _exigir_activo(punto.sitio)
+    if not punto.activo:
+        raise ValidationError("El punto está inactivo.")
+    _exigir_precision(precision_m)
+    punto.latitud = latitud
+    punto.longitud = longitud
+    punto._history_user = administrador
+    punto._change_reason = "Ubicación fijada en campo desde la app"
+    punto.save(update_fields=["latitud", "longitud"])

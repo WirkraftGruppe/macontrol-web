@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 FILTROS = ("empleado", "proyecto", "estado", "incidencia")
 INCIDENCIAS = (("sin_revisar", "Sin revisar"), ("todas", "Todas las incidencias"))
 TIPOS_IMAGEN = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
-CAMPOS_OCULTOS = {"datos", "latitud", "longitud", "precision_m"}
+CAMPOS_OCULTOS = {"datos"}
 TIPOS_CAMBIO = {"+": "Creación", "~": "Modificación", "-": "Eliminación"}
 
 
@@ -36,7 +36,7 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
     template_name = "visitas/panel/listado.html"
     template_parcial = "visitas/panel/_listado.html"
     context_object_name = "visitas"
-    orden_permitido = ("creado", "programada_para", "realizada_en", "estado")
+    orden_permitido = ("creado", "programada_para", "cerrada_en", "estado")
     campos_busqueda = ("proyecto__titulo", "proyecto__sitio__nombre")
 
     def get_filtros(self):
@@ -102,12 +102,17 @@ class FichaVisita(AdministradorRequeridoMixin, DetailView):
     context_object_name = "visita"
     queryset = Visita.objects.select_related(
         "proyecto__sitio", "empleado", "asignada_por", "incidencia_revisada_por"
-    ).prefetch_related("fotos", "productos__producto")
+    ).prefetch_related(
+        "revisiones__punto", "revisiones__fotos", "revisiones__productos__producto"
+    )
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         visita = contexto["visita"]
         contexto["filas"] = filas_planilla(visita.esquema_planilla, visita.datos)
+        contexto["revisiones"] = list(visita.revisiones.all())
+        for revision in contexto["revisiones"]:
+            revision.filas = filas_planilla(revision.esquema_planilla, revision.datos)
         contexto["historial"] = _historial(visita)
         return contexto
 
@@ -223,7 +228,9 @@ class RegistrarVisitaManual(AdministradorRequeridoMixin, FormView):
                 administrador=self.request.user,
                 motivo=datos["motivo"],
                 realizada_en=datos["realizada_en"],
+                puntos=datos["puntos"],
                 datos=form.datos_planilla(),
+                datos_visita=form.datos_planilla_visita(),
                 productos_aplicados=[
                     {**p.cleaned_data, "producto": p.cleaned_data["producto"].pk}
                     for p in productos

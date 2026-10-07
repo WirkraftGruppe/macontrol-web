@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import ProtectedError
@@ -9,7 +10,7 @@ from apps.clientes.models import Cliente
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios import services
-from apps.sitios.models import Sitio
+from apps.sitios.models import Plano, PuntoControl, Sitio
 
 
 class _BaseSitio(TestCase):
@@ -86,34 +87,80 @@ class SuprimirSitioTests(_BaseSitio):
         self.assertEqual(Sitio.history.filter(id=pk_libre).count(), 0)
         self.assertTrue(Sitio.objects.filter(pk=con_proyecto.pk).exists())
 
+    def test_suprimir_borra_puntos_y_su_historial(self):
+        pk = self.sitio.pk
+        self.assertEqual(PuntoControl.history.filter(sitio_id=pk).count(), 1)
+        services.suprimir_sitio(self.sitio)
+        self.assertFalse(PuntoControl.objects.filter(sitio_id=pk).exists())
+        self.assertEqual(PuntoControl.history.filter(sitio_id=pk).count(), 0)
 
-class RegenerarQrTests(_BaseSitio):
+
+class RegenerarQrPuntoTests(_BaseSitio):
+    def setUp(self):
+        super().setUp()
+        self.general = self.sitio.puntos.get()
+
     def test_regenerar_qr_cambia_codigo_y_borra_fecha_de_impresion(self):
-        self.sitio.qr_impreso_el = datetime.date(2026, 1, 1)
-        self.sitio.save()
-        anterior = self.sitio.qr_codigo
-        historial = Sitio.history.filter(id=self.sitio.pk).count()
-        nuevo = services.regenerar_qr(self.sitio)
-        self.sitio.refresh_from_db()
+        self.general.qr_impreso_el = datetime.date(2026, 1, 1)
+        self.general.save()
+        anterior = self.general.qr_codigo
+        historial = PuntoControl.history.filter(id=self.general.pk).count()
+        nuevo = services.regenerar_qr(self.general)
+        self.general.refresh_from_db()
         self.assertNotEqual(nuevo, anterior)
-        self.assertEqual(self.sitio.qr_codigo, nuevo)
-        self.assertIsNone(self.sitio.qr_impreso_el)
-        self.assertEqual(Sitio.history.filter(id=self.sitio.pk).count(), historial + 1)
-
-    def test_regenerar_qr_guarda_motivo_en_historial(self):
-        services.regenerar_qr(self.sitio)
+        self.assertEqual(self.general.qr_codigo, nuevo)
+        self.assertIsNone(self.general.qr_impreso_el)
         self.assertEqual(
-            self.sitio.history.first().history_change_reason, "Regeneración de QR"
+            PuntoControl.history.filter(id=self.general.pk).count(), historial + 1
         )
 
-    def test_regenerar_qr_lote_rechaza_mas_del_tope(self):
-        sitios = [
-            Sitio.objects.create(cliente=self.cliente, nombre=f"Sitio {i}")
+    def test_regenerar_qr_guarda_motivo_en_historial(self):
+        services.regenerar_qr(self.general)
+        self.assertEqual(
+            self.general.history.first().history_change_reason, "Regeneración de QR"
+        )
+
+    def test_regenerar_el_general_no_toca_el_sitio(self):
+        actualizado = self.sitio.actualizado
+        historial = self.sitio.history.count()
+        services.regenerar_qr(self.general)
+        self.sitio.refresh_from_db()
+        self.assertEqual(self.sitio.actualizado, actualizado)
+        self.assertEqual(self.sitio.history.count(), historial)
+
+    def test_regenera_solo_el_punto_y_respeta_tope(self):
+        otro = PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
+        codigo_general = self.general.qr_codigo
+        nuevo = services.regenerar_qr(otro)
+        self.general.refresh_from_db()
+        otro.refresh_from_db()
+        self.assertEqual(otro.qr_codigo, nuevo)
+        self.assertNotEqual(nuevo, codigo_general)
+        self.assertEqual(self.general.qr_codigo, codigo_general)
+        puntos = [
+            PuntoControl.objects.create(sitio=self.sitio, nombre=f"P{i}", orden=i + 2)
             for i in range(services.TOPE_REGENERAR_QR + 1)
         ]
-        codigos = [s.qr_codigo for s in sitios]
+        codigos = [p.qr_codigo for p in puntos]
         with self.assertRaises(ValidationError):
-            services.regenerar_qr_lote(sitios)
-        for sitio, codigo in zip(sitios, codigos):
-            sitio.refresh_from_db()
-            self.assertEqual(sitio.qr_codigo, codigo)
+            services.regenerar_qr_lote(puntos)
+        for punto, codigo in zip(puntos, codigos):
+            punto.refresh_from_db()
+            self.assertEqual(punto.qr_codigo, codigo)
+        self.assertEqual(services.regenerar_qr_lote(puntos[:3]), 3)
+
+
+class UbicarEnPlanoTests(_BaseSitio):
+    def test_ubica_valida_sitio_y_rango(self):
+        punto = self.sitio.puntos.get()
+        plano = Plano.objects.create(sitio=self.sitio, nombre="PB", imagen="p.png")
+        otro = Sitio.objects.create(cliente=self.cliente, nombre="Otra")
+        ajeno = Plano.objects.create(sitio=otro, nombre="Aj", imagen="a.png")
+        services.ubicar_en_plano(punto, plano, Decimal("0.2"), Decimal("0.8"))
+        punto.refresh_from_db()
+        self.assertEqual(
+            (punto.plano, punto.x, punto.y), (plano, Decimal("0.2"), Decimal("0.8"))
+        )
+        for destino, x, y in ((ajeno, 0.5, 0.5), (plano, 1.5, 0.5), (plano, 0.5, -1)):
+            with self.assertRaises(ValidationError):
+                services.ubicar_en_plano(punto, destino, x, y)

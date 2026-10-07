@@ -21,8 +21,8 @@ paths:
   /api/v1/auth/token/:
     post:
       operationId: auth_token_create
-      description: Obtiene el token; comparte con el panel los baldes de fallos por
-        usuario.
+      description: Intercambia usuario y contraseña por un par de tokens JWT.
+      summary: Obtener tokens
       tags:
       - auth
       requestBody:
@@ -33,13 +33,24 @@ paths:
         required: true
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tokens'
+          description: ''
+        '401':
+          description: Credenciales inválidas o cuenta inactiva.
+        '415':
+          description: El cuerpo no es JSON (`Content-Type`).
+        '429':
+          description: Demasiados intentos; reintentar más tarde.
   /api/v1/auth/token/refresh/:
     post:
       operationId: auth_token_refresh_create
-      description: |-
-        Takes a refresh type JSON web token and returns an access type JSON web
-        token if the refresh token is valid.
+      description: Entrega un nuevo token de acceso y un nuevo token de renovación;
+        el token de renovación enviado queda invalidado, así que hay que guardar el
+        nuevo. Falla si el usuario ya no existe o cambió su contraseña.
+      summary: Renovar el token de acceso
       tags:
       - auth
       requestBody:
@@ -53,8 +64,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Renovacion'
+                $ref: '#/components/schemas/Tokens'
           description: ''
+        '401':
+          description: Token de renovación inválido o vencido.
+        '415':
+          description: El cuerpo no es JSON (`Content-Type`).
+        '429':
+          description: Demasiados intentos; reintentar más tarde.
   /api/v1/fotos/{codigo}/:
     get:
       operationId: fotos_retrieve
@@ -124,11 +141,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedVisitaRealizadaList'
           description: ''
+  /api/v1/me/puntos/:
+    get:
+      operationId: me_puntos_list
+      description: Puntos activos, con coordenadas y estado, de los sitios activos
+        (de clientes activos) donde el empleado tiene visitas pendientes o abiertas.
+        `sitio` filtra por id; un sitio ajeno devuelve lista vacía.
+      summary: Mis puntos de control
+      parameters:
+      - in: query
+        name: sitio
+        schema:
+          type: integer
+        description: Id del sitio.
+      tags:
+      - me
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MiPunto'
+          description: ''
   /api/v1/me/visitas/:
     get:
       operationId: me_visitas_list
-      description: Lista paginada de las pendientes propias.
-      summary: Mis visitas pendientes
+      description: Lista paginada; las abiertas van primero y cada una trae su `estado`.
+      summary: Mis visitas pendientes y abiertas
       parameters:
       - name: page
         required: false
@@ -151,8 +194,35 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedVisitaPendienteList'
+                $ref: '#/components/schemas/PaginatedVisitaActivaList'
           description: ''
+  /api/v1/planos/{id}/imagen/:
+    get:
+      operationId: planos_imagen_retrieve
+      description: 'Administradores, o empleados con una visita propia pendiente o
+        abierta en un proyecto del sitio. Sin acceso, plano inactivo o inexistente:
+        el mismo 404.'
+      summary: Descargar la imagen de un plano
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - planos
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '404':
+          description: El plano no existe o no es accesible.
   /api/v1/productos/:
     get:
       operationId: productos_list
@@ -174,11 +244,52 @@ paths:
           description: ''
         '304':
           description: El catálogo no cambió.
+  /api/v1/puntos/{id}/ubicacion/:
+    post:
+      operationId: puntos_ubicacion_create
+      description: Solo administradores. Reemplaza las coordenadas y descarta la ubicación
+        propuesta; `precision_m` no puede superar `PRECISION_MAXIMA_M`.
+      summary: Fijar la ubicación de un punto en campo
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - puntos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UbicacionPuntoRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UbicacionPuntoRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UbicacionPuntoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PuntoCampo'
+          description: ''
+        '400':
+          description: Datos inválidos o precisión de GPS insuficiente.
+        '403':
+          description: Solo administradores.
+        '404':
+          description: No existe.
   /api/v1/qr/{codigo}/resolver/:
     post:
       operationId: qr_resolver_create
-      description: Solo empleados. Un QR inexistente o de un sitio inactivo responde
-        el mismo 404.
+      description: Empleados y administradores. Un QR inexistente, de un punto o sitio
+        inactivo o de un cliente inactivo responde el mismo 404.
       summary: Resolver un código QR
       parameters:
       - in: path
@@ -198,20 +309,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResolverQR'
           description: ''
-  /api/v1/visitas/:
+  /api/v1/revisiones/:
     post:
-      operationId: visitas_create
-      description: Multipart. `datos` y `productos_aplicados` son texto JSON; `fotos`
-        se repite de 1 a 10 veces (hasta 8 MB cada una). Un `cliente_uuid` ya registrado
-        responde 409; `visita` solo viene si es del mismo empleado.
-      summary: Registrar una visita realizada
+      operationId: revisiones_create
+      description: Multipart. `qr_codigo` es el del punto escaneado. `datos` y `productos_aplicados`
+        son texto JSON; `fotos` se repite de 1 a 10 veces (hasta 8 MB cada una). Un
+        `cliente_uuid` ya registrado responde 409; `revision` y `visita` solo vienen
+        si son del mismo empleado. Un administrador que escanea un punto sin coordenadas,
+        con precisión de a lo sumo 50 m, las fija.
+      summary: Registrar una revisión
       tags:
-      - visitas
+      - revisiones
       requestBody:
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/CrearVisitaRequest'
+              $ref: '#/components/schemas/CrearRevisionRequest'
         required: true
       security:
       - jwtAuth: []
@@ -220,12 +333,284 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VisitaRealizada'
+                $ref: '#/components/schemas/Revision'
           description: ''
+        '400':
+          description: 'Validación: QR que no es de un punto del sitio, visita no
+            abierta, coordenadas o foto faltantes, planilla inválida o revisión con
+            más horas de atraso que el máximo (168 por defecto).'
+        '404':
+          description: La visita no existe o es de otro usuario.
         '409':
           description: El `cliente_uuid` ya fue registrado.
+        '413':
+          description: El pedido supera el tamaño permitido.
+  /api/v1/sitios/:
+    post:
+      operationId: sitios_create
+      description: Solo administradores. Cliente activo, coordenadas y `precision_m`
+        obligatorios; la precisión no puede superar `PRECISION_MAXIMA_M`.
+      summary: Crear un sitio en campo
+      tags:
+      - sitios
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AltaSitioRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AltaSitioRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AltaSitioRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitioCampo'
+          description: ''
+        '400':
+          description: Datos inválidos o precisión de GPS insuficiente.
+        '403':
+          description: Solo administradores.
+        '404':
+          description: No existe.
+  /api/v1/sitios/{id}/puntos/:
+    post:
+      operationId: sitios_puntos_create
+      description: Solo administradores. Sin coordenadas el punto nace sin ubicación;
+        con ellas, `precision_m` es obligatoria y no puede superar `PRECISION_MAXIMA_M`.
+        La foto es opcional (multipart).
+      summary: Crear un punto de control en campo
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sitios
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AltaPuntoRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AltaPuntoRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PuntoCampo'
+          description: ''
+        '400':
+          description: Datos inválidos o precisión de GPS insuficiente.
+        '403':
+          description: Solo administradores.
+        '404':
+          description: No existe.
+  /api/v1/visitas/{id}/cerrar/:
+    post:
+      operationId: visitas_cerrar_create
+      description: '`datos` es la planilla de ámbito visita; todo es opcional. Cerrar
+        de nuevo una visita que ya cerró el mismo usuario devuelve 200 con la visita;
+        si la cerró el sistema o un administrador, 409. Cerrar la visita de un administrador
+        no modifica el proyecto.'
+      summary: Cerrar una visita
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - visitas
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CerrarVisitaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CerrarVisitaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CerrarVisitaRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitaRealizada'
+          description: ''
+        '400':
+          description: No está abierta, no tiene revisiones o la planilla es inválida.
+        '404':
+          description: La visita no existe o es de otro usuario.
+        '409':
+          description: La visita ya la cerró el sistema o un administrador.
+  /api/v1/visitas/abrir/:
+    post:
+      operationId: visitas_abrir_create
+      description: 'Abre la pendiente asignada o crea una visita nueva. `qr_codigo`
+        es el de un punto activo del sitio del proyecto. Si el empleado ya tiene una
+        abierta en el proyecto la devuelve con 200. `latitud`, `longitud` y `precision_m`
+        son opcionales: con coordenadas se guarda la distancia al punto y la incidencia
+        de ubicación, sin rechazar nunca por distancia. La visita de un administrador
+        no toma pendientes.'
+      summary: Abrir una visita
+      tags:
+      - visitas
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbrirVisitaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AbrirVisitaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AbrirVisitaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitaActiva'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisitaActiva'
+          description: ''
+        '400':
+          description: Proyecto inexistente o inactivo, o QR ajeno al sitio.
 components:
   schemas:
+    AbrirVisitaRequest:
+      type: object
+      description: |-
+        Entrada de `POST visitas/abrir/`: el proyecto, el QR escaneado en el sitio y,
+        opcionales, las coordenadas del teléfono para verificar la ubicación.
+      properties:
+        proyecto:
+          type: integer
+        qr_codigo:
+          type: string
+          format: uuid
+        latitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        precision_m:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,1})?$
+          nullable: true
+      required:
+      - proyecto
+      - qr_codigo
+    AltaPuntoRequest:
+      type: object
+      description: Alta de un punto; las coordenadas (con su precisión) y la foto
+        son opcionales.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 100
+        sector:
+          type: string
+          default: ''
+          maxLength: 100
+        latitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        precision_m:
+          type: number
+          format: double
+          minimum: 0
+        foto:
+          type: string
+          format: binary
+      required:
+      - nombre
+    AltaSitioRequest:
+      type: object
+      description: Alta de un sitio por un administrador en campo; coordenadas obligatorias.
+      properties:
+        cliente:
+          type: integer
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 200
+        direccion:
+          type: string
+          maxLength: 255
+        localidad:
+          type: string
+          maxLength: 100
+        latitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        precision_m:
+          type: number
+          format: double
+          minimum: 0
+      required:
+      - cliente
+      - latitud
+      - longitud
+      - nombre
+      - precision_m
+    CerrarVisitaRequest:
+      type: object
+      description: 'Entrada de `POST visitas/<pk>/cerrar/`: planilla de la visita
+        y observaciones.'
+      properties:
+        datos: {}
+        observaciones:
+          type: string
+          maxLength: 2000
+        incidencia:
+          type: boolean
+        incidencia_detalle:
+          type: string
+          maxLength: 2000
     ClienteQR:
       type: object
       properties:
@@ -233,15 +618,17 @@ components:
           type: string
       required:
       - razon_social
-    CrearVisitaRequest:
+    CrearRevisionRequest:
       type: object
-      description: Forma y límites del alta; las reglas de negocio las aplica el servicio.
+      description: |-
+        Forma y límites de una revisión; las reglas de negocio (incluido el atraso,
+        que respeta la idempotencia) las aplica el servicio.
       properties:
+        visita:
+          type: integer
         qr_codigo:
           type: string
           format: uuid
-        proyecto:
-          type: integer
         cliente_uuid:
           type: string
           format: uuid
@@ -292,10 +679,67 @@ components:
       - fotos
       - latitud
       - longitud
-      - proyecto
       - qr_codigo
       - realizada_en
-    PaginatedVisitaPendienteList:
+      - visita
+    EstadoEnum:
+      enum:
+      - pendiente
+      - abierta
+      - realizada
+      - cancelada
+      type: string
+      description: |-
+        * `pendiente` - Pendiente
+        * `abierta` - Abierta
+        * `realizada` - Realizada
+        * `cancelada` - Cancelada
+    MiPunto:
+      type: object
+      description: Punto activo de un sitio donde el empleado tiene trabajo, con su
+        estado.
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        sector:
+          type: string
+        sitio:
+          $ref: '#/components/schemas/SitioPunto'
+        plano:
+          type: integer
+          nullable: true
+        x:
+          type: number
+          format: double
+          nullable: true
+        y:
+          type: number
+          format: double
+          nullable: true
+        latitud:
+          type: number
+          format: double
+          nullable: true
+        longitud:
+          type: number
+          format: double
+          nullable: true
+        estado:
+          type: string
+      required:
+      - estado
+      - id
+      - latitud
+      - longitud
+      - nombre
+      - plano
+      - sector
+      - sitio
+      - x
+      - y
+    PaginatedVisitaActivaList:
       type: object
       required:
       - count
@@ -317,7 +761,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/VisitaPendiente'
+            $ref: '#/components/schemas/VisitaActiva'
     PaginatedVisitaRealizadaList:
       type: object
       required:
@@ -341,6 +785,32 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/VisitaRealizada'
+    Plano:
+      type: object
+      description: Plano del punto escaneado; `url` apunta al endpoint autenticado
+        de la imagen.
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        url:
+          type: string
+        ancho_px:
+          type: integer
+        alto_px:
+          type: integer
+        puntos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PuntoPlano'
+      required:
+      - alto_px
+      - ancho_px
+      - id
+      - nombre
+      - puntos
+      - url
     Producto:
       type: object
       description: Representación de solo lectura de un producto del catálogo.
@@ -405,8 +875,8 @@ components:
       - unidad
     ProyectoQR:
       type: object
-      description: Proyecto activo del sitio con la planilla que debe completar el
-        empleado.
+      description: Proyecto activo del sitio con las planillas que debe completar
+        el empleado.
       properties:
         id:
           type: integer
@@ -414,7 +884,12 @@ components:
           type: string
         tipo_servicio:
           $ref: '#/components/schemas/TipoServicioQR'
-        esquema_planilla:
+        esquema_punto:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        esquema_visita:
           type: array
           items:
             type: object
@@ -422,11 +897,16 @@ components:
         visita_pendiente_propia:
           type: integer
           nullable: true
+        visita_abierta_propia:
+          type: integer
+          nullable: true
       required:
-      - esquema_planilla
+      - esquema_punto
+      - esquema_visita
       - id
       - tipo_servicio
       - titulo
+      - visita_abierta_propia
       - visita_pendiente_propia
     ProyectoResumen:
       type: object
@@ -438,18 +918,91 @@ components:
       required:
       - id
       - titulo
-    Renovacion:
+    PuntoCampo:
       type: object
-      description: Rechaza renovar si el usuario no existe o cambió su contraseña.
+      description: Punto creado o ubicado en campo; el QR lo ve solo el administrador.
       properties:
-        refresh:
+        id:
+          type: integer
+        nombre:
           type: string
-        access:
+        sector:
           type: string
+        sitio:
+          type: integer
+        latitud:
+          type: number
+          format: double
+          nullable: true
+        longitud:
+          type: number
+          format: double
+          nullable: true
+        qr_codigo:
+          type: string
+          format: uuid
+        tiene_foto:
+          type: boolean
           readOnly: true
       required:
-      - access
-      - refresh
+      - id
+      - latitud
+      - longitud
+      - nombre
+      - qr_codigo
+      - sector
+      - sitio
+      - tiene_foto
+    PuntoPlano:
+      type: object
+      description: Marcador de un punto sobre el plano, con su estado de revisión.
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+        estado:
+          type: string
+      required:
+      - estado
+      - id
+      - nombre
+      - x
+      - y
+    PuntoQR:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        sector:
+          type: string
+        plano:
+          allOf:
+          - $ref: '#/components/schemas/Plano'
+          nullable: true
+      required:
+      - id
+      - nombre
+      - plano
+      - sector
+    PuntoResumen:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+      required:
+      - id
+      - nombre
     RenovacionRequest:
       type: object
       description: Rechaza renovar si el usuario no existe o cambió su contraseña.
@@ -462,6 +1015,8 @@ components:
     ResolverQR:
       type: object
       properties:
+        punto:
+          $ref: '#/components/schemas/PuntoQR'
         sitio:
           $ref: '#/components/schemas/SitioQR'
         cliente:
@@ -473,7 +1028,107 @@ components:
       required:
       - cliente
       - proyectos
+      - punto
       - sitio
+    Revision:
+      type: object
+      description: 'Revisión sin coordenadas ni precisión: no se devuelve la ubicación.'
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        visita:
+          type: integer
+          readOnly: true
+        punto:
+          allOf:
+          - $ref: '#/components/schemas/PuntoResumen'
+          readOnly: true
+        orden:
+          type: integer
+          readOnly: true
+        realizada_en:
+          type: string
+          format: date-time
+          readOnly: true
+        datos:
+          readOnly: true
+          title: Datos de la planilla
+        observaciones:
+          type: string
+          readOnly: true
+        incidencia:
+          type: boolean
+          readOnly: true
+        incidencia_detalle:
+          type: string
+          readOnly: true
+          title: Detalle de la incidencia
+        productos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductoAplicado'
+          readOnly: true
+        fotos:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - datos
+      - fotos
+      - id
+      - incidencia
+      - incidencia_detalle
+      - observaciones
+      - orden
+      - productos
+      - punto
+      - realizada_en
+      - visita
+    SitioCampo:
+      type: object
+      description: Sitio creado en campo, con su punto General.
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        cliente:
+          type: integer
+        direccion:
+          type: string
+        localidad:
+          type: string
+        latitud:
+          type: number
+          format: double
+        longitud:
+          type: number
+          format: double
+        puntos:
+          type: array
+          items:
+            $ref: '#/components/schemas/PuntoCampo'
+      required:
+      - cliente
+      - direccion
+      - id
+      - latitud
+      - localidad
+      - longitud
+      - nombre
+      - puntos
+    SitioPunto:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+      required:
+      - id
+      - nombre
     SitioQR:
       type: object
       description: Datos mínimos del sitio; sin coordenadas, contactos, notas ni horario.
@@ -527,11 +1182,46 @@ components:
       required:
       - password
       - username
-    VisitaPendiente:
+    Tokens:
       type: object
+      properties:
+        access:
+          type: string
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    UbicacionPuntoRequest:
+      type: object
+      description: Ubicación del punto tomada con el GPS del administrador.
+      properties:
+        latitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitud:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        precision_m:
+          type: number
+          format: double
+          minimum: 0
+      required:
+      - latitud
+      - longitud
+      - precision_m
+    VisitaActiva:
+      type: object
+      description: 'Visita pendiente o abierta, sin coordenadas: lista propia y apertura.'
       properties:
         id:
           type: integer
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoEnum'
           readOnly: true
         proyecto:
           allOf:
@@ -546,15 +1236,22 @@ components:
           format: date
           readOnly: true
           nullable: true
+        abierta_en:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
       required:
+      - abierta_en
+      - estado
       - id
       - programada_para
       - proyecto
       - sitio
     VisitaRealizada:
       type: object
-      description: Visita realizada para la respuesta del alta y el historial (sin
-        coordenadas).
+      description: 'Visita realizada con sus revisiones (sin coordenadas): historial
+        y cierre.'
       properties:
         id:
           type: integer
@@ -571,13 +1268,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-          nullable: true
-        cliente_uuid:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-          title: Identificador del cliente
         datos:
           readOnly: true
           title: Datos de la planilla
@@ -591,27 +1281,20 @@ components:
           type: string
           readOnly: true
           title: Detalle de la incidencia
-        productos:
+        revisiones:
           type: array
           items:
-            $ref: '#/components/schemas/ProductoAplicado'
-          readOnly: true
-        fotos:
-          type: array
-          items:
-            type: string
+            $ref: '#/components/schemas/Revision'
           readOnly: true
       required:
-      - cliente_uuid
       - datos
-      - fotos
       - id
       - incidencia
       - incidencia_detalle
       - observaciones
-      - productos
       - proyecto
       - realizada_en
+      - revisiones
       - sitio
   securitySchemes:
     jwtAuth:

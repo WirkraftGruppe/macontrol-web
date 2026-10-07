@@ -1,0 +1,8 @@
+{% extends "panel/base.html" %}
+{% block title %}{{ titulo }} · MAControl{% endblock %}
+{% block panel_contenido %}
+<h1>{{ titulo }}</h1>
+{% if es_alta %}<p class="ayuda">La ubicación se toma del primer escaneo.</p>{% endif %}
+{% url 'panel:sitios:ficha' sitio.pk as ficha_url %}
+{% include "panel/partials/formulario.html" with cancelar_url=ficha_url %}
+{% endblock %}

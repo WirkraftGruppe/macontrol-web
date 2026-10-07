@@ -6,7 +6,16 @@ from .models import CampoPlanilla, TipoServicio
 class CampoPlanillaInline(admin.TabularInline):
     model = CampoPlanilla
     extra = 0
-    fields = ("orden", "etiqueta", "clave", "tipo", "opciones", "obligatorio", "ayuda")
+    fields = (
+        "orden",
+        "etiqueta",
+        "clave",
+        "tipo",
+        "ambito",
+        "opciones",
+        "obligatorio",
+        "ayuda",
+    )
 
 
 @admin.register(TipoServicio)
@@ -28,5 +37,5 @@ class CampoPlanillaAdmin(admin.ModelAdmin):
         "obligatorio",
         "orden",
     )
-    list_filter = ("tipo", "obligatorio")
+    list_filter = ("tipo", "ambito", "obligatorio")
     search_fields = ("etiqueta", "clave", "tipo_servicio__nombre")

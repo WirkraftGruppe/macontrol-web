@@ -1,12 +1,14 @@
 """Formularios del panel de Visitas."""
 
 from django import forms
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.productos.models import Producto
+from apps.sitios.models import PuntoControl
 
-from .models import Visita
+from .models import Revision, Visita
 from .planillas import validar_datos
 from .serializers import MAX_BYTES_FOTO
 from .services import MAX_FOTOS, MAX_PRODUCTOS
@@ -34,6 +36,7 @@ class FormularioAsignar(forms.Form):
 
 
 PREFIJO_DATOS = "datos_"
+PREFIJO_DATOS_VISITA = "datosv_"
 FORMATO_FECHA_HORA = "%Y-%m-%dT%H:%M"
 
 
@@ -110,6 +113,11 @@ class FormularioManual(forms.Form):
             "username"
         ),
     )
+    puntos = forms.ModelMultipleChoiceField(
+        label="Puntos revisados",
+        queryset=PuntoControl.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+    )
     pendiente = forms.ModelChoiceField(
         label="Completar una visita pendiente",
         queryset=Visita.objects.none(),
@@ -148,10 +156,21 @@ class FormularioManual(forms.Form):
     def __init__(self, *args, proyecto, **kwargs):
         super().__init__(*args, **kwargs)
         self.proyecto = proyecto
-        self.esquema = proyecto.tipo_servicio.esquema_planilla()
-        pendientes = Visita.objects.filter(
-            proyecto=proyecto, estado=Visita.Estado.PENDIENTE
-        ).order_by("programada_para", "pk")
+        # La hora actual como valor inicial y como tope del campo.
+        ahora = timezone.localtime().strftime(FORMATO_FECHA_HORA)
+        self.fields["realizada_en"].initial = ahora
+        self.fields["realizada_en"].widget.attrs["max"] = ahora
+        self.esquema = proyecto.tipo_servicio.esquema_planilla("punto")
+        self.esquema_visita = proyecto.tipo_servicio.esquema_planilla("visita")
+        self.fields["puntos"].queryset = PuntoControl.objects.filter(
+            sitio_id=proyecto.sitio_id, activo=True
+        )
+        # Una pendiente con revisiones (evidencia migrada) no se completa a mano.
+        pendientes = (
+            Visita.objects.filter(proyecto=proyecto, estado=Visita.Estado.PENDIENTE)
+            .exclude(Exists(Revision.objects.filter(visita=OuterRef("pk"))))
+            .order_by("programada_para", "pk")
+        )
         self.fields["pendiente"].queryset = pendientes
         self.fields["pendiente"].label_from_instance = lambda v: (
             f"Pendiente {v.pk} de {v.empleado}"
@@ -163,6 +182,10 @@ class FormularioManual(forms.Form):
         )
         for campo in self.esquema:
             self.fields[PREFIJO_DATOS + campo["clave"]] = _campo_de_planilla(campo)
+        for campo in self.esquema_visita:
+            self.fields[PREFIJO_DATOS_VISITA + campo["clave"]] = _campo_de_planilla(
+                campo
+            )
 
     def clean_fotos(self):
         fotos = self.cleaned_data["fotos"]
@@ -177,11 +200,18 @@ class FormularioManual(forms.Form):
         return fotos
 
     def datos_planilla(self):
-        """Valores de la planilla con los tipos que espera `validar_datos`."""
+        """Valores de la planilla de cada punto, con los tipos de `validar_datos`."""
+        return self._datos(self.esquema, PREFIJO_DATOS)
+
+    def datos_planilla_visita(self):
+        """Valores de la planilla de ámbito visita."""
+        return self._datos(self.esquema_visita, PREFIJO_DATOS_VISITA)
+
+    def _datos(self, esquema, prefijo):
         datos = {}
-        for campo in self.esquema:
+        for campo in esquema:
             clave, tipo = campo["clave"], campo["tipo"]
-            valor = self.cleaned_data.get(PREFIJO_DATOS + clave)
+            valor = self.cleaned_data.get(prefijo + clave)
             if tipo == "booleano":
                 datos[clave] = bool(valor)
             elif tipo in ("opcion", "opcion_multiple"):
@@ -201,12 +231,14 @@ class FormularioManual(forms.Form):
 
     def clean(self):
         limpio = super().clean()
-        if self.errors.keys() & {PREFIJO_DATOS + c["clave"] for c in self.esquema}:
-            return limpio
-        for clave, mensajes in validar_datos(
-            self.esquema, self.datos_planilla()
-        ).items():
-            campo = PREFIJO_DATOS + clave
-            for mensaje in mensajes:
-                self.add_error(campo if campo in self.fields else None, mensaje)
+        for esquema, prefijo, datos in (
+            (self.esquema, PREFIJO_DATOS, self.datos_planilla),
+            (self.esquema_visita, PREFIJO_DATOS_VISITA, self.datos_planilla_visita),
+        ):
+            if self.errors.keys() & {prefijo + c["clave"] for c in esquema}:
+                continue
+            for clave, mensajes in validar_datos(esquema, datos()).items():
+                campo = prefijo + clave
+                for mensaje in mensajes:
+                    self.add_error(campo if campo in self.fields else None, mensaje)
         return limpio

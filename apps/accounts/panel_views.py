@@ -6,7 +6,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils.functional import cached_property
-from django.views.generic import CreateView, FormView, TemplateView, UpdateView
+from django.views.generic import CreateView, FormView, TemplateView, UpdateView, View
 
 from apps.panel.listados import ListadoPanelMixin
 
@@ -107,6 +107,19 @@ class UsuarioDesactivarView(AdministradorRequeridoMixin, TemplateView):
             usuario.is_active = False
             usuario.save(update_fields=["is_active"])
             messages.success(request, "Usuario desactivado.")
+        return redirect(URL_LISTADO)
+
+
+class UsuarioReactivarView(AdministradorRequeridoMixin, View):
+    """Solo POST: vuelve a activar una cuenta desactivada."""
+
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        usuario = get_object_or_404(usuarios_gestionables(request), pk=kwargs["pk"])
+        usuario.is_active = True
+        usuario.save(update_fields=["is_active"])
+        messages.success(request, "Usuario reactivado.")
         return redirect(URL_LISTADO)
 
 

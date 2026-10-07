@@ -1,15 +1,12 @@
-"""Serializers de la API de Visitas: alta desde la app y listados del empleado."""
+"""Serializers de la API de Visitas: abrir, revisiones, cerrar y listados."""
 
 import json
-from datetime import timedelta
 from decimal import Decimal
 
-from django.conf import settings
 from django.urls import reverse
-from django.utils import timezone
 from rest_framework import serializers
 
-from .models import ProductoAplicado, Visita
+from .models import ProductoAplicado, Revision, Visita
 from .planillas import MAX_LARGO_TEXTO
 from .services import MAX_FOTOS, MAX_PRODUCTOS
 
@@ -47,11 +44,46 @@ class CampoJSON(serializers.CharField):
         return valor
 
 
-class CrearVisitaSerializer(serializers.Serializer):
-    """Forma y límites del alta; las reglas de negocio las aplica el servicio."""
+class AbrirVisitaSerializer(serializers.Serializer):
+    """Entrada de `POST visitas/abrir/`: el proyecto, el QR escaneado en el sitio y,
+    opcionales, las coordenadas del teléfono para verificar la ubicación."""
 
-    qr_codigo = serializers.UUIDField()
     proyecto = serializers.IntegerField()
+    qr_codigo = serializers.UUIDField()
+    latitud = serializers.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        min_value=Decimal("-90"),
+        max_value=Decimal("90"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    longitud = serializers.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        min_value=Decimal("-180"),
+        max_value=Decimal("180"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+    precision_m = serializers.DecimalField(
+        max_digits=7,
+        decimal_places=1,
+        min_value=Decimal("0"),
+        required=False,
+        allow_null=True,
+        default=None,
+    )
+
+
+class CrearRevisionSerializer(serializers.Serializer):
+    """Forma y límites de una revisión; las reglas de negocio (incluido el atraso,
+    que respeta la idempotencia) las aplica el servicio."""
+
+    visita = serializers.IntegerField()
+    qr_codigo = serializers.UUIDField()
     cliente_uuid = serializers.UUIDField(allow_null=False)
     realizada_en = serializers.DateTimeField()
     latitud = serializers.DecimalField(
@@ -91,28 +123,10 @@ class CrearVisitaSerializer(serializers.Serializer):
         required=False, allow_blank=True, default="", max_length=MAX_LARGO_TEXTO
     )
 
-    def validate(self, attrs):
-        """Rechaza el atraso excesivo, salvo en un reintento ya aceptado.
-
-        Si la visita ya existe, se deja pasar para que el servicio responda 409.
-        """
-        horas = settings.ATRASO_MAXIMO_HORAS
-        if attrs["realizada_en"] < timezone.now() - timedelta(hours=horas):
-            if not Visita.objects.filter(cliente_uuid=attrs["cliente_uuid"]).exists():
-                raise serializers.ValidationError(
-                    {
-                        "realizada_en": [
-                            f"La visita tiene más de {horas} horas de atraso. "
-                            "Avise al administrador para que la cargue como manual."
-                        ]
-                    }
-                )
-        return attrs
-
     def validate_productos_aplicados(self, valor):
         if len(valor) > MAX_PRODUCTOS:
             raise serializers.ValidationError(
-                f"Se permiten hasta {MAX_PRODUCTOS} productos por visita."
+                f"Se permiten hasta {MAX_PRODUCTOS} productos por revisión."
             )
         if not all(isinstance(item, dict) for item in valor):
             raise serializers.ValidationError("Cada producto debe ser un objeto.")
@@ -132,13 +146,15 @@ class SitioResumenSerializer(serializers.Serializer):
     localidad = serializers.CharField()
 
 
-class VisitaPendienteSerializer(serializers.ModelSerializer):
+class VisitaActivaSerializer(serializers.ModelSerializer):
+    """Visita pendiente o abierta, sin coordenadas: lista propia y apertura."""
+
     proyecto = ProyectoResumenSerializer(read_only=True)
     sitio = SitioResumenSerializer(source="proyecto.sitio", read_only=True)
 
     class Meta:
         model = Visita
-        fields = ["id", "proyecto", "sitio", "programada_para"]
+        fields = ["id", "estado", "proyecto", "sitio", "programada_para", "abierta_en"]
         read_only_fields = fields
 
 
@@ -149,22 +165,26 @@ class ProductoAplicadoSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class VisitaRealizadaSerializer(serializers.ModelSerializer):
-    """Visita realizada para la respuesta del alta y el historial (sin coordenadas)."""
+class PuntoResumenSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    nombre = serializers.CharField()
 
-    proyecto = ProyectoResumenSerializer(read_only=True)
-    sitio = SitioResumenSerializer(source="proyecto.sitio", read_only=True)
+
+class RevisionSerializer(serializers.ModelSerializer):
+    """Revisión sin coordenadas ni precisión: no se devuelve la ubicación."""
+
+    punto = PuntoResumenSerializer(read_only=True)
     productos = ProductoAplicadoSerializer(many=True, read_only=True)
     fotos = serializers.SerializerMethodField()
 
     class Meta:
-        model = Visita
+        model = Revision
         fields = [
             "id",
-            "proyecto",
-            "sitio",
+            "visita",
+            "punto",
+            "orden",
             "realizada_en",
-            "cliente_uuid",
             "datos",
             "observaciones",
             "incidencia",
@@ -174,8 +194,49 @@ class VisitaRealizadaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_fotos(self, visita) -> list[str]:
+    def get_fotos(self, revision) -> list[str]:
         return [
-            reverse("api:visitas:foto", args=[foto.codigo])
-            for foto in visita.fotos.all()
+            reverse("api:visitas:foto", args=[f.codigo]) for f in revision.fotos.all()
         ]
+
+
+class CerrarVisitaSerializer(serializers.Serializer):
+    """Entrada de `POST visitas/<pk>/cerrar/`: planilla de la visita y observaciones."""
+
+    datos = serializers.JSONField(required=False)
+    observaciones = serializers.CharField(
+        required=False, allow_blank=True, max_length=MAX_LARGO_TEXTO
+    )
+    incidencia = serializers.BooleanField(required=False)
+    incidencia_detalle = serializers.CharField(
+        required=False, allow_blank=True, max_length=MAX_LARGO_TEXTO
+    )
+
+    def validate_datos(self, valor):
+        if not isinstance(valor, dict):
+            raise serializers.ValidationError("Debe ser un objeto.")
+        return valor
+
+
+class VisitaRealizadaSerializer(serializers.ModelSerializer):
+    """Visita realizada con sus revisiones (sin coordenadas): historial y cierre."""
+
+    proyecto = ProyectoResumenSerializer(read_only=True)
+    sitio = SitioResumenSerializer(source="proyecto.sitio", read_only=True)
+    realizada_en = serializers.DateTimeField(source="cerrada_en", read_only=True)
+    revisiones = RevisionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Visita
+        fields = [
+            "id",
+            "proyecto",
+            "sitio",
+            "realizada_en",
+            "datos",
+            "observaciones",
+            "incidencia",
+            "incidencia_detalle",
+            "revisiones",
+        ]
+        read_only_fields = fields

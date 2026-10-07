@@ -2,20 +2,26 @@
 
 from django import forms
 
-from apps.visitas.models import Visita
+from apps.visitas.models import Revision, Visita
 
 from .models import CampoPlanilla
 
 
 def clave_en_uso(tipo_servicio, clave) -> bool:
-    """Indica si alguna visita del servicio guardó datos con esa clave."""
-    return Visita.objects.filter(
-        proyecto__tipo_servicio=tipo_servicio, datos__has_key=clave
-    ).exists()
+    """Indica si alguna visita o revisión del servicio guardó datos con esa clave."""
+    visita = {"proyecto__tipo_servicio": tipo_servicio, "datos__has_key": clave}
+    revision = {
+        "visita__proyecto__tipo_servicio": tipo_servicio,
+        "datos__has_key": clave,
+    }
+    return (
+        Visita.objects.filter(**visita).exists()
+        or Revision.objects.filter(**revision).exists()
+    )
 
 
 class CampoPlanillaForm(forms.ModelForm):
-    """Alta y edición de un campo; `clave` y `tipo` se fijan si ya hay datos."""
+    """Alta y edición de un campo; `clave`, `tipo` y `ambito` se fijan con datos."""
 
     opciones = forms.CharField(
         label="Opciones",
@@ -31,6 +37,7 @@ class CampoPlanillaForm(forms.ModelForm):
             "etiqueta",
             "clave",
             "tipo",
+            "ambito",
             "opciones",
             "obligatorio",
             "ayuda",
@@ -42,7 +49,7 @@ class CampoPlanillaForm(forms.ModelForm):
         if self.instance.pk:
             self.initial["opciones"] = "\n".join(self.instance.opciones)
             if clave_en_uso(tipo_servicio, self.instance.clave):
-                for nombre in ("clave", "tipo"):
+                for nombre in ("clave", "tipo", "ambito"):
                     self.fields[nombre].disabled = True
                     self.fields[
                         nombre

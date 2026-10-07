@@ -1,89 +1,74 @@
 import logging
+from contextlib import contextmanager
 from datetime import timedelta
+from uuid import UUID
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from simple_history.utils import update_change_reason
 
+from apps.accounts.models import User
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
-from apps.visitas.models import Foto, ProductoAplicado, Visita
+from apps.sitios.models import PuntoControl
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
 from apps.visitas.planillas import validar_datos
+from apps.visitas.ubicacion import verificar
 
-# Topes de una visita desde la app; los comparte el serializer de la API.
+# Topes de una revisión desde la app; los comparte el serializer de la API.
 MAX_FOTOS = 10
 MAX_PRODUCTOS = 30
 TOLERANCIA_FUTURO = timedelta(minutes=10)
 MENSAJE_QR_INVALIDO = "El código QR no corresponde a este proyecto."
+MOTIVO_UBICACION_FIJADA = "Ubicación fijada por el primer escaneo"
 
 logger = logging.getLogger(__name__)
 
 
-class VisitaDuplicada(Exception):
-    """El `cliente_uuid` ya fue registrado; `visita` es la visita existente."""
+class RevisionDuplicada(Exception):
+    """El `cliente_uuid` ya fue registrado; `revision` es la revisión existente."""
 
-    def __init__(self, visita):
-        super().__init__("La visita ya fue registrada.")
-        self.visita = visita
+    def __init__(self, revision):
+        super().__init__("La revisión ya fue registrada.")
+        self.revision = revision
 
 
-def registrar_visita_realizada(visita, empleado, realizada_en):
-    """Marca la visita como realizada y actualiza el proyecto; devuelve la copia.
+class VisitaNoEncontrada(ValidationError):
+    """La visita no existe o es de otro empleado: la API responde 404 en ambos casos."""
 
-    La instancia recibida no se modifica: todo ocurre sobre una copia bloqueada.
+    def __init__(self):
+        super().__init__({"visita": "La visita no existe."})
+
+
+class VisitaYaCerrada(ValidationError):
+    """La visita ya estaba cerrada y no por el mismo empleado: la API responde 409."""
+
+    def __init__(self):
+        super().__init__("La visita ya fue cerrada.")
+
+
+@contextmanager
+def _transaccion_con_archivos():
+    """Transacción que, si falla, borra los archivos de las fotos ya escritas.
+
+    Entrega la lista donde el cuerpo anota las fotos guardadas. La transacción
+    revierte la base, no los archivos.
     """
-    with transaction.atomic():
-        visita_bd = Visita.objects.select_for_update().get(pk=visita.pk)
-        proyecto = Proyecto.objects.select_for_update().get(pk=visita_bd.proyecto_id)
-
-        if visita_bd.estado != Visita.Estado.PENDIENTE:
-            raise ValidationError("Solo se puede registrar una visita pendiente.")
-        if realizada_en > timezone.now() + TOLERANCIA_FUTURO:
-            raise ValidationError("La fecha de realización no puede ser futura.")
-        if visita_bd.origen == Visita.Origen.APP:
-            if visita_bd.latitud is None or visita_bd.longitud is None:
-                raise ValidationError("Una visita desde la app exige coordenadas.")
-            if not visita_bd.fotos.exists():
-                raise ValidationError(
-                    "Una visita desde la app exige al menos una foto."
-                )
-        elif visita_bd.origen == Visita.Origen.MANUAL:
-            if not (visita_bd.motivo_manual or "").strip():
-                raise ValidationError("Una visita manual exige el motivo.")
-
-        visita_bd.empleado = empleado
-        visita_bd.estado = Visita.Estado.REALIZADA
-        visita_bd.realizada_en = realizada_en
-        visita_bd.esquema_planilla = proyecto.tipo_servicio.esquema_planilla()
-        visita_bd.full_clean()
-        visita_bd.save()
-
-        hay_posterior = (
-            Visita.objects.filter(
-                proyecto=proyecto,
-                estado=Visita.Estado.REALIZADA,
-                realizada_en__gt=realizada_en,
-            )
-            .exclude(pk=visita_bd.pk)
-            .exists()
-        )
-        if not hay_posterior:
-            proyecto.encargado_actual = empleado
-            if proyecto.frecuencia_dias:
-                proyecto.proxima_visita = timezone.localdate(realizada_en) + timedelta(
-                    days=proyecto.frecuencia_dias
-                )
-            proyecto.save(
-                update_fields=["encargado_actual", "proxima_visita", "actualizado"]
-            )
-    return visita_bd
+    guardadas, confirmada = [], False
+    try:
+        with transaction.atomic():
+            yield guardadas
+        confirmada = True
+    finally:
+        if not confirmada:
+            _borrar_archivos(guardadas)
 
 
-def _validar_proyecto_y_qr(proyecto, qr_codigo):
-    """Devuelve el proyecto (con sitio y cliente) si está activo y el QR corresponde."""
+def _cargar_proyecto(proyecto):
+    """Devuelve el proyecto (con sitio y cliente) si existe y está activo."""
     pk = getattr(proyecto, "pk", proyecto)
     try:
         proyecto = Proyecto.objects.select_related("sitio__cliente").get(pk=pk)
@@ -91,16 +76,27 @@ def _validar_proyecto_y_qr(proyecto, qr_codigo):
         raise ValidationError({"proyecto": "El proyecto no existe o no está activo."})
     if proyecto.estado != Proyecto.Estado.ACTIVO:
         raise ValidationError({"proyecto": "El proyecto no existe o no está activo."})
-    sitio = proyecto.sitio
-    # Mismo mensaje para QR ajeno, sitio inactivo o cliente dado de baja: no se
-    # revela el motivo.
-    if (
-        str(sitio.qr_codigo) != str(qr_codigo).lower()
-        or not sitio.activo
-        or not sitio.cliente.activo
-    ):
-        raise ValidationError({"qr_codigo": MENSAJE_QR_INVALIDO})
     return proyecto
+
+
+def _resolver_punto(proyecto, qr_codigo):
+    """Punto activo del sitio del proyecto que tiene ese QR; si no, error genérico.
+
+    Mismo mensaje para QR ajeno, punto o sitio inactivo y cliente dado de baja: no
+    se revela el motivo.
+    """
+    try:
+        codigo = UUID(str(qr_codigo))
+    except ValueError:
+        raise ValidationError({"qr_codigo": MENSAJE_QR_INVALIDO})
+    punto = (
+        PuntoControl.objects.select_related("sitio__cliente")
+        .filter(qr_codigo=codigo, activo=True, sitio_id=proyecto.sitio_id)
+        .first()
+    )
+    if punto is None or not punto.sitio.activo or not punto.sitio.cliente.activo:
+        raise ValidationError({"qr_codigo": MENSAJE_QR_INVALIDO})
+    return punto
 
 
 def _id_producto(item):
@@ -130,7 +126,7 @@ def _armar_productos(productos_aplicados):
                 cantidad=item.get("cantidad"),
             )
             # El producto ya se leyó del catálogo: no se vuelve a consultar.
-            aplicado.full_clean(exclude=["visita", "producto"])
+            aplicado.full_clean(exclude=["revision", "producto"])
         except (KeyError, TypeError, ValueError, AttributeError):
             errores.append(f"Producto {posicion}: no existe o está inactivo.")
         except ValidationError as error:
@@ -143,13 +139,17 @@ def _armar_productos(productos_aplicados):
     return instancias, errores
 
 
-def _validar_coordenadas(latitud, longitud):
-    """Errores por campo si la latitud o la longitud están fuera de rango."""
+def _validar_coordenadas(latitud, longitud, obligatorias=False):
+    """Errores por campo si la latitud o la longitud faltan (si son obligatorias)
+    o están fuera de rango."""
     errores = {}
     for clave, valor, limite in (
         ("latitud", latitud, 90),
         ("longitud", longitud, 180),
     ):
+        if valor is None and obligatorias:
+            errores[clave] = ["Este campo es obligatorio."]
+            continue
         try:
             fuera = valor is not None and not -limite <= valor <= limite
         except TypeError:
@@ -159,19 +159,24 @@ def _validar_coordenadas(latitud, longitud):
     return errores
 
 
+def _errores_planilla(esquema, datos):
+    """Mensajes de la planilla contra su esquema (lista vacía si es válida)."""
+    return [
+        mensaje if clave == "datos" else f"{clave}: {mensaje}"
+        for clave, mensajes in validar_datos(esquema, datos).items()
+        for mensaje in mensajes
+    ]
+
+
 def _validar_evidencia(esquema, datos, productos_aplicados):
     """Valida planilla y productos; devuelve (errores por campo, productos armados)."""
     errores = {}
-    errores_datos = validar_datos(esquema, datos)
+    errores_datos = _errores_planilla(esquema, datos)
     if errores_datos:
-        errores["datos"] = [
-            mensaje if clave == "datos" else f"{clave}: {mensaje}"
-            for clave, mensajes in errores_datos.items()
-            for mensaje in mensajes
-        ]
+        errores["datos"] = errores_datos
     if len(productos_aplicados) > MAX_PRODUCTOS:
         errores["productos_aplicados"] = [
-            f"Se permiten hasta {MAX_PRODUCTOS} productos por visita."
+            f"Se permiten hasta {MAX_PRODUCTOS} productos por revisión."
         ]
         return errores, []
     aplicados, errores_productos = _armar_productos(productos_aplicados)
@@ -195,19 +200,201 @@ def _pendiente_para(proyecto, empleado):
     pendientes = Visita.objects.filter(
         proyecto=proyecto, estado=Visita.Estado.PENDIENTE
     )
+    # Una pendiente con revisiones (evidencia migrada) no se reutiliza.
+    sin_revisiones = ~Exists(Revision.objects.filter(visita=OuterRef("pk")))
     propia = (
         pendientes.select_for_update()
-        .filter(empleado=empleado)
+        .filter(sin_revisiones, empleado=empleado)
         .order_by(F("programada_para").asc(nulls_last=True), "pk")
         .first()
     )
     return propia, pendientes.exclude(empleado=empleado).exists()
 
 
-def registrar_visita_desde_app(
+def abrir_visita(
     *,
     empleado,
     proyecto,
+    qr_codigo,
+    latitud=None,
+    longitud=None,
+    precision_m=None,
+):
+    """Abre la jornada del empleado en el proyecto; devuelve `(visita, creada)`.
+
+    `latitud` y `longitud` (opcionales) verifican la ubicación: la distancia al punto
+    queda en la visita y nunca se rechaza. `precision_m` se acepta y no se guarda.
+    La visita de un administrador no cuenta como servicio: no toma pendientes ni
+    marca `incidencia_asignacion`.
+
+    Es idempotente: si el empleado ya tiene una visita abierta para el proyecto la
+    devuelve con `creada=False`. Si tiene una pendiente asignada, la abre. Si no,
+    crea una nueva, con `incidencia_asignacion` cuando otro empleado tiene la
+    pendiente. Levanta `ValidationError` si el proyecto, su sitio o su cliente no
+    están activos, o si `qr_codigo` no es el de un punto activo del sitio del
+    proyecto (prueba de que el empleado escaneó el QR): mismo error para ambos casos,
+    antes de tomar locks y de crear nada.
+    """
+    with transaction.atomic():
+        proyecto = _cargar_proyecto(proyecto)
+        if not (proyecto.sitio.activo and proyecto.sitio.cliente.activo):
+            raise ValidationError(
+                {"proyecto": "El proyecto no existe o no está activo."}
+            )
+        try:
+            punto = _resolver_punto(proyecto, qr_codigo)
+        except ValidationError:
+            raise ValidationError(
+                {"proyecto": "El proyecto no existe o no está activo."}
+            )
+        # Serializa las aperturas del mismo proyecto: no quedan dos abiertas.
+        Proyecto.objects.select_for_update(of=("self",)).get(pk=proyecto.pk)
+        abierta = (
+            Visita.objects.select_for_update()
+            .filter(proyecto=proyecto, empleado=empleado, estado=Visita.Estado.ABIERTA)
+            .order_by("pk")
+            .first()
+        )
+        if abierta is not None:
+            return abierta, False
+        if empleado.es_administrador:
+            propia, hay_de_otro = None, False
+        else:
+            propia, hay_de_otro = _pendiente_para(proyecto, empleado)
+        distancia, incidencia_ubicacion = verificar(punto, latitud, longitud)
+        ahora = timezone.now()
+        if propia is not None:
+            propia.distancia_m = distancia
+            propia.incidencia_ubicacion = incidencia_ubicacion
+            propia.estado = Visita.Estado.ABIERTA
+            propia.abierta_en = ahora
+            propia.origen = Visita.Origen.APP
+            propia.motivo_manual = ""
+            propia.save()
+            return propia, True
+        visita = Visita.objects.create(
+            proyecto=proyecto,
+            empleado=empleado,
+            origen=Visita.Origen.APP,
+            estado=Visita.Estado.ABIERTA,
+            abierta_en=ahora,
+            incidencia_asignacion=hay_de_otro,
+            distancia_m=distancia,
+            incidencia_ubicacion=incidencia_ubicacion,
+        )
+        return visita, True
+
+
+def _fijar_ubicacion_por_escaneo(punto, revision, usuario):
+    """El primer escaneo de un punto sin coordenadas las fija, sea cual sea el rol.
+
+    Bloquea el punto; con precisión peor que `PRECISION_MAXIMA_M` no fija nada y
+    la revisión igual se registra. Deja al usuario en el historial del punto.
+    """
+    precision = revision.precision_m
+    if precision is None or precision > settings.PRECISION_MAXIMA_M:
+        return
+    bloqueado = PuntoControl.objects.select_for_update().get(pk=punto.pk)
+    if bloqueado.latitud is not None and bloqueado.longitud is not None:
+        return
+    bloqueado.latitud = revision.latitud
+    bloqueado.longitud = revision.longitud
+    bloqueado._history_user = usuario
+    bloqueado._change_reason = MOTIVO_UBICACION_FIJADA
+    bloqueado.save(update_fields=["latitud", "longitud"])
+
+
+def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
+    for orden, archivo in enumerate(fotos):
+        foto = Foto(revision=revision, imagen=archivo, orden=orden)
+        try:
+            foto.save()
+        except ValidationError as error:
+            raise ValidationError({"fotos": error.messages})
+        guardadas.append(foto)
+    for aplicado in aplicados:
+        aplicado.revision = revision
+        aplicado.save()
+
+
+def _guardar_revision(
+    *,
+    visita,
+    empleado,
+    qr_codigo,
+    cliente_uuid,
+    realizada_en,
+    latitud,
+    longitud,
+    precision_m,
+    datos,
+    productos_aplicados,
+    fotos,
+    observaciones,
+    incidencia,
+    incidencia_detalle,
+    guardadas,
+):
+    """Valida y crea la revisión dentro de la transacción del llamador."""
+    proyecto = _cargar_proyecto(visita.proyecto_id)
+    punto = _resolver_punto(proyecto, qr_codigo)
+    errores = _validar_coordenadas(latitud, longitud, obligatorias=True)
+    esquema = proyecto.tipo_servicio.esquema_planilla("punto")
+    errores_evidencia, aplicados = _validar_evidencia(
+        esquema, datos, productos_aplicados
+    )
+    errores.update(errores_evidencia)
+    if not fotos:
+        errores["fotos"] = ["Se requiere al menos una foto."]
+    elif len(fotos) > MAX_FOTOS:
+        errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por revisión."]
+    ahora = timezone.now()
+    if realizada_en > ahora + TOLERANCIA_FUTURO:
+        errores["realizada_en"] = ["La fecha de realización no puede ser futura."]
+    elif realizada_en < ahora - timedelta(hours=settings.ATRASO_MAXIMO_HORAS):
+        errores["realizada_en"] = [
+            f"La revisión tiene más de {settings.ATRASO_MAXIMO_HORAS} horas de "
+            "atraso. Avise al administrador para que la cargue como manual."
+        ]
+    if errores:
+        raise ValidationError(errores)
+
+    distancia, incidencia_ubicacion = verificar(punto, latitud, longitud)
+    revision = Revision.objects.create(
+        visita=visita,
+        punto=punto,
+        orden=visita.revisiones.count() + 1,
+        realizada_en=realizada_en,
+        recibida_en=ahora,
+        cliente_uuid=cliente_uuid,
+        latitud=latitud,
+        longitud=longitud,
+        precision_m=precision_m,
+        distancia_m=distancia,
+        incidencia_ubicacion=incidencia_ubicacion,
+        datos=datos,
+        esquema_planilla=esquema,
+        observaciones=observaciones,
+        incidencia=incidencia,
+        incidencia_detalle=incidencia_detalle,
+    )
+    _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas)
+    _fijar_ubicacion_por_escaneo(punto, revision, empleado)
+    return revision
+
+
+def _duplicada(cliente_uuid):
+    return (
+        Revision.objects.select_related("visita")
+        .filter(cliente_uuid=cliente_uuid)
+        .first()
+    )
+
+
+def registrar_revision(
+    *,
+    visita,
+    empleado,
     qr_codigo,
     cliente_uuid,
     realizada_en,
@@ -221,90 +408,189 @@ def registrar_visita_desde_app(
     incidencia=False,
     incidencia_detalle="",
 ):
-    """Registra una visita hecha desde la app y devuelve la `Visita` realizada.
+    """Registra el escaneo de un punto en una visita abierta y devuelve la `Revision`.
 
-    `proyecto` es el id (o la instancia) del proyecto; `productos_aplicados` es una
-    lista de dicts `{producto, lote, dosis, unidad, cantidad}` con `producto` como id;
-    `fotos` es una lista de archivos subidos. Completa la pendiente propia más
-    antigua del proyecto si no tiene fotos ni productos; si los tiene, o no hay
-    pendiente propia, crea una visita nueva marcando `incidencia_asignacion` (también
-    si hay una pendiente de otro empleado). Todo ocurre en una transacción: si algo
-    falla no queda visita, fotos, productos ni archivos. Levanta `VisitaDuplicada`
-    si el `cliente_uuid` ya existe y `ValidationError` con errores por campo (el
-    `cliente_uuid` es obligatorio). Atención: no debe llamarse dentro de otro `atomic`:
-    si el llamador revierte después, los archivos ya escritos no se recuperan.
+    `visita` es la instancia o el id; `qr_codigo` es el del punto (el servidor lo
+    resuelve y exige que sea de un punto activo del sitio del proyecto);
+    `productos_aplicados` es una lista de dicts con `producto` como id; `fotos`, una
+    lista de archivos. Valida coordenadas, de 1 a `MAX_FOTOS` fotos, planilla de
+    ámbito `punto` y el atraso. Guarda la distancia al punto sin rechazar por ella.
+    Si el punto no tiene ubicación, un empleado propone la de la revisión y un
+    administrador la fija. Todo ocurre en una transacción (y sin fotos huérfanas si
+    falla).
+    Levanta `RevisionDuplicada` si el `cliente_uuid` ya existe y `ValidationError`
+    con errores por campo; `VisitaNoEncontrada` si la visita no existe o es ajena.
+    No debe llamarse dentro de otro `atomic`.
     """
     if cliente_uuid is None:
         raise ValidationError({"cliente_uuid": "Este campo es obligatorio."})
-    guardadas, confirmada = [], False
     try:
-        with transaction.atomic():
-            existente = Visita.objects.filter(cliente_uuid=cliente_uuid).first()
+        with _transaccion_con_archivos() as guardadas:
+            existente = _duplicada(cliente_uuid)
             if existente:
-                raise VisitaDuplicada(existente)
-            proyecto = _validar_proyecto_y_qr(proyecto, qr_codigo)
-
-            errores = _validar_coordenadas(latitud, longitud)
-            errores_evidencia, aplicados = _validar_evidencia(
-                proyecto.tipo_servicio.esquema_planilla(), datos, productos_aplicados
-            )
-            errores.update(errores_evidencia)
-            if not fotos:
-                errores["fotos"] = ["Se requiere al menos una foto."]
-            elif len(fotos) > MAX_FOTOS:
-                errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por visita."]
-            if errores:
-                raise ValidationError(errores)
-
-            visita, hay_de_otro = _pendiente_para(proyecto, empleado)
-            if visita is not None and (
-                visita.fotos.exists() or visita.productos.exists()
-            ):
-                # Una pendiente con evidencia no se hereda: queda intacta y la
-                # visita de la app se registra aparte, marcada como incidencia.
-                visita, hay_de_otro = None, True
-            if visita is None:
-                visita = Visita(
-                    proyecto=proyecto,
-                    empleado=empleado,
-                    incidencia_asignacion=hay_de_otro,
+                raise RevisionDuplicada(existente)
+            try:
+                visita_bd = Visita.objects.select_for_update().get(
+                    pk=getattr(visita, "pk", visita)
                 )
-            else:
-                visita.motivo_manual = ""
-            visita.origen = Visita.Origen.APP
-            visita.latitud, visita.longitud = latitud, longitud
-            visita.precision_m = precision_m
-            visita.datos = datos
-            visita.observaciones = observaciones
-            visita.incidencia = incidencia
-            visita.incidencia_detalle = incidencia_detalle
-            visita.cliente_uuid = cliente_uuid
-            visita.recibida_en = timezone.now()
-            visita.save()
-
-            for orden, archivo in enumerate(fotos):
-                foto = Foto(visita=visita, imagen=archivo, orden=orden)
-                try:
-                    foto.save()
-                except ValidationError as error:
-                    raise ValidationError({"fotos": error.messages})
-                guardadas.append(foto)
-            for aplicado in aplicados:
-                aplicado.visita = visita
-                aplicado.save()
-            resultado = registrar_visita_realizada(visita, empleado, realizada_en)
-        confirmada = True
-        return resultado
+            except (Visita.DoesNotExist, TypeError, ValueError):
+                raise VisitaNoEncontrada()
+            if visita_bd.empleado_id != empleado.pk:
+                raise VisitaNoEncontrada()
+            if visita_bd.estado != Visita.Estado.ABIERTA:
+                raise ValidationError({"visita": "La visita no está abierta."})
+            return _guardar_revision(
+                visita=visita_bd,
+                empleado=empleado,
+                qr_codigo=qr_codigo,
+                cliente_uuid=cliente_uuid,
+                realizada_en=realizada_en,
+                latitud=latitud,
+                longitud=longitud,
+                precision_m=precision_m,
+                datos=datos,
+                productos_aplicados=productos_aplicados,
+                fotos=fotos,
+                observaciones=observaciones,
+                incidencia=incidencia,
+                incidencia_detalle=incidencia_detalle,
+                guardadas=guardadas,
+            )
     except IntegrityError:
         # Carrera: otro pedido con el mismo `cliente_uuid` ganó.
-        existente = Visita.objects.filter(cliente_uuid=cliente_uuid).first()
+        existente = _duplicada(cliente_uuid)
         if existente:
-            raise VisitaDuplicada(existente)
+            raise RevisionDuplicada(existente)
         raise
-    finally:
-        if not confirmada:
-            # La transacción revierte la base, no los archivos ya escritos.
-            _borrar_archivos(guardadas)
+
+
+def _cerrar_sin_revisiones(visita):
+    """Cierre por sistema de una visita sin revisiones: no toca el proyecto.
+
+    Si venía asignada vuelve a pendiente; si no, queda cancelada.
+    """
+    if visita.asignada_por_id:
+        visita.estado = Visita.Estado.PENDIENTE
+        visita.abierta_en = None
+        visita.cierre = ""
+    else:
+        visita.estado = Visita.Estado.CANCELADA
+        visita.cierre = Visita.Cierre.SISTEMA
+    visita.full_clean()
+    visita.save()
+    return visita
+
+
+def cerrar_visita(
+    visita,
+    *,
+    quien,
+    cierre,
+    datos=None,
+    observaciones=None,
+    incidencia=None,
+    incidencia_detalle=None,
+    cerrada_en=None,
+):
+    """Cierra la visita abierta y actualiza el proyecto; devuelve la copia cerrada.
+
+    La instancia recibida no se modifica: todo ocurre sobre una copia bloqueada.
+    Exige al menos una revisión, salvo en el cierre por sistema (ver
+    `_cerrar_sin_revisiones`). `datos` es la planilla de ámbito `visita` (se valida,
+    salvo en el cierre por sistema). `cerrada_en` es la hora de cierre: por defecto
+    ahora, o la de la última revisión en el cierre por sistema. Solo la visita más
+    reciente del proyecto fija `encargado_actual` y `proxima_visita`, salvo que la
+    visita sea de un administrador (no cuenta como servicio). Cerrar de nuevo por
+    el mismo empleado es idempotente; si la cerró el sistema o un administrador,
+    levanta `VisitaYaCerrada`.
+    """
+    if cierre not in Visita.Cierre.values:
+        raise ValidationError({"cierre": "Tipo de cierre inválido."})
+    with transaction.atomic():
+        visita_bd = Visita.objects.select_for_update().get(pk=visita.pk)
+        proyecto = (
+            Proyecto.objects.select_for_update(of=("self",))
+            .select_related("tipo_servicio")
+            .get(pk=visita_bd.proyecto_id)
+        )
+
+        if cierre == Visita.Cierre.EMPLEADO and (
+            quien is None or quien.pk != visita_bd.empleado_id
+        ):
+            raise ValidationError("Solo el empleado de la visita puede cerrarla.")
+        if cierre == Visita.Cierre.ADMINISTRADOR and not (
+            quien is not None and quien.es_administrador
+        ):
+            raise ValidationError("Solo un administrador puede cerrar de este modo.")
+        if visita_bd.estado == Visita.Estado.REALIZADA:
+            if cierre == visita_bd.cierre == Visita.Cierre.EMPLEADO:
+                return visita_bd
+            raise VisitaYaCerrada()
+        if visita_bd.estado != Visita.Estado.ABIERTA:
+            raise ValidationError("Solo se puede cerrar una visita abierta.")
+        revisiones = visita_bd.revisiones.all()
+        if cierre != Visita.Cierre.ADMINISTRADOR:
+            # Cuentan las recibidas durante esta jornada (hora del servidor, no la
+            # del teléfono): la evidencia heredada de una migración no.
+            revisiones = revisiones.filter(recibida_en__gte=visita_bd.abierta_en)
+        ultima = revisiones.order_by("-realizada_en", "-id").first()
+        if ultima is None:
+            if cierre != Visita.Cierre.SISTEMA:
+                raise ValidationError("La visita necesita al menos una revisión.")
+            return _cerrar_sin_revisiones(visita_bd)
+        if (
+            visita_bd.origen == Visita.Origen.MANUAL
+            and not (visita_bd.motivo_manual or "").strip()
+        ):
+            raise ValidationError("Una visita manual exige el motivo.")
+
+        if cerrada_en is None:
+            sistema = cierre == Visita.Cierre.SISTEMA
+            cerrada_en = ultima.realizada_en if sistema else timezone.now()
+        if cerrada_en > timezone.now() + TOLERANCIA_FUTURO:
+            raise ValidationError("La fecha de cierre no puede ser futura.")
+        esquema = proyecto.tipo_servicio.esquema_planilla("visita")
+        if datos is not None:
+            visita_bd.datos = datos
+        if cierre != Visita.Cierre.SISTEMA:
+            errores = _errores_planilla(esquema, visita_bd.datos)
+            if errores:
+                raise ValidationError({"datos": errores})
+        for campo, valor in (
+            ("observaciones", observaciones),
+            ("incidencia", incidencia),
+            ("incidencia_detalle", incidencia_detalle),
+        ):
+            if valor is not None:
+                setattr(visita_bd, campo, valor)
+        visita_bd.esquema_planilla = esquema
+        visita_bd.estado = Visita.Estado.REALIZADA
+        visita_bd.cierre = cierre
+        visita_bd.cerrada_en = cerrada_en
+        visita_bd.full_clean()
+        visita_bd.save()
+
+        # La visita de un administrador no es servicio: no anula la del empleado.
+        hay_posterior = (
+            Visita.objects.filter(
+                proyecto=proyecto,
+                estado=Visita.Estado.REALIZADA,
+                cerrada_en__gt=cerrada_en,
+            )
+            .exclude(pk=visita_bd.pk)
+            .exclude(empleado__rol=User.Rol.ADMINISTRADOR)
+            .exists()
+        )
+        if not hay_posterior and not visita_bd.empleado.es_administrador:
+            proyecto.encargado_actual = visita_bd.empleado
+            if proyecto.frecuencia_dias:
+                proyecto.proxima_visita = timezone.localdate(cerrada_en) + timedelta(
+                    days=proyecto.frecuencia_dias
+                )
+            proyecto.save(
+                update_fields=["encargado_actual", "proxima_visita", "actualizado"]
+            )
+    return visita_bd
 
 
 def registrar_visita_manual(
@@ -314,99 +600,123 @@ def registrar_visita_manual(
     administrador,
     motivo,
     realizada_en,
+    puntos,
     datos,
     productos_aplicados,
     fotos,
     pendiente=None,
     confirmar_atraso=False,
+    datos_visita=None,
     observaciones="",
     incidencia=False,
     incidencia_detalle="",
 ):
     """Registra una visita cargada a mano por un administrador y la devuelve.
 
-    Crea la visita, o completa `pendiente` si no tiene fotos ni productos, con
+    Crea una revisión por cada punto de `puntos`, todas con la planilla `datos`
+    (ámbito `punto`); las fotos y los productos quedan en la revisión del primer
+    punto por `orden`. Cierra la visita con `cierre=administrador` y `cerrada_en`
+    igual a `realizada_en`; `datos_visita` es la planilla de ámbito `visita`. Crea
+    la visita, o completa `pendiente` (sin revisiones previas), con
     `origen=manual`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige
-    `confirmar_atraso` y deja la confirmación en el historial. Todo ocurre en una
+    `confirmar_atraso` y deja la confirmación en el historial; una hora más de
+    `TOLERANCIA_FUTURO` posterior a la actual se rechaza. Todo ocurre en una
     transacción; si algo falla no queda nada, tampoco los archivos. Levanta
-    `ValidationError` con errores por campo. No debe llamarse dentro de otro `atomic`.
+    `ValidationError` con errores por campo. No debe llamarse dentro de otro
+    `atomic`.
     """
-    guardadas, confirmada = [], False
-    try:
-        with transaction.atomic():
-            errores = {}
-            if not (motivo or "").strip():
-                errores["motivo"] = ["El motivo de la carga manual es obligatorio."]
-            if proyecto.estado != Proyecto.Estado.ACTIVO:
-                errores["proyecto"] = ["El proyecto no está activo."]
-            if not (empleado.is_active and empleado.es_empleado):
-                errores["empleado"] = ["Debe ser un empleado activo."]
-            horas = settings.ATRASO_MAXIMO_HORAS
-            atrasada = realizada_en < timezone.now() - timedelta(hours=horas)
-            if atrasada and not confirmar_atraso:
-                errores["confirmar_atraso"] = [
-                    f"La visita tiene más de {horas} horas de atraso: "
-                    "confirme la carga para continuar."
-                ]
-            errores_evidencia, aplicados = _validar_evidencia(
-                proyecto.tipo_servicio.esquema_planilla(), datos, productos_aplicados
-            )
-            errores.update(errores_evidencia)
-            if len(fotos) > MAX_FOTOS:
-                errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por visita."]
-            visita = None
-            if pendiente is not None:
-                visita = Visita.objects.select_for_update().get(pk=pendiente.pk)
-                if (
-                    visita.proyecto_id != proyecto.pk
-                    or visita.estado != Visita.Estado.PENDIENTE
-                ):
-                    errores["pendiente"] = [
-                        "La visita no es una pendiente del proyecto."
-                    ]
-                elif visita.fotos.exists() or visita.productos.exists():
-                    errores["pendiente"] = [
-                        "La visita pendiente ya tiene fotos o productos: "
-                        "no se puede completar a mano."
-                    ]
-            if errores:
-                raise ValidationError(errores)
-
-            if visita is None:
-                visita = Visita(proyecto=proyecto)
-            visita.empleado = empleado
-            visita.origen = Visita.Origen.MANUAL
-            visita.motivo_manual = motivo.strip()
-            visita.asignada_por = administrador
-            visita.datos = datos
-            visita.observaciones = observaciones
-            visita.incidencia = incidencia
-            visita.incidencia_detalle = incidencia_detalle
-            visita.recibida_en = timezone.now()
-            visita.save()
-
-            for orden, archivo in enumerate(fotos):
-                foto = Foto(visita=visita, imagen=archivo, orden=orden)
-                try:
-                    foto.save()
-                except ValidationError as error:
-                    raise ValidationError({"fotos": error.messages})
-                guardadas.append(foto)
-            for aplicado in aplicados:
-                aplicado.visita = visita
-                aplicado.save()
-            resultado = registrar_visita_realizada(visita, empleado, realizada_en)
-            if atrasada:
-                update_change_reason(
-                    resultado,
-                    "Carga manual atrasada confirmada por "
-                    f"{administrador.get_username()}",
+    if realizada_en > timezone.now() + TOLERANCIA_FUTURO:
+        raise ValidationError(
+            {
+                "realizada_en": (
+                    "La fecha y hora de la visita no puede ser posterior a la "
+                    "hora actual."
                 )
-        confirmada = True
-        return resultado
-    finally:
-        if not confirmada:
-            _borrar_archivos(guardadas)
+            }
+        )
+    with _transaccion_con_archivos() as guardadas:
+        errores = {}
+        if not (motivo or "").strip():
+            errores["motivo"] = ["El motivo de la carga manual es obligatorio."]
+        if proyecto.estado != Proyecto.Estado.ACTIVO:
+            errores["proyecto"] = ["El proyecto no está activo."]
+        if not (empleado.is_active and empleado.es_empleado):
+            errores["empleado"] = ["Debe ser un empleado activo."]
+        horas = settings.ATRASO_MAXIMO_HORAS
+        atrasada = realizada_en < timezone.now() - timedelta(hours=horas)
+        if atrasada and not confirmar_atraso:
+            errores["confirmar_atraso"] = [
+                f"La visita tiene más de {horas} horas de atraso: "
+                "confirme la carga para continuar."
+            ]
+        puntos = sorted(puntos, key=lambda p: (p.orden, p.pk))
+        if not puntos:
+            errores["puntos"] = ["Elija al menos un punto de control."]
+        elif any(not p.activo or p.sitio_id != proyecto.sitio_id for p in puntos):
+            errores["puntos"] = [
+                "Los puntos deben ser activos y del sitio del proyecto."
+            ]
+        esquema_punto = proyecto.tipo_servicio.esquema_planilla("punto")
+        errores_evidencia, aplicados = _validar_evidencia(
+            esquema_punto, datos, productos_aplicados
+        )
+        errores.update(errores_evidencia)
+        if len(fotos) > MAX_FOTOS:
+            errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por revisión."]
+        visita = None
+        if pendiente is not None:
+            visita = Visita.objects.select_for_update().get(pk=pendiente.pk)
+            if (
+                visita.proyecto_id != proyecto.pk
+                or visita.estado != Visita.Estado.PENDIENTE
+            ):
+                errores["pendiente"] = ["La visita no es una pendiente del proyecto."]
+            elif visita.revisiones.exists():
+                errores["pendiente"] = [
+                    "La pendiente ya tiene revisiones: no se completa a mano."
+                ]
+        if errores:
+            raise ValidationError(errores)
+
+        if visita is None:
+            visita = Visita(proyecto=proyecto)
+        visita.empleado = empleado
+        visita.origen = Visita.Origen.MANUAL
+        visita.motivo_manual = motivo.strip()
+        visita.asignada_por = administrador
+        visita.estado = Visita.Estado.ABIERTA
+        visita.abierta_en = realizada_en
+        visita.save()
+
+        ahora = timezone.now()
+        for orden, punto in enumerate(puntos, start=1):
+            revision = Revision.objects.create(
+                visita=visita,
+                punto=punto,
+                orden=orden,
+                realizada_en=realizada_en,
+                recibida_en=ahora,
+                datos=datos,
+                esquema_planilla=esquema_punto,
+            )
+            if orden == 1:
+                _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas)
+        resultado = cerrar_visita(
+            visita,
+            quien=administrador,
+            cierre=Visita.Cierre.ADMINISTRADOR,
+            datos=datos_visita,
+            observaciones=observaciones,
+            incidencia=incidencia,
+            incidencia_detalle=incidencia_detalle,
+            cerrada_en=realizada_en,
+        )
+        if atrasada:
+            update_change_reason(
+                resultado,
+                f"Carga manual atrasada confirmada por {administrador.get_username()}",
+            )
+    return resultado
 
 
 def marcar_incidencia_revisada(visita, administrador):

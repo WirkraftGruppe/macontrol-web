@@ -22,7 +22,7 @@
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; colaboradores de OpenStreetMap",
-    referrerPolicy: "strict-origin",
+    referrerPolicy: "strict-origin-when-cross-origin",
   }).addTo(mapa);
   var marcador = null;
 
@@ -96,8 +96,14 @@
     }
     lista.textContent = "";
     mensaje.textContent = "Buscando…";
-    fetch(seccion.dataset.urlBuscar + "?q=" + encodeURIComponent(consulta), {
-      headers: { Accept: "application/json" },
+    fetch(seccion.dataset.urlBuscar, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-CSRFToken": seccion.dataset.csrf,
+      },
+      body: "q=" + encodeURIComponent(consulta),
       credentials: "same-origin",
     })
       .then(function (respuesta) {

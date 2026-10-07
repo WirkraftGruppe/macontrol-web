@@ -36,17 +36,27 @@
             <tbody>{% for etiqueta, valor in visita.filas %}<tr><th scope="row">{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody>
           </table>
         {% endif %}
-        {% if visita.productos.all %}
-          <h4>Productos aplicados</h4>
-          <ul>{% for aplicado in visita.productos.all %}<li>{{ aplicado.producto }} · lote {{ aplicado.lote }} · {{ aplicado.dosis }} {{ aplicado.unidad }}</li>{% endfor %}</ul>
-        {% endif %}
+        {% for revision in visita.revisiones.all %}
+          <details>
+            <summary>{{ revision.punto.nombre }} · {{ revision.realizada_en|date:"d/m/Y H:i" }}</summary>
+            {% if revision.filas %}
+              <table class="tabla planilla">
+                <tbody>{% for etiqueta, valor in revision.filas %}<tr><th scope="row">{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody>
+              </table>
+            {% endif %}
+            {% if revision.productos.all %}
+              <h4>Productos aplicados</h4>
+              <ul>{% for aplicado in revision.productos.all %}<li>{{ aplicado.producto }} · lote {{ aplicado.lote }} · {{ aplicado.dosis }} {{ aplicado.unidad }}</li>{% endfor %}</ul>
+            {% endif %}
+            <div class="miniaturas">
+              {% for foto in revision.fotos.all %}
+                {% url 'panel:visitas:foto' foto.codigo as u %}{% if u %}<a href="{{ u }}"><img src="{{ u }}" alt="Foto de {{ revision.punto.nombre }}" width="96" loading="lazy"></a>{% endif %}
+              {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
         {% if visita.incidencia %}<p><strong>Incidencia:</strong> {{ visita.incidencia_detalle|default:"sin detalle" }}</p>{% endif %}
         {% if visita.observaciones %}<p>{{ visita.observaciones }}</p>{% endif %}
-        <div class="miniaturas">
-          {% for foto in visita.fotos.all %}
-            {% url 'panel:visitas:foto' foto.codigo as u %}{% if u %}<a href="{{ u }}"><img src="{{ u }}" alt="Foto de la visita" width="96" loading="lazy"></a>{% endif %}
-          {% endfor %}
-        </div>
       </li>
     {% empty %}
       <li>Este proyecto todavía no tiene visitas.</li>

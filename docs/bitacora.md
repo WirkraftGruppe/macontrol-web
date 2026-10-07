@@ -1,18 +1,50 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: correcciones-p31
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
+| puntos-control | plan/puntos-control | 4 cerrada (verificación TODO 104/105, FALLA formal aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
+| cierre-puntos | plan/cierre-puntos | 3 cerrada (T1–T11 hechas; TODO 79/80 en 6d4f7e3, FALLA formal de congelado.sh aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
+| correcciones-p31 | plan/correcciones-p31 | 2 cerrada (T1–T4 hechas; TODO 38/38 PASA en 0f43474) | merge conjunto a `main`, por decisión del usuario | sesión 2026-10-07 cerrada |
 
-Siguiente: plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: el usuario decide el merge de los tres planes a `main` (`plan/correcciones-p31` contiene a `plan/cierre-puntos` hasta 9728a27 y este a `plan/puntos-control`; `plan/cierre-puntos` suma 3 commits `registro:` propios, bc4cc32 y 6d4f7e3). Al fusionar se copian las `### Decisiones` de los tres planes a `docs/decisiones.md`. **Antes de desplegar**: P-correcciones-p31-2 (la migración `sitios/0007` pierde el rastro de las propuestas aplicadas). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-07 — Planes `cierre-puntos` y `correcciones-p31`: integrados y verificados
+Hecho:
+- `cierre-puntos` (sesiones del 2026-10-06, sin entrada propia hasta hoy): T1–T8, T10, T11 y la corrección T8b integradas; contrato openapi regenerado (dd86327); auditoría final con pendientes P-cierre-puntos-13 a 15.
+- La prueba en navegador de `cierre-puntos` (P-puntos-control-31) dio seis problemas → plan `correcciones-p31` (rama desde 9728a27). juez-plan: 1 bloqueante y 5 observaciones, corregidos antes de congelar (6510a35).
+- Ola 1: T1 (visitas: el primer escaneo de cualquier rol fija las coordenadas; hora futura en la visita manual) y T2 (sitios: modos del plano, arrastre que guarda, ubicar puntos existentes, QR con Barlow), verificadas e integradas. Ola 2: T3 (migración `sitios/0007` aplica las propuestas pendientes y quita el campo; la pestaña Mapa muestra solo el sitio), verificada e integrada; T4: docs de arquitectura, contrato openapi sin cambios.
+- Auditoría de T4: 0 bloqueantes; 2 importantes, 1 menor y 3 observaciones → P-correcciones-p31-1 a 6, por decisión del usuario (sin corregir en este plan).
+- OK del usuario en navegador (2026-10-07), que vale también para el paso 4 de T9 de `cierre-puntos`.
+- Verificación TODO: `correcciones-p31` 38/38 PASA (verificador y verificador-b); `cierre-puntos` 79/80 en ambos, con el único FALLA formal de congelado.sh aceptado.
+- Incidente: el 2026-10-07 la raíz amaneció en `plan/cierre-puntos` (checkout manual); se volvió a `plan/correcciones-p31` sin pérdidas.
+Sigue: merge de los tres planes a `main` por decisión del usuario.
+
+### 2026-10-06 — Plan `puntos-control`: olas 2 a 4 integradas, verificación final
+Hecho:
+- Ola 2: T9 verificada e integrada; auditoría ola 2 → T9b (decisión del usuario: `visitas/abrir/` exige `qr_codigo`, cambia `/api/v1/`; `me/puntos?sitio=` validado; plano filtra sitio y cliente activos); T10: openapi regenerado (e03c8db, 654a6f4).
+- Ola 3: T11, T12 (con P-17) y T13 en paralelo, integradas T13 → T12 → T11; auditoría ola 3 → T11b (PDF en subproceso con 15 s; tooltips con textContent). T14 hecha; la prueba en navegador queda diferida (P-31).
+- Ola 4: T16 (docs/01 y convenciones) y T15 (`cargar_demo` y recorrido); auditoría T15 → T15b en dos rondas (decisión del usuario: `cargar_demo` solo con DEBUG, `DJANGO_ENV=development` y SQLite).
+- Verificación TODO con `verificador` y `verificador-b`: 104/105 PASA en d781f25; única FALLA formal congelado.sh por 50822be. Suite 473 OK.
+- Decisiones del plan escritas en `### Decisiones` (9 líneas); pendientes nuevos P-puntos-control-24 a -35.
+Sigue: prueba en navegador (P-31) y merge a `main` por decisión del usuario.
+
+### 2026-10-05 — Plan `puntos-control`: ola 1 integrada, T8 integrada, T9 implementada
+Hecho:
+- Plan congelado (`4e2c496`) tras `juez-plan` (10 bloqueantes, corregidos o aprobados por el usuario como excepciones de propiedad). Contrato modificado una vez (`50822be`, decisión del usuario): el criterio del punto General pasa de T3 a T6; desde ahí `congelado.sh` da CONTRATO MODIFICADO y los veredictos salen FALLA formal.
+- Ola 1: T1 (pypdfium2, `VISITA_ABIERTA_MAXIMO_HORAS`), T2 (ámbito de planilla), T3 (PuntoControl, Plano, QR por punto), T5 (visita como jornada, Revision, migración de datos), T6 (sin QR en Sitio, estado por punto). auditor-seguridad: sin bloqueantes; dos importantes corregidos en T5b (cierre por `recibida_en`, coordenadas obligatorias) y cerrados en la re-auditoría.
+- Ola 2: T8 (resolver por punto, imagen del plano, `me/puntos/`) verificada e integrada. T9 (abrir, revisiones, cerrar; sin `POST visitas/`) implementada en su worktree (`f678582`, suite 442 OK según el informe; control del principal OK), sin verificador.
+- Pendientes nuevos: P-puntos-control-1 a -23.
+- Incidente: el principal hizo `cd` a un worktree (T2) para un control; corregido con `git status` en raíz y worktrees, sin daños.
+Pendiente: verificador sobre T9, integrarla, T10 (openapi + auditoría ola 2), olas 3 y 4.
 
 ### 2026-10-05 — Fusión en `main` de `panel`
 Hecho:

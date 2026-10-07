@@ -1,4 +1,4 @@
-"""Flujo de punta a punta del empleado con JWT real: QR, visita, historial y foto."""
+"""Flujo de punta a punta del empleado con JWT real: QR, jornada, historial y foto."""
 
 import json
 import shutil
@@ -18,7 +18,7 @@ from apps.clientes.models import Cliente
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla, TipoServicio
-from apps.sitios.models import Sitio
+from apps.sitios.models import PuntoControl, Sitio
 from apps.visitas.models import ProductoAplicado, Visita
 
 CLAVE = "clave-segura-123"
@@ -74,6 +74,7 @@ class FlujoEmpleadoTests(TestCase):
             encargado_actual=self.empleado,
         )
         Producto.objects.create(nombre_comercial="Cebo X")
+        self.punto = self.sitio.puntos.get(orden=0)
 
     def _cliente_con_token(self, usuario):
         """Cliente que se autentica solo con el JWT obtenido del endpoint real."""
@@ -88,13 +89,13 @@ class FlujoEmpleadoTests(TestCase):
         return api
 
     def test_escanear_registrar_historial_foto(self):
-        """Escanear el QR, registrar la visita y ver historial y foto, con JWT real."""
+        """Escanear, abrir, revisar, cerrar y ver historial y foto, con JWT real."""
         api = self._cliente_con_token("emp")
 
-        qr = api.post(f"/api/v1/qr/{self.sitio.qr_codigo}/resolver/")
+        qr = api.post(f"/api/v1/qr/{self.punto.qr_codigo}/resolver/")
         self.assertEqual(qr.status_code, 200, qr.content)
         proyecto = qr.data["proyectos"][0]
-        self.assertEqual(proyecto["esquema_planilla"][0]["clave"], "cebos")
+        self.assertEqual(proyecto["esquema_punto"][0]["clave"], "cebos")
 
         catalogo = api.get("/api/v1/productos/")
         self.assertEqual(catalogo.status_code, 200, catalogo.content)
@@ -109,9 +110,15 @@ class FlujoEmpleadoTests(TestCase):
                 "cantidad": "5",
             }
         ]
+        abierta = api.post(
+            "/api/v1/visitas/abrir/",
+            {"proyecto": proyecto["id"], "qr_codigo": str(self.punto.qr_codigo)},
+            format="json",
+        )
+        self.assertEqual(abierta.status_code, 201, abierta.content)
         cuerpo = {
-            "qr_codigo": str(self.sitio.qr_codigo),
-            "proyecto": proyecto["id"],
+            "visita": abierta.data["id"],
+            "qr_codigo": str(self.punto.qr_codigo),
             "cliente_uuid": str(uuid4()),
             "realizada_en": timezone.now().isoformat(),
             "latitud": "-36.100000",
@@ -121,17 +128,23 @@ class FlujoEmpleadoTests(TestCase):
             "productos_aplicados": json.dumps(productos),
             "fotos": [jpeg("a.jpg", "red"), jpeg("b.jpg", "blue")],
         }
-        creada = api.post("/api/v1/visitas/", cuerpo, format="multipart")
+        creada = api.post("/api/v1/revisiones/", cuerpo, format="multipart")
         self.assertEqual(creada.status_code, 201, creada.content)
+        cerrada = api.post(
+            f"/api/v1/visitas/{abierta.data['id']}/cerrar/", {}, format="json"
+        )
+        self.assertEqual(cerrada.status_code, 200, cerrada.content)
 
         historial = api.get("/api/v1/me/historial/")
         self.assertEqual(historial.status_code, 200, historial.content)
         self.assertEqual(
-            [v["id"] for v in historial.data["results"]], [creada.data["id"]]
+            [v["id"] for v in historial.data["results"]], [abierta.data["id"]]
         )
-        visita = Visita.objects.get(pk=creada.data["id"])
-        self.assertEqual(ProductoAplicado.objects.filter(visita=visita).count(), 1)
-        urls = historial.data["results"][0]["fotos"]
+        visita = Visita.objects.get(pk=abierta.data["id"])
+        self.assertEqual(
+            ProductoAplicado.objects.filter(revision__visita=visita).count(), 1
+        )
+        urls = historial.data["results"][0]["revisiones"][0]["fotos"]
         self.assertEqual(len(urls), 2)
 
         respuesta = api.get(urls[0], HTTP_ACCEPT="image/jpeg")
@@ -142,3 +155,93 @@ class FlujoEmpleadoTests(TestCase):
 
         ajeno = self._cliente_con_token("otro").get(urls[0])
         self.assertEqual(ajeno.status_code, 403)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class ModoCampoFlujoTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def test_administrador_crea_y_empleado_escanea_sin_propuesta(self):
+        """Con coordenadas fijas desde el campo, el escaneo no propone otras."""
+        cliente = Cliente.objects.create(razon_social="ACME")
+        User.objects.create_user("adm", password=CLAVE, rol=User.Rol.ADMINISTRADOR)
+        empleado = User.objects.create_user(
+            "emp", password=CLAVE, rol=User.Rol.EMPLEADO
+        )
+        tipo = TipoServicio.objects.create(nombre="Desratización", slug="desrat")
+
+        def con_token(usuario):
+            api = APIClient()
+            respuesta = api.post(
+                "/api/v1/auth/token/",
+                {"username": usuario, "password": CLAVE},
+                format="json",
+            )
+            self.assertEqual(respuesta.status_code, 200, respuesta.content)
+            api.credentials(HTTP_AUTHORIZATION=f"Bearer {respuesta.data['access']}")
+            return api
+
+        api_admin = con_token("adm")
+        sitio = api_admin.post(
+            "/api/v1/sitios/",
+            {
+                "cliente": cliente.id,
+                "nombre": "Galpón",
+                "latitud": "-36.100000",
+                "longitud": "-57.800000",
+                "precision_m": 10,
+            },
+            format="json",
+        )
+        self.assertEqual(sitio.status_code, 201, sitio.content)
+        punto = api_admin.post(
+            f"/api/v1/sitios/{sitio.data['id']}/puntos/",
+            {
+                "nombre": "Depósito",
+                "latitud": "-36.100500",
+                "longitud": "-57.800500",
+                "precision_m": 10,
+            },
+            format="json",
+        )
+        self.assertEqual(punto.status_code, 201, punto.content)
+        proyecto = Proyecto.objects.create(
+            sitio_id=sitio.data["id"],
+            tipo_servicio=tipo,
+            titulo="Control",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+
+        api = con_token("emp")
+        qr = PuntoControl.objects.get(pk=punto.data["id"]).qr_codigo
+        resuelto = api.post(f"/api/v1/qr/{qr}/resolver/")
+        self.assertEqual(resuelto.status_code, 200, resuelto.content)
+        abierta = api.post(
+            "/api/v1/visitas/abrir/",
+            {"proyecto": proyecto.id, "qr_codigo": str(qr)},
+            format="json",
+        )
+        self.assertEqual(abierta.status_code, 201, abierta.content)
+        creada = api.post(
+            "/api/v1/revisiones/",
+            {
+                "visita": abierta.data["id"],
+                "qr_codigo": str(qr),
+                "cliente_uuid": str(uuid4()),
+                "realizada_en": timezone.now().isoformat(),
+                "latitud": "-36.200000",
+                "longitud": "-57.900000",
+                "precision_m": "8.5",
+                "datos": json.dumps({}),
+                "fotos": [jpeg("a.jpg", "red")],
+            },
+            format="multipart",
+        )
+        self.assertEqual(creada.status_code, 201, creada.content)
+
+        marcador = PuntoControl.objects.get(pk=punto.data["id"])
+        self.assertEqual(float(marcador.latitud), -36.1005)
+        self.assertEqual(float(marcador.longitud), -57.8005)

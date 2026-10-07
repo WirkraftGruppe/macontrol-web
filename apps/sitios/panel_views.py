@@ -2,13 +2,16 @@
 
 from csp.decorators import csp_update
 from django.contrib import messages
-from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import ValidationError
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
+from django.utils.functional import cached_property
 from django.utils.text import slugify
 from django.views import View
 from django.views.generic import CreateView, DetailView, UpdateView
+from django.views.generic.detail import SingleObjectMixin
 
 from apps.accounts.mixins import AdministradorRequeridoMixin
 from apps.clientes.models import Cliente
@@ -16,8 +19,23 @@ from apps.panel.listados import ListadoPanelMixin
 from apps.panel.mapa import ORIGEN_TESELAS
 
 from . import geocodificacion, qr, services
-from .models import Sitio
-from .panel_forms import SitioForm
+from .estado import EstadoPunto, estados_de_puntos
+from .models import Plano, PuntoControl, Sitio
+from .panel_forms import (
+    PlanoForm,
+    PosicionForm,
+    PuntoAltaForm,
+    PuntoForm,
+    SitioForm,
+)
+
+PESTANAS = ("mapa", "planos", "puntos")
+CLASE_ESTADO = {
+    EstadoPunto.AL_DIA: "ok",
+    EstadoPunto.PROXIMA: "warn",
+    EstadoPunto.VENCIDA: "danger",
+    EstadoPunto.SIN_REVISAR: "neutral",
+}
 
 
 class SitioListado(AdministradorRequeridoMixin, ListadoPanelMixin):
@@ -71,7 +89,15 @@ class SitioEdicion(AdministradorRequeridoMixin, UpdateView):
         return reverse("panel:sitios:ficha", args=[self.object.pk])
 
 
+def _numero(valor):
+    """Decimal de la base a número de JSON; vacío queda en ``None``."""
+    return None if valor is None else float(valor)
+
+
+@method_decorator(csp_update({"img-src": ORIGEN_TESELAS}), name="dispatch")
 class SitioFicha(AdministradorRequeridoMixin, DetailView):
+    """Ficha con pestañas ``?pestana=mapa|planos|puntos`` (por defecto, puntos)."""
+
     model = Sitio
     template_name = "sitios/panel/ficha.html"
 
@@ -80,47 +106,261 @@ class SitioFicha(AdministradorRequeridoMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        contexto["proyectos"] = self.object.proyectos.select_related("tipo_servicio")
+        sitio = self.object
+        pestana = self.request.GET.get("pestana", "puntos")
+        if pestana not in PESTANAS:
+            pestana = "puntos"
+        puntos = list(sitio.puntos.select_related("plano"))
+        activos = [p for p in puntos if p.activo]
+        estados = estados_de_puntos(activos)
+        for punto in puntos:
+            estado = estados.get(punto.pk)
+            punto.estado = estado
+            punto.estado_etiqueta = EstadoPunto(estado).label if estado else ""
+            punto.estado_clase = CLASE_ESTADO.get(estado, "neutral")
+        planos = list(sitio.planos.filter(activo=True))
+        pk_plano = self.request.GET.get("plano", "")
+        plano = next((p for p in planos if str(p.pk) == pk_plano), None)
+        plano = plano or (planos[0] if planos else None)
+        contexto.update(
+            proyectos=sitio.proyectos.select_related("tipo_servicio"),
+            pestana=pestana,
+            pestanas=(("puntos", "Puntos"), ("mapa", "Mapa"), ("planos", "Planos")),
+            puntos=puntos,
+            puntos_activos=activos,
+            planos=planos,
+            plano=plano,
+        )
+        if pestana == "mapa":
+            contexto["datos_mapa"] = self._datos_mapa(sitio)
+        if pestana == "planos" and plano:
+            contexto["datos_plano"] = self._datos_plano(plano, activos)
         return contexto
 
+    @staticmethod
+    def _datos_mapa(sitio):
+        return {
+            "sitio": {
+                "nombre": sitio.nombre,
+                "lat": _numero(sitio.latitud),
+                "lng": _numero(sitio.longitud),
+            }
+        }
 
-class QRPng(AdministradorRequeridoMixin, View):
-    """PNG del QR: descarga por defecto, o inline con ``?inline=1`` para la ficha."""
+    @staticmethod
+    def _datos_plano(plano, puntos):
+        return {
+            "imagen": reverse("panel:sitios:plano_imagen", args=[plano.pk]),
+            "ancho": plano.ancho_px,
+            "alto": plano.alto_px,
+            "plano": plano.pk,
+            "puntos": [
+                {
+                    "id": p.pk,
+                    "nombre": p.nombre,
+                    "x": _numero(p.x),
+                    "y": _numero(p.y),
+                    "estado": p.estado,
+                    "url": reverse("panel:sitios:punto_posicion", args=[p.pk]),
+                }
+                for p in puntos
+                if p.plano_id == plano.pk
+            ],
+            "sin_ubicar": [
+                {
+                    "id": p.pk,
+                    "nombre": p.nombre,
+                    "url": reverse("panel:sitios:punto_posicion", args=[p.pk]),
+                }
+                for p in puntos
+                if not p.plano_id
+                or (p.plano_id == plano.pk and (p.x is None or p.y is None))
+            ],
+        }
 
-    def get(self, request, pk):
-        sitio = get_object_or_404(Sitio, pk=pk)
-        respuesta = HttpResponse(qr.png_qr(sitio), content_type="image/png")
-        nombre = slugify(sitio.nombre) or "sitio"
-        modo = "inline" if request.GET.get("inline") else "attachment"
+
+def _url_ficha(sitio_pk, pestana, plano_pk=None):
+    url = f"{reverse('panel:sitios:ficha', args=[sitio_pk])}?pestana={pestana}"
+    return f"{url}&plano={plano_pk}" if plano_pk else url
+
+
+class _PuntoMixin(AdministradorRequeridoMixin):
+    """Obtiene el punto de la URL, con su sitio."""
+
+    model = PuntoControl
+
+    def get_queryset(self):
+        return PuntoControl.objects.select_related("sitio", "plano")
+
+
+class PuntoAlta(AdministradorRequeridoMixin, CreateView):
+    """Alta de un punto; con ``plano``, ``x`` e ``y`` es el clic sobre el plano."""
+
+    form_class = PuntoAltaForm
+    template_name = "sitios/panel/punto_formulario.html"
+
+    @cached_property
+    def sitio(self):
+        """Se busca recién tras la autorización: el anónimo no distingue ids."""
+        return get_object_or_404(Sitio, pk=self.kwargs["pk"])
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "sitio": self.sitio}
+
+    def get_initial(self):
+        return {"activo": True, "orden": self.sitio.puntos.count()}
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto.update(titulo="Nuevo punto", sitio=self.sitio, es_alta=True)
+        return contexto
+
+    def get_success_url(self):
+        punto = self.object
+        if punto.plano_id:
+            return _url_ficha(self.sitio.pk, "planos", punto.plano_id)
+        return _url_ficha(self.sitio.pk, "puntos")
+
+
+class PuntoEdicion(_PuntoMixin, UpdateView):
+    form_class = PuntoForm
+    template_name = "sitios/panel/punto_formulario.html"
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "sitio": self.object.sitio}
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto.update(titulo=f"Editar {self.object.nombre}", sitio=self.object.sitio)
+        return contexto
+
+    def get_success_url(self):
+        return _url_ficha(self.object.sitio_id, "puntos")
+
+
+class PuntoDesactivar(_PuntoMixin, DetailView):
+    """GET pide confirmación; POST desactiva el punto."""
+
+    template_name = "sitios/panel/punto_desactivar.html"
+
+    def post(self, request, pk):
+        punto = self.get_object()
+        services.desactivar_punto(punto)
+        messages.success(request, f"Se desactivó el punto {punto.nombre}.")
+        return redirect(_url_ficha(punto.sitio_id, "puntos"))
+
+
+class PuntoQRPng(_PuntoMixin, DetailView):
+    """PNG del QR del punto: descarga, o inline con ``?inline=1``."""
+
+    def render_to_response(self, context, **kwargs):
+        punto = self.object
+        respuesta = HttpResponse(qr.png_qr(punto), content_type="image/png")
+        nombre = slugify(f"{punto.sitio.nombre} {punto.nombre}") or "punto"
+        modo = "inline" if self.request.GET.get("inline") else "attachment"
         respuesta["Content-Disposition"] = f'{modo}; filename="qr-{nombre}.png"'
         respuesta["Cache-Control"] = "private, no-store"
         return respuesta
 
 
-qr_png = QRPng.as_view()
-
-
-class RegenerarQR(AdministradorRequeridoMixin, DetailView):
+class PuntoRegenerarQR(_PuntoMixin, DetailView):
     """GET pide confirmación; POST regenera el código e invalida la etiqueta."""
 
-    model = Sitio
     template_name = "sitios/panel/regenerar_qr.html"
 
     def post(self, request, pk):
-        sitio = get_object_or_404(Sitio, pk=pk)
-        services.regenerar_qr(sitio)
+        punto = self.get_object()
+        services.regenerar_qr(punto)
         messages.success(
             request, "Se generó un nuevo QR; la etiqueta anterior ya no sirve."
         )
-        return redirect("panel:sitios:ficha", pk=sitio.pk)
+        return redirect(_url_ficha(punto.sitio_id, "puntos"))
+
+
+class _AccionPunto(_PuntoMixin, SingleObjectMixin, View):
+    """Acción POST sobre un punto, para HTMX o para un botón de la ficha."""
+
+    http_method_names = ["post"]
+
+
+class PuntoPosicion(_AccionPunto):
+    """Guarda la posición (x, y en fracción 0 a 1) del marcador en el plano.
+
+    Con ``plano`` en el POST ubica en él un punto que no lo tenía.
+    """
+
+    def post(self, request, pk):
+        punto = self.get_object()
+        form = PosicionForm(request.POST)
+        if not form.is_valid():
+            return JsonResponse({"error": "Posición inválida."}, status=400)
+        x, y = form.cleaned_data["x"], form.cleaned_data["y"]
+        if "plano" in request.POST:
+            plano = (
+                Plano.objects.filter(pk=request.POST["plano"]).first()
+                if request.POST["plano"].isdigit()
+                else None
+            )
+            try:
+                if plano is None:
+                    raise ValidationError("Plano inexistente.")
+                services.ubicar_en_plano(punto, plano, x, y)
+            except ValidationError:
+                return JsonResponse({"error": "Plano inválido."}, status=400)
+        elif not punto.plano_id:
+            return JsonResponse({"error": "Posición inválida."}, status=400)
+        else:
+            services.mover_en_plano(punto, x, y)
+        return JsonResponse({"x": _numero(punto.x), "y": _numero(punto.y)})
+
+
+class PlanoAlta(AdministradorRequeridoMixin, CreateView):
+    """Sube un plano (JPG, PNG o PDF); ``Plano`` lo valida y lo guarda como PNG."""
+
+    form_class = PlanoForm
+    template_name = "sitios/panel/plano_formulario.html"
+
+    @cached_property
+    def sitio(self):
+        """Se busca recién tras la autorización: el anónimo no distingue ids."""
+        return get_object_or_404(Sitio, pk=self.kwargs["pk"])
+
+    def form_valid(self, form):
+        form.instance.sitio = self.sitio
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto.update(titulo="Subir plano", sitio=self.sitio)
+        return contexto
+
+    def get_success_url(self):
+        return _url_ficha(self.sitio.pk, "planos", self.object.pk)
+
+
+class PlanoImagen(AdministradorRequeridoMixin, View):
+    """Imagen del plano para el editor: autenticada, nunca desde MEDIA público."""
+
+    def get(self, request, pk):
+        plano = get_object_or_404(Plano, pk=pk)
+        try:
+            archivo = plano.imagen.open("rb")
+        except FileNotFoundError:
+            raise Http404 from None
+        respuesta = FileResponse(archivo, content_type="image/png")
+        respuesta["Cache-Control"] = "private, no-store"
+        respuesta["X-Content-Type-Options"] = "nosniff"
+        return respuesta
 
 
 class Geocodificar(AdministradorRequeridoMixin, View):
-    """Candidatos de Nominatim para ``?q=``; solo se envía el texto de dirección."""
+    """Candidatos de Nominatim; solo POST (con CSRF) y el texto va en el cuerpo."""
 
-    def get(self, request):
+    http_method_names = ["post", "options"]
+
+    def post(self, request):
         try:
-            candidatos = geocodificacion.buscar(request.GET.get("q", ""))
+            candidatos = geocodificacion.buscar(request.POST.get("q", ""))
         except geocodificacion.TextoInvalido:
             return JsonResponse(
                 {"error": "Escriba una dirección de hasta 200 caracteres."}, status=400

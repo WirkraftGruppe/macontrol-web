@@ -13,7 +13,8 @@
     {% if visita.motivo_manual %}<dt>Motivo</dt><dd>{{ visita.motivo_manual }}</dd>{% endif %}
     <dt>Programada para</dt><dd>{{ visita.programada_para|date:"d/m/Y"|default:"—" }}</dd>
     <dt>Asignada por</dt><dd>{% if visita.asignada_por %}{{ visita.asignada_por.get_full_name|default:visita.asignada_por.username }}{% else %}—{% endif %}</dd>
-    <dt>Realizada</dt><dd>{{ visita.realizada_en|date:"d/m/Y H:i"|default:"—" }}</dd>
+    <dt>Abierta</dt><dd>{{ visita.abierta_en|date:"d/m/Y H:i"|default:"—" }}</dd>
+    <dt>Cerrada</dt><dd>{{ visita.cerrada_en|date:"d/m/Y H:i"|default:"—" }}{% if visita.cierre %} ({{ visita.get_cierre_display }}){% endif %}</dd>
     {% if visita.observaciones %}<dt>Observaciones</dt><dd>{{ visita.observaciones|linebreaksbr }}</dd>{% endif %}
   </dl>
 
@@ -31,25 +32,36 @@
   {% endif %}
 
   {% if filas %}
-    <h2>Planilla</h2>
+    <h2>Planilla de la visita</h2>
     <table class="tabla planilla">
       <tbody>{% for etiqueta, valor in filas %}<tr><th scope="row">{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody>
     </table>
   {% endif %}
 
-  {% if visita.productos.all %}
-    <h2>Productos aplicados</h2>
-    <ul>{% for aplicado in visita.productos.all %}<li>{{ aplicado.producto }} · lote {{ aplicado.lote }} · {{ aplicado.dosis }} {{ aplicado.unidad }}{% if aplicado.cantidad %} · cantidad {{ aplicado.cantidad }}{% endif %}</li>{% endfor %}</ul>
-  {% endif %}
-
-  {% if visita.fotos.all %}
-    <h2>Fotos</h2>
-    <div class="fotos">
-      {% for foto in visita.fotos.all %}
-        <img src="{% url 'panel:visitas:foto' foto.codigo %}" alt="Foto {{ forloop.counter }} de la visita" loading="lazy">
-      {% endfor %}
-    </div>
-  {% endif %}
+  <h2>Revisiones</h2>
+  {% for revision in revisiones %}
+    <section>
+      <h3>{{ revision.punto.nombre }} · {{ revision.realizada_en|date:"d/m/Y H:i" }}</h3>
+      {% if revision.filas %}
+        <table class="tabla planilla">
+          <tbody>{% for etiqueta, valor in revision.filas %}<tr><th scope="row">{{ etiqueta }}</th><td>{{ valor }}</td></tr>{% endfor %}</tbody>
+        </table>
+      {% endif %}
+      {% if revision.productos.all %}
+        <h4>Productos aplicados</h4>
+        <ul>{% for aplicado in revision.productos.all %}<li>{{ aplicado.producto }} · lote {{ aplicado.lote }} · {{ aplicado.dosis }} {{ aplicado.unidad }}{% if aplicado.cantidad %} · cantidad {{ aplicado.cantidad }}{% endif %}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if revision.fotos.all %}
+        <div class="fotos">
+          {% for foto in revision.fotos.all %}
+            <img src="{% url 'panel:visitas:foto' foto.codigo %}" alt="Foto {{ forloop.counter }} de {{ revision.punto.nombre }}" loading="lazy">
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+  {% empty %}
+    <p>Esta visita todavía no tiene revisiones.</p>
+  {% endfor %}
 
   <h2>Historial</h2>
   <ul>
