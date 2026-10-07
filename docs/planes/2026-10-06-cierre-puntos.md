@@ -282,7 +282,7 @@ commit_base: 9a284ed
 | T6 | hecha |
 | T7 | hecha |
 | T8 | hecha |
-| T9 | pendiente |
+| T9 | hecha |
 | T10 | hecha |
 | T11 | hecha |
 
@@ -300,6 +300,8 @@ commit_base: 9a284ed
 | 2026-10-06 | auditoría final T9 | d3f3972 | apto con correcciones: 0 bloqueantes, 2 importantes (token → T8b; incidencias de ubicación → P-cierre-puntos-13), 2 menores (→ P-cierre-puntos-14 y 15) | auditor-seguridad; contrato regenerado idéntico |
 | 2026-10-06 | T8 (con T8b) | f68fe6d | FALLA formal: 0 criterios en FALLA en ambos (4 de T8 + test apps.api); contrato MODIFICADO | aceptado por el usuario; spot check test_token y presupuesto T8 181/250; integrada e79fdef; contrato regenerado dd86327 |
 | 2026-10-07 | T9 paso 4: prueba en navegador | 3832274 (plan/correcciones-p31) | OK del usuario | los seis problemas del reporte se corrigieron en el plan `correcciones-p31`; el usuario dio el OK sobre esa rama el 2026-10-07 y vale para este paso (decisión del 2026-10-06) |
+| 2026-10-07 | TODO (verificador) | bc4cc32 | FALLA formal: 79/80; único FALLA congelado.sh, CONTRATO MODIFICADO (27b13f8, bea9b11) | aceptado por el usuario; suite completa 510 tests OK; contrato openapi idéntico |
+| 2026-10-07 | TODO (verificador-b) | bc4cc32 | FALLA formal: 79/80; mismo único FALLA | aceptado por el usuario |
 
 ## Pendientes que deja este plan
 
