@@ -1,19 +1,32 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: puntos-control
+Plan activo: correcciones-p31
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| puntos-control | plan/puntos-control | 4 cerrada (T1–T17 hechas; verificación TODO: 104/105, FALLA formal de congelado.sh por 50822be) | plan `cierre-puntos` ramificado desde `plan/puntos-control`; la prueba en navegador (P-puntos-control-31, etiqueta `cierre-puntos`) se hace sobre esa rama y los dos planes entran juntos a `main` (copiar `### Decisiones` a `docs/decisiones.md`) | sesión 2026-10-06 cerrada |
+| puntos-control | plan/puntos-control | 4 cerrada (verificación TODO 104/105, FALLA formal aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
+| cierre-puntos | plan/cierre-puntos | 3 cerrada (T1–T11 hechas; TODO 79/80 en 6d4f7e3, FALLA formal de congelado.sh aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
+| correcciones-p31 | plan/correcciones-p31 | 2 cerrada (T1–T4 hechas; TODO 38/38 PASA en 0f43474) | merge conjunto a `main`, por decisión del usuario | sesión 2026-10-07 cerrada |
 
-Siguiente: plan `cierre-puntos` (ramifica desde `plan/puntos-control`; `pendientes.py --etiqueta cierre-puntos`), prueba en navegador sobre su rama y merge conjunto a `main`. Pendientes a decidir: P-puntos-control-18, -20, -21, -22, -25. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`: reactivar usuarios y campos de planilla, filtros de proyectos con buscador, `geocodificar` por POST). Después, plan de despliegue (`--etiqueta despliegue`). Antes de la etapa Expo: `--etiqueta expo`. Hallazgos de la auditoría de saneamiento: P-saneamiento-3 a -5.
+Siguiente: el usuario decide el merge de los tres planes a `main` (`plan/correcciones-p31` contiene a `plan/cierre-puntos` hasta 9728a27 y este a `plan/puntos-control`; `plan/cierre-puntos` suma 3 commits `registro:` propios, bc4cc32 y 6d4f7e3). Al fusionar se copian las `### Decisiones` de los tres planes a `docs/decisiones.md`. **Antes de desplegar**: P-correcciones-p31-2 (la migración `sitios/0007` pierde el rastro de las propuestas aplicadas). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-07 — Planes `cierre-puntos` y `correcciones-p31`: integrados y verificados
+Hecho:
+- `cierre-puntos` (sesiones del 2026-10-06, sin entrada propia hasta hoy): T1–T8, T10, T11 y la corrección T8b integradas; contrato openapi regenerado (dd86327); auditoría final con pendientes P-cierre-puntos-13 a 15.
+- La prueba en navegador de `cierre-puntos` (P-puntos-control-31) dio seis problemas → plan `correcciones-p31` (rama desde 9728a27). juez-plan: 1 bloqueante y 5 observaciones, corregidos antes de congelar (6510a35).
+- Ola 1: T1 (visitas: el primer escaneo de cualquier rol fija las coordenadas; hora futura en la visita manual) y T2 (sitios: modos del plano, arrastre que guarda, ubicar puntos existentes, QR con Barlow), verificadas e integradas. Ola 2: T3 (migración `sitios/0007` aplica las propuestas pendientes y quita el campo; la pestaña Mapa muestra solo el sitio), verificada e integrada; T4: docs de arquitectura, contrato openapi sin cambios.
+- Auditoría de T4: 0 bloqueantes; 2 importantes, 1 menor y 3 observaciones → P-correcciones-p31-1 a 6, por decisión del usuario (sin corregir en este plan).
+- OK del usuario en navegador (2026-10-07), que vale también para el paso 4 de T9 de `cierre-puntos`.
+- Verificación TODO: `correcciones-p31` 38/38 PASA (verificador y verificador-b); `cierre-puntos` 79/80 en ambos, con el único FALLA formal de congelado.sh aceptado.
+- Incidente: el 2026-10-07 la raíz amaneció en `plan/cierre-puntos` (checkout manual); se volvió a `plan/correcciones-p31` sin pérdidas.
+Sigue: merge de los tres planes a `main` por decisión del usuario.
 
 ### 2026-10-06 — Plan `puntos-control`: olas 2 a 4 integradas, verificación final
 Hecho:
