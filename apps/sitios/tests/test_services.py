@@ -1,8 +1,9 @@
 import datetime
 from decimal import Decimal
+from unittest import mock
 
 from django.core.exceptions import ValidationError
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, QuerySet
 from django.test import TestCase
 
 from apps.accounts.models import User
@@ -164,3 +165,44 @@ class UbicarEnPlanoTests(_BaseSitio):
         for destino, x, y in ((ajeno, 0.5, 0.5), (plano, 1.5, 0.5), (plano, 0.5, -1)):
             with self.assertRaises(ValidationError):
                 services.ubicar_en_plano(punto, destino, x, y)
+
+
+class FijarUbicacionTests(_BaseSitio):
+    def test_fijar_ubicacion_bloquea_la_fila(self):
+        punto = self.sitio.puntos.get()
+        administrador = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        original = QuerySet.select_for_update
+        with mock.patch.object(
+            QuerySet, "select_for_update", autospec=True, side_effect=original
+        ) as bloqueo:
+            services.fijar_ubicacion(punto, Decimal("-36.1"), Decimal("-57.8"))
+            self.assertEqual(bloqueo.call_count, 1)
+            services.fijar_ubicacion_en_campo(
+                administrador=administrador,
+                punto=punto,
+                latitud=Decimal("-36.2"),
+                longitud=Decimal("-57.9"),
+                precision_m=9.5,
+            )
+            self.assertEqual(bloqueo.call_count, 2)
+        punto.refresh_from_db()
+        self.assertEqual(punto.latitud, Decimal("-36.2"))
+        self.assertEqual(punto.precision_m, Decimal("9.50"))
+
+    def test_fijar_ubicacion_usa_la_fila_releida(self):
+        """El punto en memoria quedó viejo: manda lo que hay en la base."""
+        punto = self.sitio.puntos.get()
+        PuntoControl.objects.filter(pk=punto.pk).update(activo=False)
+        administrador = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        with self.assertRaises(ValidationError):
+            services.fijar_ubicacion_en_campo(
+                administrador=administrador,
+                punto=punto,
+                latitud=Decimal("-36.2"),
+                longitud=Decimal("-57.9"),
+                precision_m=9,
+            )

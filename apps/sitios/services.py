@@ -74,12 +74,24 @@ def regenerar_qr_lote(puntos):
     return len(puntos)
 
 
+def _bloquear_punto(punto):
+    """Relee el punto bloqueando la fila (dentro de un ``atomic``), con su sitio."""
+    return (
+        PuntoControl.objects.select_for_update(of=("self",))
+        .select_related("sitio__cliente")
+        .get(pk=punto.pk)
+    )
+
+
 def fijar_ubicacion(punto, latitud, longitud):
     """Fija lat/lng del punto (clic en el mapa) y deja el motivo en el historial."""
-    punto.latitud = latitud
-    punto.longitud = longitud
-    punto._change_reason = "Ubicación fijada en el mapa"
-    punto.save(update_fields=["latitud", "longitud"])
+    with transaction.atomic():
+        bloqueado = _bloquear_punto(punto)
+        bloqueado.latitud = latitud
+        bloqueado.longitud = longitud
+        bloqueado._change_reason = "Ubicación fijada en el mapa"
+        bloqueado.save(update_fields=["latitud", "longitud"])
+    punto.latitud, punto.longitud = bloqueado.latitud, bloqueado.longitud
 
 
 def mover_en_plano(punto, x, y):
@@ -104,10 +116,21 @@ def ubicar_en_plano(punto, plano, x, y):
 
 
 def desactivar_punto(punto):
-    """Da de baja el punto: conserva sus revisiones, pero deja de pedirse."""
-    punto.activo = False
-    punto._change_reason = "Punto desactivado"
-    punto.save(update_fields=["activo"])
+    """Da de baja el punto: conserva sus revisiones, pero deja de pedirse.
+
+    Rechaza desactivar el último punto activo: el sitio se quedaría sin QR vigente.
+    """
+    with transaction.atomic():
+        activos = list(
+            PuntoControl.objects.select_for_update()
+            .filter(sitio_id=punto.sitio_id, activo=True)
+            .values_list("pk", flat=True)
+        )
+        if activos == [punto.pk]:
+            raise ValidationError("No se puede desactivar el último punto activo.")
+        punto.activo = False
+        punto._change_reason = "Punto desactivado"
+        punto.save(update_fields=["activo"])
 
 
 def _exigir_precision(precision_m):
@@ -146,6 +169,7 @@ def crear_sitio_en_campo(
         localidad=localidad,
         latitud=latitud,
         longitud=longitud,
+        precision_m=precision_m,
     )
     sitio._history_user = administrador
     sitio._change_reason = "Alta en campo desde la app"
@@ -176,6 +200,7 @@ def crear_punto_en_campo(
         orden=(ultimo or 0) + 1,
         latitud=latitud,
         longitud=longitud,
+        precision_m=precision_m if latitud is not None else None,
         foto=foto,
     )
     punto._history_user = administrador
@@ -186,12 +211,17 @@ def crear_punto_en_campo(
 
 def fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precision_m):
     """Fija lat/lng del punto desde el GPS de un administrador."""
-    _exigir_activo(punto.sitio)
-    if not punto.activo:
-        raise ValidationError("El punto está inactivo.")
     _exigir_precision(precision_m)
-    punto.latitud = latitud
-    punto.longitud = longitud
-    punto._history_user = administrador
-    punto._change_reason = "Ubicación fijada en campo desde la app"
-    punto.save(update_fields=["latitud", "longitud"])
+    with transaction.atomic():
+        bloqueado = _bloquear_punto(punto)
+        _exigir_activo(bloqueado.sitio)
+        if not bloqueado.activo:
+            raise ValidationError("El punto está inactivo.")
+        bloqueado.latitud = latitud
+        bloqueado.longitud = longitud
+        bloqueado.precision_m = precision_m
+        bloqueado._history_user = administrador
+        bloqueado._change_reason = "Ubicación fijada en campo desde la app"
+        bloqueado.save(update_fields=["latitud", "longitud", "precision_m"])
+    punto.latitud, punto.longitud = bloqueado.latitud, bloqueado.longitud
+    punto.precision_m = bloqueado.precision_m

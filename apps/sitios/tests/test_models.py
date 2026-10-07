@@ -1,15 +1,21 @@
 import datetime
+import io
+import shutil
+import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import FieldDoesNotExist, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, connection, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from PIL import Image
 
 from apps.clientes.models import Cliente
 from apps.proyectos.models import UMBRAL_PROXIMA_DIAS, Proyecto
 from apps.servicios.models import TipoServicio
+from apps.sitios import services
 from apps.sitios.estado import (
     GRAVEDAD_PUNTO,
     EstadoPunto,
@@ -76,6 +82,57 @@ class PuntoControlTests(TestCase):
         self.sitio.nombre = "Planta Norte"
         self.sitio.save()
         self.assertEqual(self.sitio.puntos.count(), 1)
+
+    def test_reemplazar_foto_borra_la_anterior(self):
+        media = tempfile.mkdtemp(prefix="sitios-modelo-test-")
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        buffer = io.BytesIO()
+        Image.new("RGB", (30, 30), "red").save(buffer, "PNG")
+        with override_settings(MEDIA_ROOT=media):
+            punto = self.sitio.puntos.get()
+            punto.foto = SimpleUploadedFile("a.png", buffer.getvalue())
+            punto.save()
+            almacenamiento, anterior = punto.foto.storage, punto.foto.name
+            punto.foto = SimpleUploadedFile("b.png", buffer.getvalue())
+            with self.captureOnCommitCallbacks(execute=True):
+                punto.save()
+            self.assertNotEqual(punto.foto.name, anterior)
+            self.assertFalse(almacenamiento.exists(anterior))
+            self.assertTrue(almacenamiento.exists(punto.foto.name))
+            nombre = punto.foto.name
+            with self.captureOnCommitCallbacks(execute=True):
+                punto.nombre = "Entrada"
+                punto.save()
+            self.assertTrue(almacenamiento.exists(nombre))
+
+    def test_no_desactiva_el_ultimo_punto_y_reactivar_sitio_reactiva(self):
+        general = self.sitio.puntos.get()
+        with self.assertRaises(ValidationError):
+            services.desactivar_punto(general)
+        general.refresh_from_db()
+        self.assertTrue(general.activo)
+        cocina = PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
+        deposito = PuntoControl.objects.create(
+            sitio=self.sitio, nombre="Depósito", orden=2
+        )
+        services.desactivar_punto(deposito)
+        self.sitio.activo = False
+        self.sitio.save()
+        self.assertFalse(self.sitio.puntos.filter(activo=True).exists())
+        self.sitio.activo = True
+        self.sitio.save()
+        general.refresh_from_db()
+        cocina.refresh_from_db()
+        deposito.refresh_from_db()
+        self.assertTrue(general.activo)
+        self.assertTrue(cocina.activo)
+        self.assertFalse(deposito.activo, "Lo apagó una persona, no el sitio")
+        self.assertEqual(
+            cocina.history.first().history_change_reason, "Sitio reactivado"
+        )
+        self.assertEqual(
+            deposito.history.first().history_change_reason, "Punto desactivado"
+        )
 
     def test_clean_rechaza_activo_en_sitio_inactivo_y_plano_ajeno(self):
         otro = Sitio.objects.create(cliente=self.cliente, nombre="Planta 2")
