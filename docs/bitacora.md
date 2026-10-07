@@ -7,13 +7,23 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | elegir el próximo plan | sesión 2026-10-07 cerrada |
+| — | main | — | triage de pendientes (`triage-2026-10-07`, sin código) con `docs/pendientes-snapshot.txt`; después `panel-cierre` | sesión 2026-10-07 cerrada |
 
-Siguiente: `puntos-control`, `cierre-puntos` y `correcciones-p31` están en `main` (1f85911). **Antes de desplegar**: P-correcciones-p31-2 (la migración `sitios/0007` pierde el rastro de las propuestas aplicadas) y P-correcciones-p31-1 (el primer escaneo fija coordenadas aunque haya incidencia de ubicación). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`.
+Siguiente: plan sin código `triage-2026-10-07` sobre los 108 abiertos de `docs/pendientes-snapshot.txt` (generado sin versionar). Hay pendientes ya resueltos sin `cierra:` (P-puntos-control-31 y -15 por `correcciones-p31`; P-panel-4, -5 y -6 por `cierre-puntos` T2) que el triage debe cerrar. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`. Regla nueva de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-07 — Plan `auditoria-p31`: correcciones de la auditoría, fusión en `main`
+Hecho:
+- Plan `auditoria-p31` (commit_base 701e6b2): T1 (una revisión con incidencia de ubicación no fija coordenadas) y T2 (la `sitios/0007` deja fila histórica y solo aplica propuestas respaldadas; `PosicionForm.plano` con planos activos; la fuente del QR cae a la de Pillow), en paralelo.
+- T2 rompió 4 tests de migración de visitas por la dependencia nueva `sitios.0007 → visitas.0008` → T4 (helper `_destino`), por decisión del usuario (ce638ac). La auditoría de T3 encontró que las revisiones previas a `visitas.0008` tienen `incidencia_ubicacion=False` por defecto → T5 (la `0007` filtra la revisión por punto, toma sus coordenadas y mide la distancia al sitio), por decisión del usuario (0d8b058). Re-auditoría: cerrado, nada nuevo.
+- Verificación TODO: 35/36 y 40/41, único FALLA formal `congelado.sh` por las dos modificaciones, aceptado por escrito por el usuario. Cierra P-correcciones-p31-1 a 6; deja P-auditoria-p31-1 y -2 (observaciones).
+- Fusión en `main` con `--no-ff` (a9a0058); decisiones copiadas (fc6e4d9); en `main`: check, makemigrations, ruff y 527 tests OK. Sin push.
+- Commit pasivo: regla de cuándo preguntar al usuario en CLAUDE.md (regla 8), `docs/plantilla-plan.md` § Decisiones y `docs/decisiones.md` (d1b430b).
+- `docs/pendientes-snapshot.txt` generado sin versionar para el triage: 108 abiertos (13 importantes, 40 menores, 55 observaciones; 68 sin etiqueta).
+Sigue: triage `triage-2026-10-07` con el usuario; después `panel-cierre`.
 
 ### 2026-10-07 — Planes `cierre-puntos` y `correcciones-p31`: integrados y verificados
 Hecho:
