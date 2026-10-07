@@ -288,9 +288,13 @@ def abrir_visita(
 def _fijar_ubicacion_por_escaneo(punto, revision, usuario):
     """El primer escaneo de un punto sin coordenadas las fija, sea cual sea el rol.
 
-    Bloquea el punto; con precisión peor que `PRECISION_MAXIMA_M` no fija nada y
-    la revisión igual se registra. Deja al usuario en el historial del punto.
+    Bloquea el punto; con precisión peor que `PRECISION_MAXIMA_M`, o con
+    incidencia de ubicación (revisión lejos de la referencia), no fija nada y la
+    revisión igual se registra. Si el sitio no tiene coordenadas no hay incidencia
+    y el primer escaneo fija. Deja al usuario en el historial del punto.
     """
+    if revision.incidencia_ubicacion:
+        return
     precision = revision.precision_m
     if precision is None or precision > settings.PRECISION_MAXIMA_M:
         return
@@ -415,9 +419,10 @@ def registrar_revision(
     `productos_aplicados` es una lista de dicts con `producto` como id; `fotos`, una
     lista de archivos. Valida coordenadas, de 1 a `MAX_FOTOS` fotos, planilla de
     ámbito `punto` y el atraso. Guarda la distancia al punto sin rechazar por ella.
-    Si el punto no tiene ubicación, un empleado propone la de la revisión y un
-    administrador la fija. Todo ocurre en una transacción (y sin fotos huérfanas si
-    falla).
+    Si el punto no tiene ubicación, la primera revisión con precisión de a lo sumo
+    `PRECISION_MAXIMA_M` y sin incidencia de ubicación la fija (ver
+    `_fijar_ubicacion_por_escaneo`). Todo ocurre en una transacción (y sin fotos
+    huérfanas si falla).
     Levanta `RevisionDuplicada` si el `cliente_uuid` ya existe y `ValidationError`
     con errores por campo; `VisitaNoEncontrada` si la visita no existe o es ajena.
     No debe llamarse dentro de otro `atomic`.

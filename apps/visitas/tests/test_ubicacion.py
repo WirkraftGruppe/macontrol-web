@@ -128,6 +128,22 @@ class UbicacionTests(SinArchivosMixin, TestCase):
         self.assertEqual(self.punto.latitud, Decimal("-35.100000"))
         self.assertEqual(revision.visita.empleado, self.admin)
 
+    def test_revision_lejos_del_sitio_no_fija_coordenadas(self):
+        self._con_coordenadas(self.sitio)
+        revision = self._revisar(**LEJOS)
+        self.assertTrue(revision.incidencia_ubicacion)
+        self.punto.refresh_from_db()
+        self.assertIsNone(self.punto.latitud)
+        self.assertIsNone(self.punto.longitud)
+
+    def test_sitio_sin_coordenadas_el_escaneo_fija(self):
+        self.assertIsNone(self.sitio.latitud)
+        revision = self._revisar(precision_m=Decimal("8.5"), **LEJOS)
+        self.assertFalse(revision.incidencia_ubicacion)
+        self.punto.refresh_from_db()
+        self.assertEqual(self.punto.latitud, LEJOS["latitud"])
+        self.assertEqual(self.punto.longitud, LEJOS["longitud"])
+
     def test_empleado_fija_coordenadas_del_punto(self):
         revision = self._revisar(precision_m=Decimal("8.5"))
         self.punto.refresh_from_db()
