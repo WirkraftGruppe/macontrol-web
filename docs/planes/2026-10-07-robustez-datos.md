@@ -239,9 +239,9 @@ commit_base: 07191c7
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -251,8 +251,8 @@ commit_base: 07191c7
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-07 | T1 | 9b80d5f | PASA (verificador 5/5, verificador-b 5/5) | |
-| | T2 | | | |
-| | T3 | | | |
+| 2026-10-07 | T2 | a18b3e9 (worktree) | PASA (verificador 20/20, verificador-b 20/20) | T2b f7f58bf: test de migración con todas las apps en su hoja, para integrar con sitios.0008 |
+| 2026-10-07 | T3 | f69ba3d (worktree) | PASA (verificador 18/18, verificador-b 18/18) | integrada en 030216b; suite 562 OK |
 | | T5 | | | |
 | | T6 | | | |
 | | TODO | | | |
@@ -260,6 +260,10 @@ commit_base: 07191c7
 ## Pendientes que deja este plan
 
 ### Problemas
+- P-robustez-datos-1 [importante] `PuntoForm` (`apps/sitios/panel_forms.py`) deja destildar "activo" al editar un punto: se puede desactivar el último punto activo de un sitio sin pasar por `desactivar_punto` (informe de T3).
+- P-robustez-datos-2 [menor] `test_foto_enorme_da_400_sin_500` pasaría también sin el corte por `CONTENT_LENGTH` (la validación de la foto ya daba 400): no prueba que el cuerpo no se lea (verificador de T3).
+- P-robustez-datos-3 [menor] `?incidencia=ubicacion` lista solo las no revisadas (igual que el contador del tablero); no hay forma de ver las de ubicación ya revisadas (informe de T2).
+- P-robustez-datos-4 [observación] La regla de P-panel-7 "una sola llamada a `esquema_planilla` en `panel_forms.py`" se resolvió con prefetch: siguen dos llamadas (una por ámbito) y una sola consulta, cubierta por `ManualTests.test_pide_los_campos_del_esquema_una_sola_vez` (informe de T2).
 
 ### Decisiones
 - 2026-10-07 — Al reactivar un sitio se reactivan solo los puntos que apagó el sitio (última fila histórica "Sitio desactivado") — P-puntos-control-27, decisión del usuario al planificar — reemplaza a: (nada)
