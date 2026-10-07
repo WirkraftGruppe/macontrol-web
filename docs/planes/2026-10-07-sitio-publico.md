@@ -291,7 +291,7 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
 - `[cmd]` `bash .claude/hooks/congelado.sh docs/planes/2026-10-07-sitio-publico.md sitio-publico`
 
 ## Registro de verificación
-commit_base: (se anota tras el commit `docs(plan): sitio-publico`)
+commit_base: 45fb49c
 
 ### Estado de subtareas
 | Tarea | Estado |
