@@ -7,13 +7,20 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | triage de pendientes (`triage-2026-10-07`, sin código) con `docs/pendientes-snapshot.txt`; después `panel-cierre` | sesión 2026-10-07 cerrada |
+| — | main | — | elegir el próximo plan; candidato: `robustez-datos` | sesión 2026-10-07 cerrada |
 
-Siguiente: plan sin código `triage-2026-10-07` sobre los 108 abiertos de `docs/pendientes-snapshot.txt` (generado sin versionar). Hay pendientes ya resueltos sin `cierra:` (P-puntos-control-31 y -15 por `correcciones-p31`; P-panel-4, -5 y -6 por `cierre-puntos` T2) que el triage debe cerrar. Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`. Regla nueva de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
+Siguiente: 79 abiertos, todos con destino (`py -3 .claude/hooks/pendientes.py --etiqueta <destino>`): `robustez-datos` 28 (candidato natural al próximo plan; trae decisiones ya tomadas en el triage: P-cierre-puntos-13, P-panel-24, -25, P-cierre-puntos-10, P-auditoria-p31-1), `despliegue` 24, `robustez-panel` 13, `expo` 8, `empresa` 4, `informes` 2. La etiqueta `panel-cierre` desapareció: no hay plan `panel-cierre`. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-07 — Plan `triage-2026-10-07`: triage de pendientes, fusión en `main`
+Hecho:
+- Plan sin código `triage-2026-10-07` (Chico): T1 comprobó con 8 tests existentes y un grep los 9 cierres condicionales (todos resueltos); T2 anotó en `convenciones-proyecto` que `Visita.datos` pasa por `validar_datos` y la sección nueva § Panel (`id="listado"`, decidida por Claude, revisable); T3 aplicó el triage del usuario: 29 cierres, 51 etiquetas nuevas, 12 decisiones.
+- 108 → 79 abiertos, todos con destino; `panel-cierre` sin abiertos. Verificación TODO 16/16 PASA (9c877c6).
+- Fusión en `main` con `--no-ff` (4cb06d2); 12 decisiones copiadas (e3525b9); en `main`: check, makemigrations, ruff y 527 tests OK. Sin push. `docs/pendientes-snapshot.txt` queda sin versionar (es la foto previa al triage).
+Sigue: elegir el próximo plan (candidato `robustez-datos`).
 
 ### 2026-10-07 — Plan `auditoria-p31`: correcciones de la auditoría, fusión en `main`
 Hecho:
