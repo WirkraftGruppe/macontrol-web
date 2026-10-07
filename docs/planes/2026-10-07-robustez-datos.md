@@ -233,7 +233,7 @@
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): robustez-datos>
+commit_base: 07191c7
 
 ### Estado de subtareas
 | Tarea | Estado |
