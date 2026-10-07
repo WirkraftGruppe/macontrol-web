@@ -26,6 +26,7 @@ La raíz es un repositorio git propio. Cuando exista `mobile/`, será otro repos
 5. **Delegación a subagentes con contrato** (ver § Flujo de trabajo).
 6. **Verificación independiente obligatoria** (ver § Flujo de trabajo). Ningún trabajo se reporta como terminado sin un informe del subagente `verificador`.
 7. **Contenido real**: el sitio público solo publica textos, datos de contacto, certificaciones y clientes que figuran en `docs/00-contenido-fuente.md` o que el usuario entregue. Sin cifras inventadas, sin testimonios inventados, sin formulario de presupuesto ni de contacto por correo (decisión del cliente: el contacto es telefónico).
+8. **Cuándo preguntar**: Claude pregunta al usuario solo cuando la decisión (a) es de producto o del negocio, (b) es irreversible o toca datos, (c) contradice una decisión registrada, o (d) es una frontera del esquema (contrato, merge, FALLA). En todo lo demás elige la opción que recomendaría, la anota en ### Decisiones del plan con la marca 'decidida por Claude, revisable', y sigue; esas decisiones se presentan juntas al cierre de cada ola, no una por una.
 
 ## El principal coordina, no ejecuta
 

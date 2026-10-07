@@ -222,6 +222,9 @@ una línea sangrada continúa la anterior):
 
 - AAAA-MM-DD — decisión — motivo — reemplaza a: (nada|fecha)
 
+Claude pregunta al usuario solo cuando la decisión (a) es de producto o del negocio, (b) es irreversible o toca datos, (c) contradice una decisión registrada, o (d) es una frontera del esquema (contrato, merge, FALLA). En todo lo demás elige la opción que recomendaría, la anota en ### Decisiones del plan con la marca 'decidida por Claude, revisable', y sigue; esas decisiones se presentan juntas al cierre de cada ola, no una por una.
+Ejemplo: `- AAAA-MM-DD — decisión — motivo — reemplaza a: (nada) — decidida por Claude, revisable`
+
 ### Cierra
 
 - cierra: P-<otro-slug>-3 — cómo lo resuelve este plan
