@@ -194,6 +194,7 @@ commit_base: 6510a35
 | 2026-10-06 | T3 (verificador-b) | 91b2773 | PASA 9/9 | |
 | 2026-10-06 | T4 paso 3: spectacular --validate | 9ac7257 | sin cambios | el YAML no cambia (diff=0) |
 | 2026-10-06 | T4 paso 4: auditor-seguridad | 9ac7257 | 0 bloqueantes, 2 importantes, 1 menor, 3 observaciones | todo a pendientes por decisión del usuario |
+| 2026-10-07 | T4 paso 5: prueba en navegador | 3832274 | OK del usuario | plano (modos, arrastre, ubicar), pestaña Mapa, QR con acentos, visita manual con hora futura, `registrar_revision_demo` fija coordenadas (historial: demo-empleado, "Ubicación fijada por el primer escaneo"); vale también para T9 paso 4 de `cierre-puntos` |
 
 ## Pendientes que deja este plan
 
