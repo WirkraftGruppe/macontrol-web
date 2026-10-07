@@ -238,7 +238,7 @@ commit_base: 07191c7
 ### Estado de subtareas
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
@@ -250,7 +250,7 @@ commit_base: 07191c7
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-07 | T1 | 9b80d5f | PASA (verificador 5/5, verificador-b 5/5) | |
 | | T2 | | | |
 | | T3 | | | |
 | | T5 | | | |
