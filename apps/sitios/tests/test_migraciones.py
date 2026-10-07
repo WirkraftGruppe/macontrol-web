@@ -68,38 +68,87 @@ class MigracionPuntosTests(TransactionTestCase):
 
 
 class QuitarPropuestaTests(TransactionTestCase):
-    ANTES = [("sitios", "0006_puntocontrol_foto")]
+    ANTES = [
+        ("sitios", "0006_puntocontrol_foto"),
+        ("visitas", "0008_ubicacion_y_administrador"),
+    ]
     DESPUES = [("sitios", "0007_quitar_ubicacion_propuesta")]
 
     def tearDown(self):
         ejecutor = MigrationExecutor(connection)
         ejecutor.migrate(ejecutor.loader.graph.leaf_nodes())
 
-    def test_propuesta_pendiente_se_aplica_si_no_hay_coordenadas(self):
+    def _escenario(self):
+        """Estado previo: un sitio, un empleado y una visita para citar revisiones."""
         apps = _migrar(self.ANTES)
         Cliente = apps.get_model("clientes", "Cliente")
         Sitio = apps.get_model("sitios", "Sitio")
-        Punto = apps.get_model("sitios", "PuntoControl")
         sitio = Sitio.objects.create(
             cliente=Cliente.objects.create(razon_social="ACME"), nombre="Planta"
         )
-        propuesta = {
-            "latitud": "-35.100000",
-            "longitud": "-57.500000",
-            "precision_m": "8",
-        }
-        sin_coordenadas = Punto.objects.create(
-            sitio=sitio, nombre="A", orden=1, ubicacion_propuesta=propuesta
+        empleado = apps.get_model("accounts", "User").objects.create(
+            username="emp", rol="empleado"
         )
-        con_coordenadas = Punto.objects.create(
+        proyecto = apps.get_model("proyectos", "Proyecto").objects.create(
             sitio=sitio,
-            nombre="B",
-            orden=2,
+            tipo_servicio=apps.get_model("servicios", "TipoServicio").objects.create(
+                nombre="Control"
+            ),
+            titulo="Control mensual",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+        self.visita = apps.get_model("visitas", "Visita").objects.create(
+            proyecto=proyecto, empleado=empleado, origen="manual"
+        )
+        self.empleado = empleado
+        self.apps_antes = apps
+        self.sitio = sitio
+        return apps
+
+    def _punto(self, orden, propuesta, **extra):
+        Punto = self.apps_antes.get_model("sitios", "PuntoControl")
+        return Punto.objects.create(
+            sitio=self.sitio,
+            nombre=f"P{orden}",
+            orden=orden,
+            ubicacion_propuesta=propuesta,
+            **extra,
+        )
+
+    def _revision(self, **extra):
+        ahora = datetime.datetime(2026, 1, 5, 10, tzinfo=datetime.UTC)
+        Punto = self.apps_antes.get_model("sitios", "PuntoControl")
+        return self.apps_antes.get_model("visitas", "Revision").objects.create(
+            visita=self.visita,
+            punto=Punto.objects.first(),
+            realizada_en=ahora,
+            recibida_en=ahora,
+            **extra,
+        )
+
+    @staticmethod
+    def _propuesta(revision, latitud="-35.100000", longitud="-57.500000"):
+        return {
+            "latitud": latitud,
+            "longitud": longitud,
+            "precision_m": "8",
+            "revision": revision,
+        }
+
+    def test_propuesta_pendiente_se_aplica_si_no_hay_coordenadas(self):
+        self._escenario()
+        self._punto(0, None)
+        revision = self._revision()
+        propuesta = self._propuesta(revision.pk)
+        sin_coordenadas = self._punto(1, propuesta)
+        con_coordenadas = self._punto(
+            2,
+            propuesta,
             latitud=Decimal("-36.100000"),
             longitud=Decimal("-58.200000"),
-            ubicacion_propuesta=propuesta,
         )
-        sin_propuesta = Punto.objects.create(sitio=sitio, nombre="C", orden=3)
+        sin_propuesta = self._punto(3, None)
         apps = _migrar(self.DESPUES)
         Punto = apps.get_model("sitios", "PuntoControl")
         punto = Punto.objects.get(pk=sin_coordenadas.pk)
@@ -110,3 +159,55 @@ class QuitarPropuestaTests(TransactionTestCase):
         self.assertEqual(punto.longitud, Decimal("-58.2"))
         punto = Punto.objects.get(pk=sin_propuesta.pk)
         self.assertIsNone(punto.latitud)
+
+    def test_propuesta_aplicada_deja_historial_con_la_revision(self):
+        self._escenario()
+        base = self._punto(0, None)
+        revision = self._revision()
+        punto = self._punto(1, self._propuesta(revision.pk))
+        apps = _migrar(self.DESPUES)
+        Historico = apps.get_model("sitios", "HistoricalPuntoControl")
+        filas = Historico.objects.filter(id=punto.pk)
+        self.assertEqual(filas.count(), 1)
+        fila = filas.get()
+        self.assertEqual(fila.history_type, "~")
+        self.assertEqual(fila.history_user_id, self.empleado.pk)
+        self.assertIn(f"revisión {revision.pk}", fila.history_change_reason)
+        self.assertEqual(fila.latitud, Decimal("-35.1"))
+        self.assertEqual(fila.nombre, "P1")
+        self.assertFalse(Historico.objects.filter(id=base.pk).exists())
+
+    def test_propuesta_con_incidencia_o_sin_revision_no_se_aplica(self):
+        self._escenario()
+        self._punto(0, None)
+        con_incidencia = self._revision(incidencia_ubicacion=True)
+        puntos = [
+            self._punto(1, self._propuesta(con_incidencia.pk)),
+            self._punto(2, {"latitud": "-35.1", "longitud": "-57.5"}),
+            self._punto(3, self._propuesta(999999)),
+        ]
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        for punto in puntos:
+            self.assertIsNone(Punto.objects.get(pk=punto.pk).latitud)
+        Historico = apps.get_model("sitios", "HistoricalPuntoControl")
+        self.assertFalse(Historico.objects.filter(history_type="~").exists())
+
+    def test_propuesta_no_finita_o_fuera_de_rango_se_omite(self):
+        self._escenario()
+        self._punto(0, None)
+        revision = self._revision()
+        malas = [("NaN", "-57.5"), ("-35.1", "Infinity"), ("95", "-57.5")]
+        malas += [("-35.1", "-181"), ("abc", "-57.5")]
+        puntos = [
+            self._punto(orden, self._propuesta(revision.pk, lat, lng))
+            for orden, (lat, lng) in enumerate(malas, start=1)
+        ]
+        buena = self._punto(10, self._propuesta(revision.pk))
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        for punto in puntos:
+            self.assertIsNone(Punto.objects.get(pk=punto.pk).latitud)
+        self.assertEqual(Punto.objects.get(pk=buena.pk).latitud, Decimal("-35.1"))
+        Historico = apps.get_model("sitios", "HistoricalPuntoControl")
+        self.assertEqual(Historico.objects.filter(history_type="~").count(), 1)

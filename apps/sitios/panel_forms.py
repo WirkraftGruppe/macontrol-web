@@ -102,3 +102,6 @@ class PosicionForm(forms.Form):
 
     x = forms.DecimalField(min_value=0, max_value=1, max_digits=5, decimal_places=4)
     y = forms.DecimalField(min_value=0, max_value=1, max_digits=5, decimal_places=4)
+    plano = forms.ModelChoiceField(
+        queryset=Plano.objects.filter(activo=True), required=False
+    )
