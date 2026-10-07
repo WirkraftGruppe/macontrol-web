@@ -127,6 +127,17 @@ class PaginaServicioTests(TestCase):
         pagina.sectores = [Sector.SALUD.value, Sector.HOTELERIA.value]
         pagina.full_clean()
 
+    @override_settings(ROOT_URLCONF="config.urls")
+    def test_solo_publicadas_en_home_y_sitemap(self):
+        PaginaServicio.objects.filter(pk=2).update(publicado=False)
+        TipoServicio.objects.filter(pk=3).update(activo=False)
+        home = self.client.get("/").content.decode()
+        sitemap = self.client.get("/sitemap.xml").content.decode()
+        for pk, visible in ((1, True), (2, False), (3, False), (4, True)):
+            url = PaginaServicio.objects.get(pk=pk).get_absolute_url()
+            self.assertEqual(url in home, visible, url)
+            self.assertEqual(url in sitemap, visible, url)
+
     def test_sectores_del_fixture_son_validos(self):
         for pagina in PaginaServicio.objects.all():
             self.assertTrue(set(pagina.sectores) <= set(Sector.values))
