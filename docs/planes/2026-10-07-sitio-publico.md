@@ -71,10 +71,11 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
 - **Depende de**: —
 - **Puede tocar**:
   - `apps/web/models.py`, `apps/web/validators.py`, `apps/web/admin.py`
-  - `apps/web/migrations/**`, `apps/web/fixtures/contenido_inicial.json`
+  - `apps/web/migrations/**`
   - `apps/web/tests/test_contenido.py`
   - `docs/01-modelo-y-arquitectura.md` (solo §3.12)
-- **No puede tocar**: `docs/planes/`, `config/`, `templates/`, `static/`, `apps/web/views.py`, `apps/web/urls.py`, `apps/web/panel_*.py`, `apps/servicios/**`, `apps/panel/**`, el resto de `apps/web/tests/`
+  - (modificado: el fixture `apps/web/fixtures/contenido_inicial.json` pasa a T7)
+- **No puede tocar**: `docs/planes/`, `config/`, `templates/`, `static/`, `apps/web/fixtures/`, `apps/web/views.py`, `apps/web/urls.py`, `apps/web/panel_*.py`, `apps/servicios/**`, `apps/panel/**`, el resto de `apps/web/tests/`
 - **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Models
 - **Worktree**: sí
 - **Ruta**: delegada (implementador)
@@ -156,9 +157,29 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 700 --subtarea T2`
 
+### T7 — Fixture de contenido inicial (partida de T1)
+- **Ola**: 1
+- **Depende de**: T1 (mismo worktree y rama `sitio-publico-T1`)
+- **Puede tocar**: `apps/web/fixtures/contenido_inicial.json`
+- **No puede tocar**: `docs/planes/`, todo lo demás
+- **Skill a leer antes**: `docs/00-contenido-fuente.md` completo
+- **Worktree**: sí (`worktrees/sitio-publico-T1`)
+- **Ruta**: delegada (implementador)
+- **Presupuesto**: 600 líneas agregadas
+- **Qué hacer**:
+  - Rehacer los commits del worktree de T1: un `T1:` sin el fixture y un `T7:` con el fixture. El contenido es el que describe T1 § Qué hacer.
+  - En `sectores` de cada `PaginaServicio`, solo los sectores que la Carta asocia explícitamente con ese servicio: Servicio MIPU → gastronómicos y comercios; Manejo integral en edificios → torres, edificios y condominios. El resto queda en `[]`. Decisión del usuario del 2026-10-07.
+- **Criterios**:
+  - `[grep-1]` `grep -n "MAControl S.A." apps/web/fixtures/contenido_inicial.json`
+  - `[grep-0]` `grep -rin "presupuesto" apps/web/fixtures/`
+  - `[grep-0]` `grep -n "Rucery" apps/web/fixtures/contenido_inicial.json`
+  - `[cmd]` `./venv/Scripts/python.exe -c "import json, sys; d=json.load(open('apps/web/fixtures/contenido_inicial.json', encoding='utf-8')); s=[o['fields']['sectores'] for o in d if o['model']=='web.paginaservicio']; sys.exit(0 if len(s)==9 and sum(1 for x in s if x)==2 and all(len(x)<=1 for x in s) else 1)"`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_contenido --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 600 --subtarea T7`
+
 ### T3 — Integración de la ola 1 (principal)
-- **Ola**: 1 (después de verificar T1 y T2)
-- **Depende de**: T1, T2
+- **Ola**: 1 (después de verificar T1, T7 y T2)
+- **Depende de**: T1, T7, T2
 - **Pasos**:
   1. `verificador` y `verificador-b` sobre T1 y T2 (`refutador` si discrepan). Revisar `bash .claude/hooks/cambios.sh . plan/sitio-publico` de cada worktree, no los informes.
   2. Desde la raíz del worktree del plan:
@@ -302,6 +323,7 @@ commit_base: 45fb49c
 | T4 | pendiente |
 | T5 | pendiente |
 | T6 | pendiente |
+| T7 | pendiente |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -331,6 +353,8 @@ commit_base: 45fb49c
 - 2026-10-07 — El `[cmd] manage.py loaddata contenido_inicial` del pedido se reemplaza por `test_singleton_y_fixture_carga`, que carga el fixture en la base de test — el verificador no puede migrar ni escribir la base local (`.claude/agents/verificador.md:41`) — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — T2 (diseño) no escribe tests: sus comprobaciones son `[cmd]` y `[grep]`, y `test_diseno.DisenoWebTests` lo escribe T5 — según la tabla de propiedad, `apps/web/tests/` es de la subtarea de la app — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — Los datos legales de la empresa para el certificado no entran en `Configuracion` en este plan; §3.12 lo anota — el sitio no los necesita y su forma depende del certificado actual, que todavía no llegó — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — T1 se parte en T1 (modelos, admin, migración, tests) y T7 (fixture) — T1 excedió su presupuesto (1036/900) y no se sube; aplica la decisión del 2026-10-04 — elección del usuario — reemplaza a: (nada)
+- 2026-10-07 — `sectores` del fixture solo lleva lo que la Carta asocia explícitamente (MIPU → gastronómicos y comercios; edificios → torres y condominios) — la Carta no relaciona servicios con sectores; no se inventa contenido — elección del usuario — reemplaza a: (nada)
 - 2026-10-07 — El test de recorrido lo escribe T5, no el principal — necesita todas las páginas públicas, que son de T5 — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
