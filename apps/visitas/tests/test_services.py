@@ -1,5 +1,6 @@
 import shutil
 import tempfile
+from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -25,7 +26,9 @@ from apps.visitas.services import (
     MAX_FOTOS,
     MAX_PRODUCTOS,
     RevisionDuplicada,
+    VisitaNoEncontrada,
     VisitaYaCerrada,
+    _cargar_proyecto,
     abrir_visita,
     cerrar_visita,
     registrar_revision,
@@ -60,6 +63,23 @@ def abierta(**extra):
     }
     datos.update(extra)
     return crear_visita(**datos)
+
+
+@contextmanager
+def espiar_bloqueos():
+    """Lista, en orden, los modelos sobre los que se pide `select_for_update`.
+
+    SQLite no emite `FOR UPDATE`, así que el orden de bloqueo se comprueba así.
+    """
+    modelos = []
+    original = models.QuerySet.select_for_update
+
+    def espia(self, *args, **kwargs):
+        modelos.append(self.model)
+        return original(self, *args, **kwargs)
+
+    with mock.patch.object(models.QuerySet, "select_for_update", espia):
+        yield modelos
 
 
 class SinArchivosMixin:
@@ -660,6 +680,11 @@ class ManualPorPuntosTests(SinArchivosMixin, TestCase):
         )
         self.producto = Producto.objects.create(nombre_comercial="Cebo")
         self.fecha = timezone.now() - timedelta(hours=3)
+        # Las cargas son anteriores a hoy: el proyecto ya existía.
+        Proyecto.objects.filter(pk=self.proyecto.pk).update(
+            creado=timezone.now() - timedelta(days=60)
+        )
+        self.proyecto.refresh_from_db()
 
     def cargar(self, **extra):
         argumentos = {
@@ -930,3 +955,122 @@ class RegistrarRevisionTests(SinArchivosMixin, TestCase):
             self.registrar(fotos=[], latitud=Decimal("99"))
         self.assertEqual({"fotos", "latitud"}, set(contexto.exception.message_dict))
         self.assertNadaCreado()
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class BloqueosTests(SinArchivosMixin, TestCase):
+    """Orden de bloqueo Proyecto -> Visita y rol fijado al abrir."""
+
+    def setUp(self):
+        self.visita = abierta()
+        self.proyecto = self.visita.proyecto
+        self.empleado = self.visita.empleado
+
+    def test_orden_de_bloqueo_proyecto_visita(self):
+        crear_revision(self.visita, realizada_en=timezone.now() - timedelta(minutes=5))
+        with espiar_bloqueos() as al_cerrar:
+            cerrar_visita(
+                self.visita, quien=self.empleado, cierre=Visita.Cierre.EMPLEADO
+            )
+        self.assertEqual(al_cerrar, [Proyecto, Visita])
+        otro = User.objects.create_user(
+            username="emp-bloqueo", password="x", rol=User.Rol.EMPLEADO
+        )
+        with espiar_bloqueos() as al_abrir:
+            abrir(empleado=otro, proyecto=self.proyecto)
+        self.assertLess(al_abrir.index(Proyecto), al_abrir.index(Visita))
+
+    def test_revision_filtra_por_empleado_al_bloquear(self):
+        ajeno = User.objects.create_user(
+            username="emp-ajeno", password="x", rol=User.Rol.EMPLEADO
+        )
+        with CaptureQueriesContext(connection) as consultas:
+            with self.assertRaises(VisitaNoEncontrada):
+                registrar_revision(
+                    visita=self.visita,
+                    empleado=ajeno,
+                    qr_codigo=punto_de(self.visita).qr_codigo,
+                    cliente_uuid=uuid4(),
+                    realizada_en=timezone.now(),
+                    latitud=Decimal("-35.1"),
+                    longitud=Decimal("-57.7"),
+                    precision_m=None,
+                    datos={},
+                    productos_aplicados=[],
+                    fotos=[jpeg_chico()],
+                )
+        sobre_visita = [
+            c["sql"]
+            for c in consultas.captured_queries
+            if 'FROM "visitas_visita" WHERE' in c["sql"]
+        ]
+        self.assertTrue(sobre_visita)
+        self.assertIn(
+            '"visitas_visita"."empleado_id" =', sobre_visita[0].split("WHERE")[1]
+        )
+
+    def test_rol_se_evalua_al_abrir(self):
+        proyecto = self.proyecto
+        proyecto.frecuencia_dias = 30
+        proyecto.save()
+        admin = User.objects.create_user(
+            username="adm-rol", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        de_admin, _ = abrir(empleado=admin, proyecto=proyecto)
+        de_empleado, _ = abrir(empleado=self.empleado, proyecto=proyecto)
+        self.assertFalse(de_admin.cuenta_como_servicio)
+        self.assertTrue(de_empleado.cuenta_como_servicio)
+        # El rol cambia después de abrir: el cierre usa el rol de cuando se abrió.
+        User.objects.filter(pk=admin.pk).update(rol=User.Rol.EMPLEADO)
+        User.objects.filter(pk=self.empleado.pk).update(rol=User.Rol.ADMINISTRADOR)
+        for visita in (de_admin, de_empleado):
+            crear_revision(visita, realizada_en=timezone.now() - timedelta(minutes=5))
+        admin.refresh_from_db()
+        self.empleado.refresh_from_db()
+        cerrar_visita(de_admin, quien=admin, cierre=Visita.Cierre.EMPLEADO)
+        proyecto.refresh_from_db()
+        self.assertEqual(proyecto.encargado_actual_id, proyecto.encargado_inicial_id)
+        self.assertIsNone(proyecto.proxima_visita)
+        cerrar_visita(de_empleado, quien=self.empleado, cierre=Visita.Cierre.EMPLEADO)
+        proyecto.refresh_from_db()
+        self.assertEqual(proyecto.encargado_actual, self.empleado)
+        self.assertIsNotNone(proyecto.proxima_visita)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class PrecisionTests(SinArchivosMixin, TestCase):
+    def test_abrir_guarda_precision_m(self):
+        pendiente = crear_visita(programada_para=date(2026, 9, 1))
+        proyecto, empleado = pendiente.proyecto, pendiente.empleado
+        visita, _ = abrir(
+            empleado=empleado, proyecto=proyecto, precision_m=Decimal("8.5")
+        )
+        self.assertEqual(visita.pk, pendiente.pk)
+        visita.refresh_from_db()
+        self.assertEqual(visita.precision_m, Decimal("8.50"))
+        otro = User.objects.create_user(
+            username="emp-prec", password="x", rol=User.Rol.EMPLEADO
+        )
+        nueva, _ = abrir(empleado=otro, proyecto=proyecto)
+        nueva.refresh_from_db()
+        self.assertIsNone(nueva.precision_m)
+        # Como en Revision, la precisión no entra en el historial.
+        campos = {f.name for f in Visita.history.model._meta.get_fields()}
+        self.assertNotIn("precision_m", campos)
+
+
+class EsquemaTests(TestCase):
+    def test_cargar_proyecto_prefetchea_campos(self):
+        visita = crear_visita()
+        CampoPlanilla.objects.create(
+            tipo_servicio=visita.proyecto.tipo_servicio,
+            orden=1,
+            etiqueta="Cebos",
+            clave="cebos",
+            tipo=CampoPlanilla.Tipo.NUMERO,
+        )
+        proyecto = _cargar_proyecto(visita.proyecto_id)
+        with self.assertNumQueries(0):
+            esquema = proyecto.tipo_servicio.esquema_planilla("punto")
+            proyecto.tipo_servicio.esquema_planilla("visita")
+        self.assertEqual([c["clave"] for c in esquema], ["cebos"])

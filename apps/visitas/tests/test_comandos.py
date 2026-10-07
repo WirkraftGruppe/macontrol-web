@@ -9,12 +9,15 @@ from unittest import mock
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import OperationalError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.proyectos.models import Proyecto
 from apps.sitios import services as servicios_sitio
 from apps.visitas.models import Revision, Visita
+from apps.visitas.services import cerrar_visita
 from apps.visitas.tests.test_models import crear_revision, crear_visita
 
 
@@ -80,6 +83,31 @@ class CerrarAbiertasTests(TestCase):
             proyecto.refresh_from_db()
             self.assertIsNone(proyecto.proxima_visita)
 
+    def test_operational_error_no_corta_la_corrida(self):
+        trabada = abierta_hace(30)
+        crear_revision(trabada)
+        libre = abierta_hace(20)
+        crear_revision(libre)
+
+        def cierra(visita, **opciones):
+            if visita.pk == trabada.pk:
+                raise OperationalError("bloqueo no disponible")
+            return cerrar_visita(visita, **opciones)
+
+        with mock.patch(
+            "apps.visitas.management.commands.cerrar_visitas_abiertas.cerrar_visita",
+            side_effect=cierra,
+        ):
+            with self.assertLogs(
+                "apps.visitas.management.commands.cerrar_visitas_abiertas", "ERROR"
+            ):
+                salida = self.ejecutar()
+        trabada.refresh_from_db()
+        libre.refresh_from_db()
+        self.assertEqual(trabada.estado, Visita.Estado.ABIERTA)
+        self.assertEqual(libre.estado, Visita.Estado.REALIZADA)
+        self.assertIn("1", salida)
+
 
 @override_settings(DEBUG=True, MEDIA_ROOT=tempfile.mkdtemp(prefix="revision-demo-"))
 class RevisionDemoTests(TestCase):
@@ -129,6 +157,25 @@ class RevisionDemoTests(TestCase):
         revision = Revision.objects.get()
         self.assertTrue(revision.incidencia_ubicacion)
         self.assertGreater(revision.distancia_m, 500)
+
+    def test_opcion_proyecto(self):
+        punto, _ = self.preparar()
+        primero = Proyecto.objects.get()
+        segundo = Proyecto.objects.create(
+            sitio=punto.sitio,
+            tipo_servicio=primero.tipo_servicio,
+            titulo="Segundo",
+            encargado_inicial=primero.encargado_inicial,
+            encargado_actual=primero.encargado_actual,
+        )
+        self.ejecutar("General", "--proyecto", str(segundo.pk))
+        self.assertEqual(Revision.objects.get().visita.proyecto, segundo)
+        ajeno = crear_visita().proyecto
+        for valor in (str(ajeno.pk), "999999"):
+            with self.subTest(proyecto=valor):
+                with self.assertRaises(CommandError):
+                    self.ejecutar("General", "--proyecto", valor)
+        self.assertEqual(Revision.objects.count(), 1)
 
     def test_punto_inexistente(self):
         with self.assertRaises(CommandError):

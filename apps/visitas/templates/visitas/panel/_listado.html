@@ -42,8 +42,9 @@
           <td>{{ v.programada_para|date:"d/m/Y"|default:"—" }}</td>
           <td>{{ v.realizada_en|date:"d/m/Y H:i"|default:"—" }}</td>
           <td>
-            {% if v.incidencia %}
+            {% if v.incidencia or v.con_ubicacion %}
               {% if v.incidencia_revisada_en %}{% include "panel/partials/etiqueta_estado.html" with tono="neutral" texto="Revisada" %}{% else %}{% include "panel/partials/etiqueta_estado.html" with tono="danger" texto="Sin revisar" %}{% endif %}
+              {% if v.con_ubicacion %}<small>Ubicación</small>{% endif %}
             {% else %}—{% endif %}
           </td>
         </tr>
