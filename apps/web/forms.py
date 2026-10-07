@@ -1,0 +1,94 @@
+"""Formularios del panel para el contenido del sitio público."""
+
+import json
+
+from django import forms
+
+from .models import ClienteDestacado, Configuracion, PaginaServicio, Sector
+
+
+class ListaDeObjetosField(forms.JSONField):
+    """JSON que debe ser una lista de dicts con exactamente `claves`, no vacías."""
+
+    def __init__(self, *, claves, **kwargs):
+        self.claves = tuple(claves)
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("widget", forms.Textarea(attrs={"rows": 8}))
+        super().__init__(**kwargs)
+
+    def prepare_value(self, value):
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, indent=2)
+
+    def clean(self, value):
+        lista = super().clean(value)
+        if lista in (None, ""):
+            return []
+        if not isinstance(lista, list):
+            raise forms.ValidationError("Debe ser una lista de objetos JSON.")
+        for numero, elemento in enumerate(lista, start=1):
+            if not isinstance(elemento, dict) or set(elemento) != set(self.claves):
+                raise forms.ValidationError(
+                    f"El elemento {numero} debe tener exactamente las claves: "
+                    f"{', '.join(self.claves)}."
+                )
+            if not all(isinstance(v, str) and v.strip() for v in elemento.values()):
+                raise forms.ValidationError(
+                    f"El elemento {numero} tiene valores vacíos o que no son texto."
+                )
+        return lista
+
+
+class ConfiguracionForm(forms.ModelForm):
+    direcciones = ListaDeObjetosField(
+        claves=("localidad", "direccion"), label="Direcciones"
+    )
+    redes = ListaDeObjetosField(claves=("nombre", "url"), label="Redes sociales")
+
+    class Meta:
+        model = Configuracion
+        fields = [
+            "razon_social",
+            "eslogan",
+            "presentacion",
+            "telefono",
+            "whatsapp",
+            "correo",
+            "horario",
+            "direcciones",
+            "redes",
+        ]
+
+
+class PaginaServicioForm(forms.ModelForm):
+    metodos = ListaDeObjetosField(claves=("titulo", "descripcion"), label="Métodos")
+    faq = ListaDeObjetosField(
+        claves=("pregunta", "respuesta"), label="Preguntas frecuentes"
+    )
+    sectores = forms.MultipleChoiceField(
+        label="Sectores",
+        choices=Sector.choices,
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = PaginaServicio
+        fields = [
+            "titulo_seo",
+            "resumen",
+            "problema",
+            "adicional",
+            "metodos",
+            "faq",
+            "sectores",
+            "imagen_portada",
+            "publicado",
+        ]
+
+
+class ClienteDestacadoForm(forms.ModelForm):
+    class Meta:
+        model = ClienteDestacado
+        fields = ["nombre", "logo", "orden", "activo"]
