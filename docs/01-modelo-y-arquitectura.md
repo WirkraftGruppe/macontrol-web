@@ -131,7 +131,7 @@ Campos: `proyecto` (FK) o `cliente` (FK), `desde`, `hasta`, `numero` (correlativ
 Extiende `AbstractUser`: `rol` (administrador/empleado), `telefono`, `activo`. Los empleados no tienen `is_staff`.
 
 ### 3.12 `web` — contenido de la web pública
-`web.PaginaServicio` (1:1 con `TipoServicio`): `titulo_seo`, `resumen`, `problema`, `metodos` (JSON: título + descripción), `adicional`, `faq` (JSON), `sectores` (M2M a choices), `imagen_portada`, `publicado`. `web.Cliente destacado`: `nombre`, `logo`, `orden`. `web.Configuracion` (singleton): teléfono, WhatsApp, correo, direcciones, horario, redes. Toda la web pública lee de aquí; nada queda escrito en plantillas.
+`web.PaginaServicio` (1:1 con `TipoServicio`, `related_name="pagina"`): `titulo_seo`, `resumen`, `problema`, `metodos` (JSON: título + descripción), `adicional`, `faq` (JSON: pregunta + respuesta, puede estar vacía), `sectores` (JSON de valores de web.Sector, validada), `imagen_portada`, `publicado`. `web.ClienteDestacado`: `nombre`, `logo`, `orden`, `activo`. `web.Configuracion` (singleton, pk=1): `razon_social`, `eslogan`, `presentacion`, `telefono`, `whatsapp`, `correo`, `horario`, `direcciones` (JSON: localidad + dirección), `redes` (JSON: nombre + url). Los datos legales, las habilitaciones y el director técnico que pide el certificado (§3.10) se agregan a `Configuracion` en el plan de informes. Toda la web pública lee de aquí; nada queda escrito en plantillas.
 
 ## 4. Flujos
 
