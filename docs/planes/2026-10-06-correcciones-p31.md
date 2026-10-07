@@ -180,7 +180,7 @@ commit_base: 6510a35
 | T1 | hecha (integrada 2f4ad1b) |
 | T2 | hecha (integrada 16cec24) |
 | T3 | hecha (integrada 9ac7257) |
-| T4 | pendiente |
+| T4 | hecha |
 
 ### Corridas
 
@@ -195,6 +195,8 @@ commit_base: 6510a35
 | 2026-10-06 | T4 paso 3: spectacular --validate | 9ac7257 | sin cambios | el YAML no cambia (diff=0) |
 | 2026-10-06 | T4 paso 4: auditor-seguridad | 9ac7257 | 0 bloqueantes, 2 importantes, 1 menor, 3 observaciones | todo a pendientes por decisión del usuario |
 | 2026-10-07 | T4 paso 5: prueba en navegador | 3832274 | OK del usuario | plano (modos, arrastre, ubicar), pestaña Mapa, QR con acentos, visita manual con hora futura, `registrar_revision_demo` fija coordenadas (historial: demo-empleado, "Ubicación fijada por el primer escaneo"); vale también para T9 paso 4 de `cierre-puntos` |
+| 2026-10-07 | TODO (verificador) | 0f43474 | PASA 38/38 | suite completa 516 tests OK; contrato intacto |
+| 2026-10-07 | TODO (verificador-b) | 0f43474 | PASA 38/38 | |
 
 ## Pendientes que deja este plan
 
