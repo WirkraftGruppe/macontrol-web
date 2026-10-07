@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from simple_history.admin import SimpleHistoryAdmin
 
+from apps.accounts.models import User
+
 from .models import Foto, ProductoAplicado, Revision, Visita
 
 CAMPOS_EVIDENCIA = (
@@ -23,7 +25,13 @@ CAMPOS_PLANIFICACION = ("programada_para", "asignada_por")
 CAMPOS_REVISION = ("incidencia_revisada_por", "incidencia_revisada_en")
 
 # Campos que llena el servicio al abrir la visita: nunca se editan a mano.
-CAMPOS_DE_LA_APP = ("incidencia_asignacion", "distancia_m", "incidencia_ubicacion")
+CAMPOS_DE_LA_APP = (
+    "incidencia_asignacion",
+    "distancia_m",
+    "precision_m",
+    "incidencia_ubicacion",
+    "cuenta_como_servicio",
+)
 
 CAMPOS_VISITA = (
     (
@@ -121,6 +129,20 @@ class VisitaAdmin(SimpleHistoryAdmin):
         + CAMPOS_REVISION
     )
     inlines = (RevisionInline,)
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Una visita nueva o pendiente se asigna solo a empleados.
+
+        La regla es de `Visita.clean`; esto solo acota las opciones del campo.
+        """
+        form = super().get_form(request, obj, **kwargs)
+        if "empleado" in form.base_fields and (
+            obj is None or obj.estado == Visita.Estado.PENDIENTE
+        ):
+            form.base_fields["empleado"].queryset = User.objects.filter(
+                rol=User.Rol.EMPLEADO
+            )
+        return form
 
     def get_inlines(self, request, obj):
         """Las revisiones solo se ven fuera de pendiente (en el alta tampoco)."""

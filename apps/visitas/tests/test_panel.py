@@ -11,7 +11,9 @@ from uuid import uuid4
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image
@@ -323,6 +325,22 @@ class AsignarTests(BaseTests):
     def test_proyecto_inexistente_da_404(self):
         self.assertEqual(self.client.get(self._url(999999)).status_code, 404)
 
+    def test_rechaza_sitio_o_cliente_de_baja(self):
+        manana = timezone.localdate() + timedelta(days=1)
+        datos = {"empleado": self.empleado.pk, "programada_para": manana}
+        sitio = self.proyecto.sitio
+        for objeto in (sitio, sitio.cliente):
+            with self.subTest(baja=objeto._meta.model_name):
+                # `update` evita la cascada de la baja del sitio sobre sus puntos.
+                type(objeto).objects.filter(pk=objeto.pk).update(activo=False)
+                respuesta = self.client.post(self._url(), datos)
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertTrue(respuesta.context["form"].non_field_errors())
+                self.assertFalse(Visita.objects.filter(estado=Visita.Estado.PENDIENTE))
+                type(objeto).objects.filter(pk=objeto.pk).update(activo=True)
+        respuesta = self.client.post(self._url(), datos)
+        self.assertEqual(respuesta.status_code, 302)
+
 
 MEDIA_MANUAL = tempfile.mkdtemp(prefix="macontrol-manual-test-")
 
@@ -338,6 +356,11 @@ class ManualTests(BaseTests):
         super().setUp()
         self.url = reverse("panel:visitas:manual", args=[self.proyecto.pk])
         self.producto = Producto.objects.create(nombre_comercial="Cebo")
+        # Las cargas atrasadas son anteriores a hoy: el proyecto ya existía.
+        Proyecto.objects.filter(pk=self.proyecto.pk).update(
+            creado=timezone.now() - timedelta(days=90)
+        )
+        self.proyecto.refresh_from_db()
 
     def _archivos(self):
         return list(Path(MEDIA_MANUAL).rglob("*.jpg"))
@@ -528,6 +551,58 @@ class ManualTests(BaseTests):
             visita.history.first().history_change_reason,
             "Carga manual atrasada confirmada por adm-pv",
         )
+
+    def test_rechaza_fecha_anterior_al_proyecto_y_sitio_de_baja(self):
+        anterior = (self.proyecto.creado - timedelta(days=2)).astimezone()
+        anterior = anterior.strftime("%Y-%m-%dT%H:%M")
+        respuesta = self.client.post(
+            self.url, self._datos(realizada_en=anterior, confirmar_atraso="on")
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("realizada_en", respuesta.context["form"].errors)
+        self.assertEqual(Visita.objects.count(), 1)
+        sitio = self.proyecto.sitio
+        for objeto in (sitio, sitio.cliente):
+            with self.subTest(baja=objeto._meta.model_name):
+                # `update` evita la cascada de la baja del sitio sobre sus puntos.
+                type(objeto).objects.filter(pk=objeto.pk).update(activo=False)
+                respuesta = self.client.post(self.url, self._datos())
+                self.assertEqual(respuesta.status_code, 200)
+                self.assertTrue(respuesta.context["form"].non_field_errors())
+                self.assertEqual(Visita.objects.count(), 1)
+                type(objeto).objects.filter(pk=objeto.pk).update(activo=True)
+        respuesta = self.client.post(self.url, self._datos())
+        self.assertEqual(respuesta.status_code, 302)
+
+    def test_reasignar_deja_motivo_en_historial(self):
+        otro = User.objects.create_user(
+            "emp-reasig", password="x", rol=User.Rol.EMPLEADO
+        )
+        propia = self._pendiente()
+        ajena = self._pendiente()
+        self.client.post(self.url, self._datos(pendiente=ajena.pk, empleado=otro.pk))
+        self.client.post(self.url, self._datos(pendiente=propia.pk))
+        motivo = "Reasignada en carga manual por adm-pv"
+
+        def razones(visita):
+            return [h.history_change_reason for h in visita.history.all()]
+
+        ajena.refresh_from_db()
+        self.assertEqual(ajena.empleado, otro)
+        self.assertIn(motivo, razones(ajena))
+        propia.refresh_from_db()
+        self.assertEqual(propia.estado, Visita.Estado.REALIZADA)
+        self.assertNotIn(motivo, razones(propia))
+
+    def test_pide_los_campos_del_esquema_una_sola_vez(self):
+        with CaptureQueriesContext(connection) as consultas:
+            self.client.get(self.url)
+        campos = [
+            c
+            for c in consultas.captured_queries
+            if "servicios_campoplanilla" in c["sql"]
+        ]
+        self.assertEqual(len(campos), 1, campos)
 
     def test_planilla_invalida_muestra_errores(self):
         CampoPlanilla.objects.create(

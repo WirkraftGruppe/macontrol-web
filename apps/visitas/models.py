@@ -89,11 +89,16 @@ class Visita(models.Model):
     distancia_m = models.PositiveIntegerField(
         "distancia al punto (m)", null=True, blank=True
     )
+    precision_m = models.DecimalField(
+        "precisión (m)", max_digits=7, decimal_places=2, null=True, blank=True
+    )
     incidencia_ubicacion = models.BooleanField("incidencia de ubicación", default=False)
+    # Rol del empleado al abrir la visita: un administrador no cuenta como servicio.
+    cuenta_como_servicio = models.BooleanField("cuenta como servicio", default=True)
     creado = models.DateTimeField("creado", auto_now_add=True)
     actualizado = models.DateTimeField("actualizado", auto_now=True)
 
-    history = HistoricalRecords(excluded_fields=["datos", "distancia_m"])
+    history = HistoricalRecords(excluded_fields=["datos", "distancia_m", "precision_m"])
 
     class Meta:
         verbose_name = "visita"
@@ -124,6 +129,14 @@ class Visita(models.Model):
             and self.revisiones.exists()
         ):
             raise ValidationError("Una visita pendiente no tiene revisiones.")
+        if (
+            self.estado == self.Estado.PENDIENTE
+            and self.empleado_id
+            and self.empleado.es_administrador
+        ):
+            raise ValidationError(
+                {"empleado": "Una visita pendiente no se asigna a un administrador."}
+            )
 
 
 class Revision(models.Model):

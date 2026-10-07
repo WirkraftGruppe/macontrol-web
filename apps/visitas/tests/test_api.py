@@ -467,6 +467,29 @@ class CrearRevisionTests(ApiVisitasBase):
         self.assertFalse(Revision.objects.exists())
 
 
+class RevisionesTests(ApiVisitasBase):
+    def test_409_no_expone_visita_ajena(self):
+        clave = str(uuid4())
+        de_otro = self._abierta(self.otro)
+        primera = self._post(de_otro, api=self._api(self.otro), cliente_uuid=clave)
+        self.assertEqual(primera.status_code, 201, primera.content)
+        propia = self._abierta()
+        for visita in (propia, de_otro):
+            with self.subTest(visita=visita.pk):
+                r = self._post(visita, cliente_uuid=clave)
+                self.assertEqual(r.status_code, 409)
+                self.assertEqual(
+                    r.json(),
+                    {"detalle": "La revisión ya fue registrada.", "campos": {}},
+                )
+        self.assertEqual(Revision.objects.count(), 1)
+        # El dueño sí recibe los ids para reconciliar.
+        r = self._post(de_otro, api=self._api(self.otro), cliente_uuid=clave)
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.data["revision"], primera.data["id"])
+        self.assertEqual(r.data["visita"], de_otro.id)
+
+
 class CerrarVisitaApiTests(ApiVisitasBase):
     def setUp(self):
         super().setUp()

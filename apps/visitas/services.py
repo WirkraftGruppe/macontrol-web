@@ -10,7 +10,6 @@ from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from simple_history.utils import update_change_reason
 
-from apps.accounts.models import User
 from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.sitios.models import PuntoControl
@@ -71,7 +70,11 @@ def _cargar_proyecto(proyecto):
     """Devuelve el proyecto (con sitio y cliente) si existe y está activo."""
     pk = getattr(proyecto, "pk", proyecto)
     try:
-        proyecto = Proyecto.objects.select_related("sitio__cliente").get(pk=pk)
+        proyecto = (
+            Proyecto.objects.select_related("sitio__cliente")
+            .prefetch_related("tipo_servicio__campos")
+            .get(pk=pk)
+        )
     except (Proyecto.DoesNotExist, TypeError, ValueError):
         raise ValidationError({"proyecto": "El proyecto no existe o no está activo."})
     if proyecto.estado != Proyecto.Estado.ACTIVO:
@@ -223,9 +226,10 @@ def abrir_visita(
     """Abre la jornada del empleado en el proyecto; devuelve `(visita, creada)`.
 
     `latitud` y `longitud` (opcionales) verifican la ubicación: la distancia al punto
-    queda en la visita y nunca se rechaza. `precision_m` se acepta y no se guarda.
-    La visita de un administrador no cuenta como servicio: no toma pendientes ni
-    marca `incidencia_asignacion`.
+    queda en la visita y nunca se rechaza. `precision_m` se guarda tal cual. La
+    visita de un administrador no cuenta como servicio (`cuenta_como_servicio` queda
+    en `False`, según su rol al abrir): no toma pendientes ni marca
+    `incidencia_asignacion`.
 
     Es idempotente: si el empleado ya tiene una visita abierta para el proyecto la
     devuelve con `creada=False`. Si tiene una pendiente asignada, la abre. Si no,
@@ -247,6 +251,7 @@ def abrir_visita(
             raise ValidationError(
                 {"proyecto": "El proyecto no existe o no está activo."}
             )
+        # Orden de bloqueo: Proyecto -> Visita -> PuntoControl.
         # Serializa las aperturas del mismo proyecto: no quedan dos abiertas.
         Proyecto.objects.select_for_update(of=("self",)).get(pk=proyecto.pk)
         abierta = (
@@ -265,6 +270,7 @@ def abrir_visita(
         ahora = timezone.now()
         if propia is not None:
             propia.distancia_m = distancia
+            propia.precision_m = precision_m
             propia.incidencia_ubicacion = incidencia_ubicacion
             propia.estado = Visita.Estado.ABIERTA
             propia.abierta_en = ahora
@@ -280,7 +286,9 @@ def abrir_visita(
             abierta_en=ahora,
             incidencia_asignacion=hay_de_otro,
             distancia_m=distancia,
+            precision_m=precision_m,
             incidencia_ubicacion=incidencia_ubicacion,
+            cuenta_como_servicio=not empleado.es_administrador,
         )
         return visita, True
 
@@ -435,12 +443,11 @@ def registrar_revision(
             if existente:
                 raise RevisionDuplicada(existente)
             try:
+                # Se filtra por empleado al bloquear: la fila ajena no se toca.
                 visita_bd = Visita.objects.select_for_update().get(
-                    pk=getattr(visita, "pk", visita)
+                    pk=getattr(visita, "pk", visita), empleado=empleado
                 )
             except (Visita.DoesNotExist, TypeError, ValueError):
-                raise VisitaNoEncontrada()
-            if visita_bd.empleado_id != empleado.pk:
                 raise VisitaNoEncontrada()
             if visita_bd.estado != Visita.Estado.ABIERTA:
                 raise ValidationError({"visita": "La visita no está abierta."})
@@ -505,19 +512,26 @@ def cerrar_visita(
     salvo en el cierre por sistema). `cerrada_en` es la hora de cierre: por defecto
     ahora, o la de la última revisión en el cierre por sistema. Solo la visita más
     reciente del proyecto fija `encargado_actual` y `proxima_visita`, salvo que la
-    visita sea de un administrador (no cuenta como servicio). Cerrar de nuevo por
-    el mismo empleado es idempotente; si la cerró el sistema o un administrador,
-    levanta `VisitaYaCerrada`.
+    visita no cuente como servicio (`cuenta_como_servicio`, fijado al abrir). Bloquea
+    en el orden Proyecto -> Visita. Cerrar de nuevo por el mismo empleado es
+    idempotente; si la cerró el sistema o un administrador, levanta
+    `VisitaYaCerrada`.
     """
     if cierre not in Visita.Cierre.values:
         raise ValidationError({"cierre": "Tipo de cierre inválido."})
     with transaction.atomic():
-        visita_bd = Visita.objects.select_for_update().get(pk=visita.pk)
+        # El proyecto se lee sin bloquear solo para saber cuál bloquear primero;
+        # el estado se evalúa recién con la visita bloqueada.
+        proyecto_id = Visita.objects.values_list("proyecto_id", flat=True).get(
+            pk=visita.pk
+        )
         proyecto = (
             Proyecto.objects.select_for_update(of=("self",))
             .select_related("tipo_servicio")
-            .get(pk=visita_bd.proyecto_id)
+            .prefetch_related("tipo_servicio__campos")
+            .get(pk=proyecto_id)
         )
+        visita_bd = Visita.objects.select_for_update().get(pk=visita.pk)
 
         if cierre == Visita.Cierre.EMPLEADO and (
             quien is None or quien.pk != visita_bd.empleado_id
@@ -583,10 +597,10 @@ def cerrar_visita(
                 cerrada_en__gt=cerrada_en,
             )
             .exclude(pk=visita_bd.pk)
-            .exclude(empleado__rol=User.Rol.ADMINISTRADOR)
+            .filter(cuenta_como_servicio=True)
             .exists()
         )
-        if not hay_posterior and not visita_bd.empleado.es_administrador:
+        if not hay_posterior and visita_bd.cuenta_como_servicio:
             proyecto.encargado_actual = visita_bd.empleado
             if proyecto.frecuencia_dias:
                 proyecto.proxima_visita = timezone.localdate(cerrada_en) + timedelta(
@@ -625,7 +639,10 @@ def registrar_visita_manual(
     la visita, o completa `pendiente` (sin revisiones previas), con
     `origen=manual`. Una carga con más de `ATRASO_MAXIMO_HORAS` de atraso exige
     `confirmar_atraso` y deja la confirmación en el historial; una hora más de
-    `TOLERANCIA_FUTURO` posterior a la actual se rechaza. Todo ocurre en una
+    `TOLERANCIA_FUTURO` posterior a la actual se rechaza, como una fecha anterior a
+    la creación del proyecto (al minuto, la resolución del formulario) y un
+    proyecto cuyo sitio o cliente están de baja. Si la pendiente era de otro
+    empleado, la reasignación queda en el historial. Todo ocurre en una
     transacción; si algo falla no queda nada, tampoco los archivos. Levanta
     `ValidationError` con errores por campo. No debe llamarse dentro de otro
     `atomic`.
@@ -645,6 +662,12 @@ def registrar_visita_manual(
             errores["motivo"] = ["El motivo de la carga manual es obligatorio."]
         if proyecto.estado != Proyecto.Estado.ACTIVO:
             errores["proyecto"] = ["El proyecto no está activo."]
+        elif not (proyecto.sitio.activo and proyecto.sitio.cliente.activo):
+            errores["proyecto"] = ["El sitio o el cliente del proyecto están de baja."]
+        if realizada_en < proyecto.creado.replace(second=0, microsecond=0):
+            errores["realizada_en"] = [
+                "La fecha no puede ser anterior a la creación del proyecto."
+            ]
         if not (empleado.is_active and empleado.es_empleado):
             errores["empleado"] = ["Debe ser un empleado activo."]
         horas = settings.ATRASO_MAXIMO_HORAS
@@ -685,6 +708,10 @@ def registrar_visita_manual(
 
         if visita is None:
             visita = Visita(proyecto=proyecto)
+        if visita.empleado_id not in (None, empleado.pk):
+            visita._change_reason = (
+                f"Reasignada en carga manual por {administrador.get_username()}"
+            )
         visita.empleado = empleado
         visita.origen = Visita.Origen.MANUAL
         visita.motivo_manual = motivo.strip()
@@ -725,18 +752,29 @@ def registrar_visita_manual(
 
 
 def marcar_incidencia_revisada(visita, administrador):
-    """Registra quién y cuándo revisó la incidencia de una visita."""
-    if not visita.incidencia:
-        raise ValidationError("La visita no tiene incidencia para revisar.")
-    if visita.incidencia_revisada_en is not None:
-        raise ValidationError("La incidencia ya fue revisada.")
-    visita.incidencia_revisada_por = administrador
-    visita.incidencia_revisada_en = timezone.now()
-    visita.save(
-        update_fields=[
-            "incidencia_revisada_por",
-            "incidencia_revisada_en",
-            "actualizado",
-        ]
-    )
+    """Registra quién y cuándo revisó la incidencia de una visita; devuelve la copia.
+
+    Vale para la incidencia declarada y para la de ubicación (en la visita o en
+    alguna de sus revisiones): comparten la marca de revisión. Bloquea la fila para
+    que dos administradores no la revisen a la vez.
+    """
+    with transaction.atomic():
+        visita = Visita.objects.select_for_update().get(pk=visita.pk)
+        con_ubicacion = (
+            visita.incidencia_ubicacion
+            or visita.revisiones.filter(incidencia_ubicacion=True).exists()
+        )
+        if not (visita.incidencia or con_ubicacion):
+            raise ValidationError("La visita no tiene incidencia para revisar.")
+        if visita.incidencia_revisada_en is not None:
+            raise ValidationError("La incidencia ya fue revisada.")
+        visita.incidencia_revisada_por = administrador
+        visita.incidencia_revisada_en = timezone.now()
+        visita.save(
+            update_fields=[
+                "incidencia_revisada_por",
+                "incidencia_revisada_en",
+                "actualizado",
+            ]
+        )
     return visita
