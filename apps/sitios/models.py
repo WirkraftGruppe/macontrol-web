@@ -3,6 +3,7 @@
 import logging
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
@@ -16,6 +17,14 @@ from apps.visitas import imagenes
 from . import planos
 
 logger = logging.getLogger(__name__)
+
+MOTIVO_SITIO_DESACTIVADO = "Sitio desactivado"
+MOTIVO_SITIO_REACTIVADO = "Sitio reactivado"
+
+
+def _borrar_archivo_al_confirmar(almacenamiento, nombre):
+    """Borra el archivo del almacenamiento cuando la transacción se confirma."""
+    transaction.on_commit(lambda: almacenamiento.delete(nombre))
 
 
 class Sitio(models.Model):
@@ -50,6 +59,13 @@ class Sitio(models.Model):
     longitud = models.DecimalField(
         "longitud", max_digits=9, decimal_places=6, null=True, blank=True
     )
+    precision_m = models.DecimalField(
+        "precisión del GPS (m)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     sector = models.CharField(
         "sector", max_length=20, choices=Sector.choices, default=Sector.OTRO
     )
@@ -71,6 +87,7 @@ class Sitio(models.Model):
             "telefono_en_sitio",
             "notas",
             "horario_acceso",
+            "precision_m",
         ]
     )
 
@@ -83,7 +100,8 @@ class Sitio(models.Model):
         return f"{self.nombre} ({self.cliente})"
 
     def save(self, *args, **kwargs):
-        """Al crear suma el punto General; al desactivar apaga sus puntos."""
+        """Al crear suma el punto General; al desactivar apaga sus puntos y al
+        reactivar vuelven solo los que apagó el sitio."""
         creado = self._state.adding
         with transaction.atomic():
             super().save(*args, **kwargs)
@@ -92,8 +110,19 @@ class Sitio(models.Model):
             elif not self.activo:
                 for punto in self.puntos.filter(activo=True):
                     punto.activo = False
-                    punto._change_reason = "Sitio desactivado"
+                    punto._change_reason = MOTIVO_SITIO_DESACTIVADO
                     punto.save()
+            else:
+                for punto in self.puntos.filter(activo=False):
+                    ultimo = (
+                        punto.history.order_by("-history_date", "-history_id")
+                        .values_list("history_change_reason", flat=True)
+                        .first()
+                    )
+                    if ultimo == MOTIVO_SITIO_DESACTIVADO:
+                        punto.activo = True
+                        punto._change_reason = MOTIVO_SITIO_REACTIVADO
+                        punto.save()
 
 
 def ruta_plano(instancia, nombre):
@@ -134,6 +163,13 @@ class Plano(models.Model):
 
     def save(self, *args, **kwargs):
         nuevo = self._sin_confirmar()
+        anterior = None
+        if self.pk:
+            anterior = (
+                Plano.objects.filter(pk=self.pk)
+                .values_list("imagen", flat=True)
+                .first()
+            )
         if nuevo:
             procesado = getattr(self, "_procesado", None)
             self._procesado = None
@@ -151,6 +187,8 @@ class Plano(models.Model):
                 except Exception:  # noqa: BLE001
                     logger.exception("No se pudo borrar el plano huérfano.")
             raise
+        if anterior and anterior != self.imagen.name:
+            _borrar_archivo_al_confirmar(self.imagen.storage, anterior)
 
 
 @receiver(post_delete, sender=Plano)
@@ -201,9 +239,27 @@ class PuntoControl(models.Model):
     longitud = models.DecimalField(
         "longitud", max_digits=9, decimal_places=6, null=True, blank=True
     )
+    precision_m = models.DecimalField(
+        "precisión del GPS (m)",
+        max_digits=7,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
     foto = models.ImageField("foto", upload_to=ruta_foto_punto, null=True, blank=True)
+    ubicacion_fijada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="ubicación fijada por",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    ubicacion_fijada_en = models.DateTimeField(
+        "ubicación fijada en", null=True, blank=True
+    )
 
-    history = HistoricalRecords()
+    history = HistoricalRecords(excluded_fields=["precision_m"])
 
     class Meta:
         verbose_name = "punto de control"
@@ -224,6 +280,14 @@ class PuntoControl(models.Model):
 
     def save(self, *args, **kwargs):
         """Una foto nueva se procesa como las de visitas (JPEG sin metadatos)."""
+        anterior = None
+        campos = kwargs.get("update_fields")
+        if self.pk and (campos is None or "foto" in campos):
+            anterior = (
+                PuntoControl.objects.filter(pk=self.pk)
+                .values_list("foto", flat=True)
+                .first()
+            )
         nuevo = bool(self.foto) and not self.foto._committed
         if nuevo:
             contenido = imagenes.procesar_imagen(self.foto)
@@ -238,6 +302,8 @@ class PuntoControl(models.Model):
                 except Exception:  # noqa: BLE001
                     logger.exception("No se pudo borrar la foto huérfana.")
             raise
+        if anterior and anterior != (self.foto.name or ""):
+            _borrar_archivo_al_confirmar(self.foto.storage, anterior)
 
 
 @receiver(post_delete, sender=PuntoControl)

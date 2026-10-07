@@ -1,5 +1,10 @@
 """Vistas de la API de Sitios: resolver QR, imagen del plano y puntos del empleado."""
 
+from django.core.exceptions import (
+    RequestDataTooBig,
+    TooManyFieldsSent,
+    TooManyFilesSent,
+)
 from django.core.exceptions import ValidationError as ErrorDeValidacion
 from django.db.models import F
 from django.http import FileResponse
@@ -17,6 +22,7 @@ from rest_framework.views import APIView
 from apps.accounts.permisos import EsAdministrador, EsEmpleado
 from apps.proyectos.models import Proyecto
 from apps.visitas.models import Visita
+from apps.visitas.serializers import MAX_BYTES_FOTO
 
 from . import services
 from .estado import estados_de_puntos
@@ -33,6 +39,8 @@ from .serializers import (
 )
 
 ESTADOS_CON_TRABAJO = (Visita.Estado.PENDIENTE, Visita.Estado.ABIERTA)
+MAX_BYTES_PEDIDO_PUNTO = MAX_BYTES_FOTO + 1024 * 1024
+MENSAJE_PEDIDO_GRANDE = "El pedido supera el tamaño permitido."
 
 
 def _datos_plano(punto):
@@ -256,7 +264,7 @@ class AltaSitioView(APIView):
 
     permission_classes = [EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "crear_visita"
+    throttle_scope = "alta_campo"
 
     @extend_schema(
         request=AltaSitioSerializer,
@@ -294,7 +302,7 @@ class AltaPuntoView(APIView):
 
     permission_classes = [EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "crear_visita"
+    throttle_scope = "alta_campo"
     parser_classes = [MultiPartParser, JSONParser]
 
     @extend_schema(
@@ -304,14 +312,26 @@ class AltaPuntoView(APIView):
         description=(
             "Solo administradores. Sin coordenadas el punto nace sin ubicación; con "
             "ellas, `precision_m` es obligatoria y no puede superar "
-            "`PRECISION_MAXIMA_M`. La foto es opcional (multipart)."
+            "`PRECISION_MAXIMA_M`. La foto es opcional (multipart). Un pedido "
+            "mayor que una foto más 1 MiB, o con demasiados campos, da 400."
         ),
     )
     def post(self, request, pk):
         sitio = Sitio.objects.select_related("cliente").filter(pk=pk).first()
         if sitio is None:
             raise NotFound("El sitio no existe.")
-        serializer = AltaPuntoSerializer(data=request.data)
+        try:
+            largo = int(request.META.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            largo = 0
+        # Se corta antes de leer el cuerpo: Django escribe los archivos a disco.
+        if largo > MAX_BYTES_PEDIDO_PUNTO:
+            raise ValidationError(MENSAJE_PEDIDO_GRANDE)
+        try:
+            datos_pedido = request.data
+        except (RequestDataTooBig, TooManyFieldsSent, TooManyFilesSent):
+            raise ValidationError(MENSAJE_PEDIDO_GRANDE)
+        serializer = AltaPuntoSerializer(data=datos_pedido)
         serializer.is_valid(raise_exception=True)
         try:
             punto = services.crear_punto_en_campo(
@@ -329,7 +349,7 @@ class UbicacionPuntoView(APIView):
 
     permission_classes = [EsAdministrador]
     throttle_classes = [ScopedRateThrottle]
-    throttle_scope = "crear_visita"
+    throttle_scope = "alta_campo"
 
     @extend_schema(
         request=UbicacionPuntoSerializer,

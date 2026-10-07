@@ -94,7 +94,7 @@ class MiPuntoSerializer(serializers.Serializer):
 class MisPuntosParametrosSerializer(serializers.Serializer):
     """Parámetros de consulta de `GET me/puntos/`."""
 
-    sitio = serializers.IntegerField(required=False, min_value=1)
+    sitio = serializers.IntegerField(required=False, min_value=1, max_value=2**31 - 1)
 
 
 class _PrecisionMixin(serializers.Serializer):
