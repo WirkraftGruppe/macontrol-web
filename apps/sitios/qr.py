@@ -1,11 +1,14 @@
 """Código QR de un punto de control: contenido y PNG con sitio, punto y sector."""
 
+import logging
 from io import BytesIO
 
 import segno
 from django.conf import settings
 from django.urls import reverse
 from PIL import Image, ImageDraw, ImageFont
+
+logger = logging.getLogger(__name__)
 
 # Barlow (OFL) trae los glifos acentuados que la fuente por defecto de Pillow no tiene.
 RUTA_FUENTE = settings.BASE_DIR / "static/fonts/barlow-latin-600-normal.woff2"
@@ -30,7 +33,11 @@ def png_qr(punto):
     lienzo = Image.new("RGB", (qr.width, qr.height + 18 + 36 * len(lineas)), "white")
     lienzo.paste(qr, (0, 0))
     dibujo = ImageDraw.Draw(lienzo)
-    fuente = ImageFont.truetype(RUTA_FUENTE, 22)
+    try:
+        fuente = ImageFont.truetype(RUTA_FUENTE, 22)
+    except OSError:
+        logger.warning("No se pudo cargar la fuente del QR; se usa la de Pillow.")
+        fuente = ImageFont.load_default(size=22)
     for fila, texto in enumerate(lineas):
         ancho = dibujo.textlength(texto, font=fuente)
         dibujo.text(
