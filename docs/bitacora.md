@@ -1,17 +1,15 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: correcciones-p31
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| puntos-control | plan/puntos-control | 4 cerrada (verificación TODO 104/105, FALLA formal aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
-| cierre-puntos | plan/cierre-puntos | 3 cerrada (T1–T11 hechas; TODO 79/80 en 6d4f7e3, FALLA formal de congelado.sh aceptado) | merge conjunto a `main` | sesión 2026-10-07 cerrada |
-| correcciones-p31 | plan/correcciones-p31 | 2 cerrada (T1–T4 hechas; TODO 38/38 PASA en 0f43474) | merge conjunto a `main`, por decisión del usuario | sesión 2026-10-07 cerrada |
+| — | main | — | elegir el próximo plan | sesión 2026-10-07 cerrada |
 
-Siguiente: el usuario decide el merge de los tres planes a `main` (`plan/correcciones-p31` contiene a `plan/cierre-puntos` hasta 9728a27 y este a `plan/puntos-control`; `plan/cierre-puntos` suma 3 commits `registro:` propios, bc4cc32 y 6d4f7e3). Al fusionar se copian las `### Decisiones` de los tres planes a `docs/decisiones.md`. **Antes de desplegar**: P-correcciones-p31-2 (la migración `sitios/0007` pierde el rastro de las propuestas aplicadas). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`.
+Siguiente: `puntos-control`, `cierre-puntos` y `correcciones-p31` están en `main` (1f85911). **Antes de desplegar**: P-correcciones-p31-2 (la migración `sitios/0007` pierde el rastro de las propuestas aplicadas) y P-correcciones-p31-1 (el primer escaneo fija coordenadas aunque haya incidencia de ubicación). Después, plan `panel-cierre` (`pendientes.py --etiqueta panel-cierre`), plan de despliegue (`--etiqueta despliegue`) y, antes de la etapa Expo, `--etiqueta expo`.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
@@ -26,7 +24,8 @@ Hecho:
 - OK del usuario en navegador (2026-10-07), que vale también para el paso 4 de T9 de `cierre-puntos`.
 - Verificación TODO: `correcciones-p31` 38/38 PASA (verificador y verificador-b); `cierre-puntos` 79/80 en ambos, con el único FALLA formal de congelado.sh aceptado.
 - Incidente: el 2026-10-07 la raíz amaneció en `plan/cierre-puntos` (checkout manual); se volvió a `plan/correcciones-p31` sin pérdidas.
-Sigue: merge de los tres planes a `main` por decisión del usuario.
+- Fusión en `main` (1f85911) por decisión del usuario: decisiones de los tres planes copiadas a `docs/decisiones.md` (23 líneas); en `main`, check, makemigrations, ruff y suite completa (516 tests) OK.
+Sigue: elegir el próximo plan; P-correcciones-p31-1 y -2 antes de desplegar.
 
 ### 2026-10-06 — Plan `puntos-control`: olas 2 a 4 integradas, verificación final
 Hecho:
