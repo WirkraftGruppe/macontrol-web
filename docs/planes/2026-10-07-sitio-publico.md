@@ -317,17 +317,20 @@ commit_base: 45fb49c
 ### Estado de subtareas
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
 | T4 | pendiente |
 | T5 | pendiente |
 | T6 | pendiente |
-| T7 | pendiente |
+| T7 | hecha |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-07 | T2 | 8285189 | verificador: 17/17 PASA; verificador-b: 17/17 PASA | ambos marcan CONTRATO MODIFICADO (9ac7c9d, aprobado por el usuario); el bloque de T2 no cambió |
+| 2026-10-07 | T1, T7 | 04e4410 | verificador: 21/21 PASA; verificador-b: 18/18 PASA | CONTRATO MODIFICADO (9ac7c9d); T1 490/900, T7 491/600; direcciones del fixture entregadas por el usuario en el pedido |
+| 2026-10-07 | T3 (integración ola 1) | 9007d07 | worktree-integrar: makemigrations --check y test --keepdb OK (538 tests) | T1 (con T7) y T2 integradas |
 
 ## Pendientes que deja este plan
 ### Problemas
