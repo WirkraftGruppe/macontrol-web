@@ -293,14 +293,13 @@ class PuntoPosicion(_AccionPunto):
         punto = self.get_object()
         form = PosicionForm(request.POST)
         if not form.is_valid():
-            return JsonResponse({"error": "Posición inválida."}, status=400)
+            error = (
+                "Plano inválido." if "plano" in form.errors else "Posición inválida."
+            )
+            return JsonResponse({"error": error}, status=400)
         x, y = form.cleaned_data["x"], form.cleaned_data["y"]
         if "plano" in request.POST:
-            plano = (
-                Plano.objects.filter(pk=request.POST["plano"]).first()
-                if request.POST["plano"].isdigit()
-                else None
-            )
+            plano = form.cleaned_data["plano"]
             try:
                 if plano is None:
                     raise ValidationError("Plano inexistente.")

@@ -262,6 +262,21 @@ class PlanoPanelTests(_BaseAdminTests):
         self.assertEqual(self.general.plano, self.plano)
         self.assertIsNone(self.general.x)
 
+    def test_plano_invalido_o_inactivo_da_400(self):
+        inactivo = Plano.objects.create(
+            sitio=self.sitio,
+            nombre="Viejo",
+            imagen=SimpleUploadedFile("v.png", _png()),
+            activo=False,
+        )
+        suelto = PuntoControl.objects.create(sitio=self.sitio, nombre="Suelto")
+        url = reverse("panel:sitios:punto_posicion", args=[suelto.pk])
+        for plano in ("²", "٣", inactivo.pk, ""):
+            r = self.client.post(url, {"plano": plano, "x": "0.9", "y": "0.9"})
+            self.assertEqual(r.status_code, 400, plano)
+        suelto.refresh_from_db()
+        self.assertIsNone(suelto.plano)
+
     def test_subir_pdf_crea_plano_y_rechaza_otro_formato(self):
         r = self._subir(_pdf(), "plano.pdf")
         self.assertEqual(r.status_code, 302)

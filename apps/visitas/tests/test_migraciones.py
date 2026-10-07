@@ -10,9 +10,15 @@ DESPUES = ("visitas", "0008_ubicacion_y_administrador")
 
 
 def _destino(visitas):
-    """Última migración de cada app, salvo `visitas`, que se lleva a `visitas`."""
+    """Destino de migración: `visitas` al pedido, `sitios` fija y el resto a su hoja.
+
+    `sitios` queda en `0006_puntocontrol_foto`: su hoja
+    (`0007_quitar_ubicacion_propuesta`) depende de `visitas.0008`, así que llevarla
+    a la hoja haría inalcanzable el estado "antes" (`visitas.0004`) de estos tests.
+    """
     hojas = MigrationExecutor(connection).loader.graph.leaf_nodes()
-    return [visitas if nodo[0] == "visitas" else nodo for nodo in hojas]
+    fijas = {"visitas": visitas, "sitios": ("sitios", "0006_puntocontrol_foto")}
+    return [fijas.get(nodo[0], nodo) for nodo in hojas]
 
 
 def _migrar(destino):
