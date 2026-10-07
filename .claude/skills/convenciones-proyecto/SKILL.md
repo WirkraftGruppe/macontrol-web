@@ -145,6 +145,10 @@ Para ver las rutas de una app: `grep -n "path(" apps/<app>/api_urls.py apps/<app
 - `ProductoAplicado.producto` siempre apunta al catálogo; la API no acepta nombres libres de producto.
 - Un `Certificado` emitido no se edita; una corrección emite uno nuevo con `reemplaza_a`.
 - El sitio público no tiene formularios que envíen correo ni "pedir presupuesto"; el contacto es el teléfono y WhatsApp.
+- El panel no edita `Visita.datos`. Si algún día lo hace, los datos pasan por `validar_datos` (`apps/visitas/planillas.py`) contra el esquema de la visita, igual que la carga desde la app.
+
+## Panel
+- Todo listado del panel y su parcial de HTMX llevan `id="listado"` en el contenedor que se reemplaza: los filtros y la paginación apuntan a ese id.
 
 ## Variables de entorno
 - Requeridas: `SECRET_KEY`, `DJANGO_ENV`, `DATABASE_URL`
