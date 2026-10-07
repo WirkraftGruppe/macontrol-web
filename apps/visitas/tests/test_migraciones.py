@@ -171,6 +171,10 @@ class MigracionRevisionesTests(TransactionTestCase):
         )
 
         # Con los modelos reales: no se reutiliza y, si se abriera, no se cierra.
+        # Los modelos reales exigen todas las apps en su hoja (sitios incluida).
+        MigrationExecutor(connection).migrate(
+            MigrationExecutor(connection).loader.graph.leaf_nodes()
+        )
         from apps.accounts.models import User
         from apps.visitas.models import Visita as VisitaReal
         from apps.visitas.services import abrir_visita
