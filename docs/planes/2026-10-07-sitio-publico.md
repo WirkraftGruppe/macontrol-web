@@ -358,6 +358,8 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
 ## Registro de verificación
 commit_base: 45fb49c
 
+Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 9ac7c9d, 5c01419 y 56ea85f."
+
 ### Estado de subtareas
 | Tarea | Estado |
 |---|---|
@@ -390,7 +392,7 @@ commit_base: 45fb49c
 - P-sitio-publico-3 [menor] `cargar_demo` no carga `contenido_inicial` (está en `apps/panel`, que toca la sesión paralela) — destino: `robustez-panel`.
 - P-sitio-publico-4 [observación] Faltan datos de la empresa: WhatsApp, horario, handle real de Instagram, autorización de uso de logos de clientes, nombre exacto del cliente "YPF / Casa Rucery [?]" (cargado como "YPF") y fotos de estaciones cebaderas y sellado de techos — destino: `empresa`.
 - P-sitio-publico-5 [menor] `docs/02-diseno.md:77` sigue diciendo "12 tarjetas" de servicios y "8 tarjetas" de sectores — se actualiza al fusionar.
-- P-sitio-publico-6 [importante] `loaddata contenido_inicial` sobreescribe `nombre`, `descripcion` y `activo` de los `TipoServicio` pk 1-9. Además falla con IntegrityError si una base tiene alguno de esos slugs con otro pk. En producción se carga una sola vez, sobre una base vacía — destino: `despliegue`.
+- P-sitio-publico-6 [importante] Defecto: `contenido_inicial.json` incluye los 9 `servicios.tiposervicio`, así que `loaddata` pisa `nombre`, `descripcion` y `activo` de los pk 1-9 y falla con IntegrityError si un slug existe con otro pk. El fixture no debe incluir `TipoServicio`: `PaginaServicio` enlaza al tipo por slug (decisión del usuario 2026-10-08).
 - P-sitio-publico-7 [importante] `Configuracion` no lleva todavía los datos legales, las habilitaciones ni el director técnico que pide `informes.Certificado` (§3.10) — destino: `informes`.
 - P-sitio-publico-8 [menor] `Configuracion.obtener()` crea la fila pk=1 en un GET público si falta (la home escribe en la base la primera vez) — destino: `robustez-datos`.
 - P-sitio-publico-9 [observación] `404.html` y `500.html` son globales: también se ven en 404 de `/panel/` y `/admin/` (autónomas, sin datos) — destino: `robustez-panel`.
@@ -399,6 +401,14 @@ commit_base: 45fb49c
 - P-sitio-publico-12 [menor] El admin de Django (`apps/web/admin.py`) no usa los formularios del panel: un superusuario puede subir logo o portada con EXIF/GPS, un GIF renombrado, dejar archivos huérfanos o guardar `redes[].url` con `javascript:`. Corrección: `form=` en los ModelAdmin (con `tipo` en `PaginaServicioAdmin`) o `unregister`, y `validators=[validar_redes]` en el `JSONField`, con un test por admin (auditoría N1) — destino: `robustez-panel`.
 - P-sitio-publico-13 [menor] `clean_redes` acepta URLs con usuario y contraseña (`https://facebook.com@evil.com/x`); rechazar `urlsplit(url).username/password` y agregar los casos al test (auditoría N2). Hoy ninguna plantilla muestra `redes` — destino: `robustez-panel`.
 - P-sitio-publico-14 [menor] `reprocesar_imagen` decodifica la imagen completa antes de cualquier tope (solo `MAX_IMAGE_PIXELS` ≈ 89 M): un PNG uniforme de 9400×9400 de menos de 1 MB reserva unos 350 MB; además el límite de 2 MB ahora mide la salida y no la subida. Validar bytes y píxeles antes de `load()` y acotar con `thumbnail` (auditoría N3, plausible según la memoria del contenedor) — destino: `despliegue`.
+
+### Etiquetas
+- etiqueta: P-sitio-publico-1 → sitio-cierre
+- etiqueta: P-sitio-publico-2 → sitio-cierre
+- etiqueta: P-sitio-publico-6 → sitio-cierre
+- etiqueta: P-sitio-publico-7 → sitio-cierre
+- etiqueta: P-sitio-publico-12 → sitio-cierre
+- etiqueta: P-sitio-publico-4 → empresa
 
 ### Decisiones
 - 2026-10-07 — El sitio publica 9 páginas de servicio, una por `TipoServicio` del fixture — confirmado por el usuario; aplica la decisión del 2026-10-02 al sitio — reemplaza a: "12 tarjetas numeradas" de `docs/02-diseno.md:77`
@@ -417,6 +427,9 @@ commit_base: 45fb49c
 - 2026-10-07 — T1 se parte en T1 (modelos, admin, migración, tests) y T7 (fixture) — T1 excedió su presupuesto (1036/900) y no se sube; aplica la decisión del 2026-10-04 — elección del usuario — reemplaza a: (nada)
 - 2026-10-07 — `sectores` del fixture solo lleva lo que la Carta asocia explícitamente (MIPU → gastronómicos y comercios; edificios → torres y condominios) — la Carta no relaciona servicios con sectores; no se inventa contenido — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — Se agrega T8 para corregir H1-H4 de `auditor-seguridad` (imágenes subidas con EXIF, nombre original, formato real sin restringir, redes sin esquema): EXIF/GPS se publicaría al servir `media/` — elección del usuario — reemplaza a: (nada)
+- 2026-10-08 — El fixture de contenido no incluye `TipoServicio`; `PaginaServicio` se enlaza al tipo por slug (P-sitio-publico-6 es un defecto, no una decisión) — `loaddata` no debe pisar ni depender de los pk de `servicios` — decisión del usuario — reemplaza a: 2026-10-07 "contenido_inicial.json repite los 9 TipoServicio"
+- 2026-10-08 — `media/publico/` se sirve en abierto (helper de Django en desarrollo, proxy en producción) solo para logos de clientes y portadas de servicio; las fotos de visitas y demás archivos siguen por vistas autenticadas — resuelve P-sitio-publico-1 sin exponer fotos — decisión del usuario — reemplaza a: (nada)
+- 2026-10-08 — P-sitio-publico-7 (datos legales en `Configuracion`) y los textos institucionales fijos de las plantillas se resuelven juntos — ambos son contenido de empresa que hoy no está en la base — decisión del usuario — reemplaza a: (nada; condiciona la decisión 2026-10-07 de textos fijos en plantillas)
 - 2026-10-08 — T8 se parte en T8 (reprocesado sin EXIF y formato real) y T9 (nombres uuid, borrado del anterior, redes https) — T8 excedió su presupuesto (288/250) y no se sube — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — T8 no reutiliza `apps.visitas.imagenes.procesar_imagen` sino un módulo propio en `apps/web` — la sesión paralela modifica `apps/visitas` y el logo necesita conservar el canal alfa — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — El test de recorrido lo escribe T5, no el principal — necesita todas las páginas públicas, que son de T5 — reemplaza a: (nada) — decidida por Claude, revisable
