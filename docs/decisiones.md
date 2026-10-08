@@ -124,3 +124,13 @@ Una decisión no se edita: se agrega otra que la reemplaza y la nombra por su fe
 - 2026-10-07 — Un punto cuyas coordenadas fijó un escaneo muestra el aviso "punto fijado por escaneo" en su ficha, sin bloquear nada — P-auditoria-p31-1, triage del usuario — reemplaza a: (nada)
 - 2026-10-07 — La etiqueta `panel-cierre` desaparece: sus abiertos se cierran o pasan a `robustez-datos` y `robustez-panel`; no habrá plan `panel-cierre` — triage del usuario — reemplaza a: (nada)
 - 2026-10-07 — Las convenciones del panel van en una sección `## Panel` nueva de `convenciones-proyecto` (no existía) — P-panel-3 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — Al reactivar un sitio se reactivan solo los puntos que apagó el sitio (última fila histórica "Sitio desactivado") — P-puntos-control-27, decisión del usuario al planificar — reemplaza a: (nada)
+- 2026-10-07 — `Visita.cuenta_como_servicio` guarda el rol al abrir; `visitas.0009` lo llena con el rol actual del empleado — P-cierre-puntos-10, decisión del usuario al planificar — reemplaza a: (nada)
+- 2026-10-07 — El orden de bloqueo único es Proyecto → Visita → PuntoControl — P-puntos-control-9 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — Las altas de campo (sitio, punto, ubicación) usan el cupo `alta_campo` de 300/h — P-cierre-puntos-11 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — Un pedido de alta de punto demasiado grande responde 400, no 413, para no cambiar el contrato actual de esa vista — P-cierre-puntos-5 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — El aviso "punto fijado por escaneo" va en la pestaña de puntos de la ficha del sitio y en la edición del punto, porque no existe una ficha propia del punto; los campos nuevos no se exponen en la API — P-auditoria-p31-1 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — P-cierre-puntos-2 (etiqueta `robustez-panel`) entra en este plan — el usuario lo pidió en forma explícita — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-08 — P-robustez-datos-8 y -9 (hallazgos importantes de la auditoría final) se fusionan abiertos y se corrigen en el próximo plan, con la etiqueta `robustez-panel` — decisión del usuario al cerrar — reemplaza a: (nada)
+- 2026-10-08 — Una incidencia (general o de ubicación) se marca como revisada solo con la visita realizada — hallazgo del auditor de la ola 1, decisión del usuario — reemplaza a: (nada)
+- 2026-10-08 — El plan se amplía con T8, T9 y T10 para corregir los hallazgos de la auditoría de la ola 1; `visitas.0009` y `sitios.0008` se editan porque nacieron en este plan sin desplegar — decisión del usuario — reemplaza a: (nada)
