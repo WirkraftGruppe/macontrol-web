@@ -347,7 +347,7 @@ commit_base: 07191c7
 - 2026-10-07 — Las altas de campo (sitio, punto, ubicación) usan el cupo `alta_campo` de 300/h — P-cierre-puntos-11 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — Un pedido de alta de punto demasiado grande responde 400, no 413, para no cambiar el contrato actual de esa vista — P-cierre-puntos-5 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — El aviso "punto fijado por escaneo" va en la pestaña de puntos de la ficha del sitio y en la edición del punto, porque no existe una ficha propia del punto; los campos nuevos no se exponen en la API — P-auditoria-p31-1 — reemplaza a: (nada) — decidida por Claude, revisable
-- 2026-10-07 — P-cierre-puntos-2 (etiqueta `robustez-panel`) entra en este plan porque el usuario lo pidió en forma explícita — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-07 — P-cierre-puntos-2 (etiqueta `robustez-panel`) entra en este plan — el usuario lo pidió en forma explícita — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 - cierra: P-cierre-puntos-13 — T2 (servicio, filtro `ubicacion`, distancia y botón en la ficha) y T5 (contador sin administradores)
