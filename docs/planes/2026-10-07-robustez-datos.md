@@ -308,7 +308,7 @@ commit_base: 07191c7
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T7 | pendiente |
+| T7 | hecha |
 | T8 | hecha |
 | T9 | hecha |
 | T10 | hecha |
