@@ -144,6 +144,14 @@ class UbicacionTests(SinArchivosMixin, TestCase):
         self.assertEqual(self.punto.latitud, LEJOS["latitud"])
         self.assertEqual(self.punto.longitud, LEJOS["longitud"])
 
+    def test_escaneo_registra_quien_y_cuando_fijo(self):
+        antes = timezone.now()
+        self._revisar(precision_m=Decimal("8.5"))
+        self.punto.refresh_from_db()
+        self.assertEqual(self.punto.ubicacion_fijada_por, self.empleado)
+        self.assertGreaterEqual(self.punto.ubicacion_fijada_en, antes)
+        self.assertLessEqual(self.punto.ubicacion_fijada_en, timezone.now())
+
     def test_empleado_fija_coordenadas_del_punto(self):
         revision = self._revisar(precision_m=Decimal("8.5"))
         self.punto.refresh_from_db()

@@ -311,9 +311,18 @@ def _fijar_ubicacion_por_escaneo(punto, revision, usuario):
         return
     bloqueado.latitud = revision.latitud
     bloqueado.longitud = revision.longitud
+    bloqueado.ubicacion_fijada_por = usuario
+    bloqueado.ubicacion_fijada_en = timezone.now()
     bloqueado._history_user = usuario
     bloqueado._change_reason = MOTIVO_UBICACION_FIJADA
-    bloqueado.save(update_fields=["latitud", "longitud"])
+    bloqueado.save(
+        update_fields=[
+            "latitud",
+            "longitud",
+            "ubicacion_fijada_por",
+            "ubicacion_fijada_en",
+        ]
+    )
 
 
 def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
