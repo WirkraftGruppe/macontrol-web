@@ -368,8 +368,8 @@ commit_base: 45fb49c
 | T5 | hecha |
 | T6 | pendiente |
 | T7 | hecha |
-| T8 | pendiente |
-| T9 | pendiente |
+| T8 | hecha |
+| T9 | hecha |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -379,6 +379,9 @@ commit_base: 45fb49c
 | 2026-10-07 | T3 (integración ola 1) | 9007d07 | worktree-integrar: makemigrations --check y test --keepdb OK (538 tests) | T1 (con T7) y T2 integradas |
 | 2026-10-07 | T4 | 2ed1344 | verificador: 9/9 PASA; verificador-b: 9/9 PASA | CONTRATO MODIFICADO (9ac7c9d); 385/400; las 6 vistas exigen administrador |
 | 2026-10-07 | T5 | e02ac4a | verificador: 19/19 PASA (+4 comprobaciones); verificador-b: 19/19 PASA | CONTRATO MODIFICADO (9ac7c9d); 740/900; qr sin consultas; textos fijos literales de la Carta |
+| 2026-10-08 | auditor-seguridad (T6 paso 3) | 7d49537 | sin bloqueantes; H1 importante, H2 menor, H3-H4 observación | el usuario eligió corregir en T8 (luego partida en T8 y T9) |
+| 2026-10-08 | T8, T9 | 173e689 | verificador: 12/12 PASA; verificador-b: 12/12 PASA | CONTRATO MODIFICADO (9ac7c9d, 5c01419, 56ea85f); T8 176/250, T9 115/200; código idéntico a la versión previa a partir |
+| 2026-10-08 | reauditoría T8, T9 | 173e689 | H1-H4 cerrados en el panel; 3 hallazgos nuevos de severidad baja (N1-N3, P-12 a P-14) | fuzzing de 4000 mutaciones sin excepciones sin manejar |
 
 ## Pendientes que deja este plan
 ### Problemas
@@ -393,6 +396,9 @@ commit_base: 45fb49c
 - P-sitio-publico-9 [observación] `404.html` y `500.html` son globales: también se ven en 404 de `/panel/` y `/admin/` (autónomas, sin datos) — destino: `robustez-panel`.
 - P-sitio-publico-10 [observación] Las portadas estáticas por servicio (`PORTADA_POR_SLUG` en `apps/web/views.py`) son una asignación provisoria: 5 fotos para 9 servicios; murciélagos y tanques usan la del hero. Las portadas subidas se muestran con `width=1200 height=675` fijos — destino: `empresa`.
 - P-sitio-publico-11 [observación] Los cuatro pasos de "Cómo trabajamos" muestran solo el título (la Carta no trae descripción por paso) — destino: `empresa`.
+- P-sitio-publico-12 [menor] El admin de Django (`apps/web/admin.py`) no usa los formularios del panel: un superusuario puede subir logo o portada con EXIF/GPS, un GIF renombrado, dejar archivos huérfanos o guardar `redes[].url` con `javascript:`. Corrección: `form=` en los ModelAdmin (con `tipo` en `PaginaServicioAdmin`) o `unregister`, y `validators=[validar_redes]` en el `JSONField`, con un test por admin (auditoría N1) — destino: `robustez-panel`.
+- P-sitio-publico-13 [menor] `clean_redes` acepta URLs con usuario y contraseña (`https://facebook.com@evil.com/x`); rechazar `urlsplit(url).username/password` y agregar los casos al test (auditoría N2). Hoy ninguna plantilla muestra `redes` — destino: `robustez-panel`.
+- P-sitio-publico-14 [menor] `reprocesar_imagen` decodifica la imagen completa antes de cualquier tope (solo `MAX_IMAGE_PIXELS` ≈ 89 M): un PNG uniforme de 9400×9400 de menos de 1 MB reserva unos 350 MB; además el límite de 2 MB ahora mide la salida y no la subida. Validar bytes y píxeles antes de `load()` y acotar con `thumbnail` (auditoría N3, plausible según la memoria del contenedor) — destino: `despliegue`.
 
 ### Decisiones
 - 2026-10-07 — El sitio publica 9 páginas de servicio, una por `TipoServicio` del fixture — confirmado por el usuario; aplica la decisión del 2026-10-02 al sitio — reemplaza a: "12 tarjetas numeradas" de `docs/02-diseno.md:77`
