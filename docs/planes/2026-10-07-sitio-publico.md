@@ -321,9 +321,31 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 200 --subtarea T9`
 
+### T10 — Contraste de tarjetas en sección amarilla y dimensiones del logo (defecto de la prueba en el navegador)
+- **Ola**: 2 (después de integrar T8 y T9)
+- **Depende de**: T8, T9
+- **Puede tocar**: `static/css/web.css`, `templates/web/base_web.html` (solo el `<img>` del logo), `apps/web/tests/test_diseno.py` (solo agregar los dos métodos de abajo)
+- **No puede tocar**: `docs/planes/`, `config/`, `templates/base.html`, `templates/panel/**`, `apps/web/templates/**`, `apps/web/*.py`, `static/img/**`, el resto de `apps/web/tests/`
+- **Skill a leer antes**: `docs/02-diseno.md:9-32` y `:65-73` (tarjeta invertida: hijas con fondo `--bg`)
+- **Worktree**: sí
+- **Ruta**: delegada (implementador)
+- **Presupuesto**: 80 líneas agregadas
+- **Qué hacer**:
+  - Lighthouse móvil sobre la home (2026-10-08) dio `color-contrast` 1.07:1 en los 12 `.tarjeta-titulo` de `#sectores`: `.seccion-amarilla` hereda `color: var(--on-brand)` a tarjetas con fondo `--surface`.
+  - Agregar `.seccion-amarilla .tarjeta { background: var(--bg); color: var(--text); }`, como `.bloque-invertido .tarjeta`.
+  - En `base_web.html`, dar al `<img>` del logo `width` y `height` con las proporciones reales de `static/img/logo.png`.
+  - Los tests fallan antes del cambio.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_diseno.DisenoWebTests.test_tarjetas_de_seccion_amarilla_usan_texto_claro_sobre_fondo_oscuro --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_diseno.DisenoWebTests.test_logo_declara_width_y_height --keepdb`
+  - `[grep-1]` `grep -n "\.seccion-amarilla \.tarjeta" static/css/web.css`
+  - `[grep-0]` `grep -n 'style="' templates/web/base_web.html`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 80 --subtarea T10`
+
 ### T6 — Integración de la ola 2, auditoría y verificación TODO (principal)
 - **Ola**: 2 (después de verificar T4 y T5)
-- **Depende de**: T4, T5, T8, T9
+- **Depende de**: T4, T5, T8, T9, T10
 - **Pasos**:
   1. `verificador` y `verificador-b` sobre T4 y T5 (`refutador` si discrepan). Revisar `cambios.sh` de cada worktree.
   2. Integrar desde la raíz del worktree del plan:
@@ -342,6 +364,7 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
   - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T4: integra sitio-publico-T4"`
   - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T5: integra sitio-publico-T5"`
   - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T8: integra sitio-publico-T8"`
+  - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T10: integra sitio-publico-T10"`
   - `[grep-0]` `grep -rln "<form" templates/web/ apps/web/templates/`
   - `[grep-0]` `grep -rin "presupuesto" templates/web/ apps/web/templates/ apps/web/fixtures/`
   - `[existe]` `static/fonts/OFL.txt`
@@ -372,6 +395,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 | T7 | hecha |
 | T8 | hecha |
 | T9 | hecha |
+| T10 | pendiente |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -427,6 +451,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 - 2026-10-07 — T1 se parte en T1 (modelos, admin, migración, tests) y T7 (fixture) — T1 excedió su presupuesto (1036/900) y no se sube; aplica la decisión del 2026-10-04 — elección del usuario — reemplaza a: (nada)
 - 2026-10-07 — `sectores` del fixture solo lleva lo que la Carta asocia explícitamente (MIPU → gastronómicos y comercios; edificios → torres y condominios) — la Carta no relaciona servicios con sectores; no se inventa contenido — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — Se agrega T8 para corregir H1-H4 de `auditor-seguridad` (imágenes subidas con EXIF, nombre original, formato real sin restringir, redes sin esquema): EXIF/GPS se publicaría al servir `media/` — elección del usuario — reemplaza a: (nada)
+- 2026-10-08 — Se agrega T10 para corregir el contraste de los 12 sectores (1.07:1) y las dimensiones del logo hallados en Lighthouse móvil; el merge espera esa corrección — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — El fixture de contenido no incluye `TipoServicio`; `PaginaServicio` se enlaza al tipo por slug (P-sitio-publico-6 es un defecto, no una decisión) — `loaddata` no debe pisar ni depender de los pk de `servicios` — decisión del usuario — reemplaza a: 2026-10-07 "contenido_inicial.json repite los 9 TipoServicio"
 - 2026-10-08 — `media/publico/` se sirve en abierto (helper de Django en desarrollo, proxy en producción) solo para logos de clientes y portadas de servicio; las fotos de visitas y demás archivos siguen por vistas autenticadas — resuelve P-sitio-publico-1 sin exponer fotos — decisión del usuario — reemplaza a: (nada)
 - 2026-10-08 — P-sitio-publico-7 (datos legales en `Configuracion`) y los textos institucionales fijos de las plantillas se resuelven juntos — ambos son contenido de empresa que hoy no está en la base — decisión del usuario — reemplaza a: (nada; condiciona la decisión 2026-10-07 de textos fijos en plantillas)
