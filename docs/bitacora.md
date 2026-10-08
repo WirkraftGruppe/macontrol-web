@@ -7,13 +7,20 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | elegir el próximo plan; candidatos: `robustez-panel` (P-robustez-datos-8 y -9) y `sitio-cierre` (P-sitio-publico-1, -2, -6, -7, -12) | sesiones 2026-10-08 cerradas (robustez-datos y sitio-publico) |
+| — | main | — | arrancar robustez-panel | sesión 2026-10-08 cerrada (merge de ajustes visuales de sitio-publico) |
 
 Siguiente: 79 abiertos: `despliegue` 24, `robustez-panel` 14, `expo` 8, `empresa` 6, `sitio-cierre` 5, `informes` 2, `saneamiento` 1, y 21 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12; P-sitio-publico-3, -5, -8 a -11 y -13 a -17), a etiquetar en el próximo triage. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-08 — merge de robustez-datos y sitio-publico en main
+Hecho:
+- `robustez-datos` (55ec1db) y `sitio-publico` (25e188a) ya estaban fusionados con sus decisiones copiadas; la rama `plan/robustez-datos` ya no existía.
+- Se fusionaron en `main` con `--no-ff` los ajustes visuales del usuario posteriores al cierre de `sitio-publico` (80f8ed7, 6bd79a2) en bb788ca, sin conflictos. No había decisiones nuevas que copiar.
+- En `main` (bb788ca): check, makemigrations --check, ruff y 613 tests OK. Sin push. `pruebanueva.json` queda sin versionar en la raíz y no se tocó.
+Sigue: arrancar `robustez-panel`.
 
 ### 2026-10-08 — Plan `sitio-publico`: sitio público, fusión en `main`
 Hecho:
