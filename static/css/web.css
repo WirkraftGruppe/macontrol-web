@@ -9,11 +9,13 @@
  * Botones:      .btn .btn-primario .btn-secundario .enlace
  * Componentes:  .tarjeta .tarjeta-numero .tarjeta-titulo .tarjeta-texto .tarjeta-enlace
  *               .bloque-invertido (con .tarjeta hijas) .etiqueta .etiqueta-ok .etiqueta-aviso
- *               .contacto .contacto-telefono .contacto-acciones .franja .aviso .migas
- *               .campo-imagen .respaldos .respaldo .pasos .paso .logos-clientes .logo-cliente
+ *               .contacto .contacto-info .contacto-titulo .contacto-datos .contacto-dato .contacto-llamar
+ *               .contacto-telefono .contacto-acciones .contacto-compacto .franja .aviso .migas
+ *               .campo-imagen .respaldos .respaldo .respaldo-titulo .respaldo-texto
+ *               .pasos .paso .paso-titulo .paso-texto .logos-clientes .logo-cliente .beneficios
  * Grillas:      .grilla .grilla-2 .grilla-3 .grilla-4
  * Home:         .hero .hero-texto .hero-imagen .hero-botones .banda-edilicia .banda-edilicia-imagen
- *               .dos-columnas .circulos .circulo
+ *               .dos-columnas .valores .valor .valor-indice .valor-titulo .valor-texto
  * Servicio:     .servicio .servicio-cabecera .servicio-principal .servicio-lateral
  *               .metodos .faq (details/summary) .relacionados
  * Responsive: a 900 px las grillas pasan a 1 columna y el lateral baja.
@@ -99,12 +101,13 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 
 /* Navegación */
 .barra-nav { position: sticky; top: 0; z-index: 50; background: var(--bg); border-bottom: 1px solid var(--border); }
-.barra-nav-interna { display: flex; align-items: center; gap: 28px; min-height: 76px; }
-.nav-logo img { height: 44px; width: auto; }
-.nav-enlaces { display: flex; align-items: center; gap: 24px; margin-left: auto; }
-.nav-enlaces a { color: var(--text); font-weight: 500; }
+.barra-nav-interna { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 32px; min-height: 84px; }
+.nav-logo { display: flex; align-items: center; }
+.nav-logo img { height: 52px; width: auto; }
+.nav-enlaces { display: flex; align-items: center; justify-content: center; gap: 36px; }
+.nav-enlaces a { color: var(--text); font-size: 15px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
 .nav-enlaces a:hover { color: var(--brand); text-decoration: none; }
-.nav-telefono { margin-left: 8px; }
+.nav-telefono { min-height: 46px; padding: 0 22px; font-size: 15px; }
 .nav-movil { display: none; position: relative; }
 .nav-movil summary {
   list-style: none; cursor: pointer; padding: 10px 14px; min-height: 44px;
@@ -119,6 +122,8 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 }
 .nav-movil-panel a { color: var(--text); padding: 12px; border-radius: 4px; }
 .nav-movil-panel a:hover { background: var(--surface-2); text-decoration: none; }
+.nav-movil-titulo { display: block; margin: 8px 12px 4px; padding-top: 12px; border-top: 1px solid var(--border); color: var(--brand); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; }
+.nav-movil-servicio { font-size: 14px; color: var(--text-muted); padding: 8px 12px; }
 
 /* Pie */
 .pie { background: var(--surface); border-top: 1px solid var(--border); padding: 56px 0 32px; }
@@ -160,13 +165,27 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 }
 .etiqueta-ok { background: #12281b; color: #6fd39a; border-color: var(--ok); }
 .etiqueta-aviso { background: var(--brand-tint); color: var(--brand); border-color: var(--on-brand-muted); }
-.contacto { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 28px; }
+.contacto { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 48px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 48px; }
+.contacto-titulo { font-size: 40px; font-weight: 800; text-transform: uppercase; line-height: 1; margin-bottom: 14px; }
+.contacto-texto { max-width: 520px; margin-bottom: 24px; }
+.contacto-datos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; margin: 0; }
+.contacto-dato dt { color: var(--brand); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }
+.contacto-dato dd { margin: 0; color: var(--text); font-size: 16px; }
+.contacto-llamar { display: flex; flex-direction: column; align-items: stretch; text-align: center; gap: 14px; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 6px; padding: 32px; }
+.contacto-llamar .eyebrow { margin-bottom: 0; }
 .contacto-telefono {
-  display: block; margin: 8px 0 20px; color: var(--text);
-  font-family: var(--fuente-display); font-size: 56px; font-weight: 800; line-height: 1;
+  display: block; color: var(--text);
+  font-family: var(--fuente-display); font-size: 52px; font-weight: 800; line-height: 1;
 }
 .contacto-telefono:hover { color: var(--brand); text-decoration: none; }
-.contacto-acciones { display: flex; flex-wrap: wrap; gap: 12px; }
+.contacto-acciones { display: flex; flex-direction: column; gap: 10px; }
+.contacto-compacto { display: flex; flex-direction: column; gap: 12px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 26px; }
+.contacto-compacto .eyebrow { margin-bottom: 0; }
+.contacto-compacto-texto { font-size: 14px; margin: 0; }
+.contacto-telefono-compacto { font-size: 40px; }
+.beneficios { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+.beneficios li { padding: 14px 0 14px 28px; border-top: 1px solid var(--border); position: relative; }
+.beneficios li::before { content: ""; position: absolute; left: 0; top: 21px; width: 12px; height: 12px; background: var(--brand); transform: rotate(45deg); }
 .franja { height: 14px; background: repeating-linear-gradient(135deg, var(--brand) 0 18px, var(--bg) 18px 36px); }
 .aviso { background: var(--brand-tint); border: 1px solid var(--on-brand-muted); border-radius: 6px; padding: 18px 20px; }
 .aviso p:last-child { margin-bottom: 0; }
@@ -174,12 +193,18 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .migas li + li::before { content: "/"; margin-right: 8px; }
 .campo-imagen { border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
 .campo-imagen img { width: 100%; object-fit: cover; }
-.respaldos { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface); }
-.respaldo { padding: 22px 24px; border-left: 1px solid var(--border); font-weight: 600; }
-.respaldo:first-child { border-left: 0; }
-.pasos { display: grid; gap: 16px; counter-reset: paso; }
-.paso { counter-increment: paso; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px 24px 20px 72px; position: relative; }
-.paso::before { content: counter(paso, decimal-leading-zero); position: absolute; left: 22px; top: 16px; font-family: var(--fuente-display); font-size: 32px; font-weight: 700; color: var(--brand); }
+.respaldos-seccion { padding: 48px 0 8px; }
+.respaldos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.respaldo { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 24px 24px 24px 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.respaldo::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--brand); }
+.respaldo-titulo { font-family: var(--fuente-display); font-size: 26px; font-weight: 700; line-height: 1.05; text-transform: uppercase; color: var(--text); }
+.respaldo-texto { font-size: 14px; line-height: 1.45; color: var(--text-muted); }
+.pasos { display: grid; gap: 0; counter-reset: paso; list-style: none; margin: 0; padding: 0; }
+.paso { counter-increment: paso; display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 24px; align-items: start; padding: 26px 0; border-top: 1px solid var(--border); }
+.paso:last-child { border-bottom: 1px solid var(--border); }
+.paso::before { content: counter(paso, decimal-leading-zero); font-family: var(--fuente-display); font-size: 44px; font-weight: 800; line-height: 1; color: var(--brand); }
+.paso-titulo { font-family: var(--fuente-texto); font-size: 22px; font-weight: 600; line-height: 1.2; margin-bottom: 6px; }
+.paso-texto { font-size: 15px; line-height: 1.5; color: var(--text-muted); margin: 0; }
 .logos-clientes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; list-style: none; padding: 0; margin: 0; }
 .logo-cliente { display: flex; align-items: center; justify-content: center; min-height: 88px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; text-align: center; font-family: var(--fuente-display); font-size: 20px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
 .logo-cliente img { max-height: 56px; width: auto; }
@@ -200,7 +225,14 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .banda-edilicia { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
 .banda-edilicia-imagen { border-radius: 8px; overflow: hidden; }
 .banda-edilicia-imagen img { width: 100%; max-height: 520px; object-fit: cover; }
-.dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+.dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
+.valores { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 32px; }
+.valor { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 32px 24px 24px; overflow: hidden; }
+.valor::before { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 4px; background: var(--brand); }
+.valor-indice { display: block; margin-bottom: 18px; color: var(--brand); font-family: var(--fuente-display); font-size: 14px; font-weight: 700; letter-spacing: 0.12em; }
+.valor-titulo { font-family: var(--fuente-display); font-size: 32px; font-weight: 800; text-transform: uppercase; line-height: 1; margin-bottom: 10px; }
+.valor-texto { font-size: 15px; line-height: 1.5; color: var(--text-muted); margin: 0; }
+/* Compatibilidad: .circulos/.circulo quedan por si alguna plantilla los usa */
 .circulos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
 .circulo { text-align: center; }
 .circulo::before { content: ""; display: block; width: 72px; height: 72px; margin: 0 auto 16px; border: 3px solid var(--brand); border-radius: 50%; }
@@ -225,12 +257,18 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
   h2 { font-size: 40px; }
   .seccion { padding: 56px 0; }
   .nav-enlaces { display: none; }
+  .barra-nav-interna { grid-template-columns: auto 1fr auto auto; gap: 12px; min-height: 72px; }
+  .nav-logo img { height: 40px; }
   .nav-movil { display: block; }
-  .nav-telefono { margin-left: auto; }
-  .grilla-2, .grilla-3, .grilla-4, .pie-grilla, .circulos, .metodos,
+  .nav-telefono { grid-column: 3; padding: 0 14px; }
+  .grilla-2, .grilla-3, .grilla-4, .pie-grilla, .circulos, .valores, .metodos, .contacto, .contacto-datos, .beneficios,
   .hero .contenedor, .banda-edilicia, .dos-columnas, .servicio { grid-template-columns: 1fr; }
-  .respaldos { grid-template-columns: 1fr 1fr; }
-  .respaldo:nth-child(odd) { border-left: 0; }
+  .contacto { padding: 24px; gap: 28px; }
+  .contacto-titulo { font-size: 32px; }
+  .respaldos { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .respaldo { padding: 18px 16px 18px 20px; }
+  .paso { grid-template-columns: 48px minmax(0, 1fr); gap: 16px; }
+  .paso::before { font-size: 34px; }
   .servicio-lateral { position: static; }
-  .contacto-telefono { font-size: 44px; }
+  .contacto-telefono { font-size: 40px; }
 }
