@@ -16,9 +16,8 @@
     </div>
   </div>
 </section>
-<div class="franja" aria-hidden="true"></div>
 
-<section id="respaldos" aria-label="Respaldos de la empresa">
+<section id="respaldos" class="respaldos-seccion" aria-label="Respaldos de la empresa">
   {% include "web/paginas/_respaldos.html" %}
 </section>
 
@@ -32,7 +31,6 @@
       {% for pagina in paginas_nav %}
       <a class="tarjeta-enlace" href="{{ pagina.get_absolute_url }}">
         <div class="tarjeta">
-          <span class="tarjeta-numero">{{ forloop.counter|stringformat:"02d" }}</span>
           <h3 class="tarjeta-titulo">{{ pagina.tipo.nombre }}</h3>
           <p class="tarjeta-texto">{{ pagina.resumen }}</p>
         </div>
@@ -78,10 +76,30 @@
       <p class="texto-suave">Manejamos el control de plagas de forma integral: no termina al finalizar el trabajo, continuamos con el monitoreo determinando la efectividad del tratamiento empleado y conociendo la satisfacción de los clientes.</p>
     </div>
     <ol class="pasos">
-      <li class="paso"><h3 class="tarjeta-titulo">Monitoreo</h3></li>
-      <li class="paso"><h3 class="tarjeta-titulo">Detección</h3></li>
-      <li class="paso"><h3 class="tarjeta-titulo">Exclusión</h3></li>
-      <li class="paso"><h3 class="tarjeta-titulo">Prevención</h3></li>
+      <li class="paso">
+        <div>
+          <h3 class="paso-titulo">Monitoreo</h3>
+          <p class="paso-texto">Análisis y mapeo minucioso de la situación de la plaga: especie, cantidad poblacional estimada, estadio de madurez, sitios donde se aloja y daños producidos.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <div>
+          <h3 class="paso-titulo">Detección</h3>
+          <p class="paso-texto">Plan de trabajo específico según demanda, lugar y necesidad del cliente, con productos regulados y aprobados por ANMAT y SENASA.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <div>
+          <h3 class="paso-titulo">Exclusión</h3>
+          <p class="paso-texto">Aplicación por operarios calificados, con métodos estandarizados, protocolos de seguridad y equipamiento de vanguardia.</p>
+        </div>
+      </li>
+      <li class="paso">
+        <div>
+          <h3 class="paso-titulo">Prevención</h3>
+          <p class="paso-texto">Seguimiento posterior para determinar la efectividad del tratamiento y conocer la satisfacción del cliente. El trabajo no termina al finalizar la aplicación.</p>
+        </div>
+      </li>
     </ol>
   </div>
 </section>
@@ -92,10 +110,19 @@
       <span class="eyebrow">La empresa</span>
       <h2>Nuestros valores</h2>
     </div>
-    <div class="circulos">
-      <div class="circulo"><h3>Bioseguridad</h3></div>
-      <div class="circulo"><h3>Vanguardia</h3></div>
-      <div class="circulo"><h3>Compromiso</h3></div>
+    <div class="valores">
+      <div class="valor">
+        <h3 class="valor-titulo">Bioseguridad</h3>
+        <p class="valor-texto">Productos domisanitarios regulados y aprobados por ANMAT y SENASA, aplicados con protocolos de seguridad y seguro de trabajo.</p>
+      </div>
+      <div class="valor">
+        <h3 class="valor-titulo">Vanguardia</h3>
+        <p class="valor-texto">Herramientas, maquinarias y productos de vanguardia y alta calidad, con un equipo de profesionales en constante actualización.</p>
+      </div>
+      <div class="valor">
+        <h3 class="valor-titulo">Compromiso</h3>
+        <p class="valor-texto">El trabajo no termina al finalizar la aplicación: continuamos con el monitoreo hasta verificar la efectividad del tratamiento.</p>
+      </div>
     </div>
     <p class="centrado"><a class="enlace" href="{% url 'web:empresa' %}">Conocer la empresa</a></p>
   </div>

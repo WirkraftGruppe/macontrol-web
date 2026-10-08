@@ -17,19 +17,25 @@
   {% url 'web:contacto' as url_contacto %}
   <header class="barra-nav">
     <div class="contenedor barra-nav-interna">
-      <a class="nav-logo" href="{{ url_inicio|default:'/' }}"><img src="{% static 'img/logo.png' %}" alt="MAControl" width="44" height="44"></a>
+      <a class="nav-logo" href="{{ url_inicio|default:'/' }}"><img src="{% static 'img/logo.png' %}" alt="MAControl" width="206" height="52"></a>
       <nav class="nav-enlaces" aria-label="Principal">
-        {% for pagina in paginas_nav %}<a href="{{ pagina.get_absolute_url }}">{{ pagina.tipo.nombre }}</a>{% endfor %}
+        <a href="{{ url_inicio|default:'/' }}#servicios">Servicios</a>
+        <a href="{{ url_inicio|default:'/' }}#sectores">Sectores</a>
+        <a href="{{ url_inicio|default:'/' }}#como-trabajamos">Cómo trabajamos</a>
         {% if url_empresa %}<a href="{{ url_empresa }}">Empresa</a>{% endif %}
         {% if url_contacto %}<a href="{{ url_contacto }}">Contacto</a>{% endif %}
       </nav>
-      {% if config.telefono_href %}<a class="btn btn-primario nav-telefono" href="{{ config.telefono_href }}">Llamar {{ config.telefono }}</a>{% endif %}
+      {% if config.telefono_href %}<a class="btn btn-primario nav-telefono" href="{{ config.telefono_href }}">{{ config.telefono }}</a>{% endif %}
       <details class="nav-movil">
         <summary>Menú</summary>
         <nav class="nav-movil-panel" aria-label="Menú móvil">
-          {% for pagina in paginas_nav %}<a href="{{ pagina.get_absolute_url }}">{{ pagina.tipo.nombre }}</a>{% endfor %}
+          <a href="{{ url_inicio|default:'/' }}#servicios">Servicios</a>
+          <a href="{{ url_inicio|default:'/' }}#sectores">Sectores</a>
+          <a href="{{ url_inicio|default:'/' }}#como-trabajamos">Cómo trabajamos</a>
           {% if url_empresa %}<a href="{{ url_empresa }}">Empresa</a>{% endif %}
           {% if url_contacto %}<a href="{{ url_contacto }}">Contacto</a>{% endif %}
+          <span class="nav-movil-titulo">Servicios</span>
+          {% for pagina in paginas_nav %}<a class="nav-movil-servicio" href="{{ pagina.get_absolute_url }}">{{ pagina.tipo.nombre }}</a>{% endfor %}
         </nav>
       </details>
     </div>

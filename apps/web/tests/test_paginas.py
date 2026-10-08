@@ -45,7 +45,8 @@ class HomeTests(ConContenido):
             ),
             9,
         )
-        self.assertContains(respuesta, "Director técnico matriculado")
+        self.assertContains(respuesta, "Director técnico")
+        self.assertContains(respuesta, "Matriculado")
         for nombre in (
             "Bioseguridad",
             "Vanguardia",
