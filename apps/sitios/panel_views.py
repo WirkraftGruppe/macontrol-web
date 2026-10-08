@@ -245,8 +245,12 @@ class PuntoDesactivar(_PuntoMixin, DetailView):
 
     def post(self, request, pk):
         punto = self.get_object()
-        services.desactivar_punto(punto)
-        messages.success(request, f"Se desactivó el punto {punto.nombre}.")
+        try:
+            services.desactivar_punto(punto)
+        except ValidationError as error:
+            messages.error(request, " ".join(error.messages))
+        else:
+            messages.success(request, f"Se desactivó el punto {punto.nombre}.")
         return redirect(_url_ficha(punto.sitio_id, "puntos"))
 
 

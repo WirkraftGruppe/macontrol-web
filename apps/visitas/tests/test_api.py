@@ -2,6 +2,7 @@ import json
 import shutil
 import tempfile
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from io import BytesIO
 from types import SimpleNamespace
 from unittest import mock
@@ -269,6 +270,17 @@ class AbrirVisitaTests(ApiVisitasBase):
         ajena.refresh_from_db()
         self.assertEqual(ajena.estado, Visita.Estado.PENDIENTE)
 
+    def test_precision_fuera_de_rango_da_400(self):
+        for precision in ("100000", "99999.9"):
+            r = self._abrir(precision_m=precision)
+            with self.subTest(precision=precision):
+                self.assertEqual(r.status_code, 400 if precision == "100000" else 201)
+                if r.status_code == 400:
+                    self.assertIn("precision_m", r.data["campos"])
+                else:
+                    visita = Visita.objects.get(pk=r.data["id"])
+                    self.assertEqual(visita.precision_m, Decimal("99999.90"))
+
     def test_proyecto_inexistente_o_pausado_da_400(self):
         r = self._abrir(proyecto=999999)
         self.assertEqual(r.status_code, 400, r.content)
@@ -465,6 +477,29 @@ class CrearRevisionTests(ApiVisitasBase):
         r = self._enviar(fotos=[jpeg_chico() for _ in range(101)])
         self.assertEqual(r.status_code, 413)
         self.assertFalse(Revision.objects.exists())
+
+
+class RevisionesTests(ApiVisitasBase):
+    def test_409_no_expone_visita_ajena(self):
+        clave = str(uuid4())
+        de_otro = self._abierta(self.otro)
+        primera = self._post(de_otro, api=self._api(self.otro), cliente_uuid=clave)
+        self.assertEqual(primera.status_code, 201, primera.content)
+        propia = self._abierta()
+        for visita in (propia, de_otro):
+            with self.subTest(visita=visita.pk):
+                r = self._post(visita, cliente_uuid=clave)
+                self.assertEqual(r.status_code, 409)
+                self.assertEqual(
+                    r.json(),
+                    {"detalle": "La revisión ya fue registrada.", "campos": {}},
+                )
+        self.assertEqual(Revision.objects.count(), 1)
+        # El dueño sí recibe los ids para reconciliar.
+        r = self._post(de_otro, api=self._api(self.otro), cliente_uuid=clave)
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(r.data["revision"], primera.data["id"])
+        self.assertEqual(r.data["visita"], de_otro.id)
 
 
 class CerrarVisitaApiTests(ApiVisitasBase):

@@ -2,6 +2,8 @@ import datetime
 import io
 import tempfile
 import uuid
+from decimal import Decimal
+from unittest import mock
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -9,11 +11,18 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 from rest_framework.test import APIClient
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import CampoPlanilla, TipoServicio
+from apps.sitios.api_views import (
+    MAX_BYTES_PEDIDO_PUNTO,
+    AltaPuntoView,
+    AltaSitioView,
+    UbicacionPuntoView,
+)
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Visita
 
@@ -429,6 +438,14 @@ class MisPuntosTests(TestCase):
                 r = self.api.get(self.URL, {"sitio": valor})
                 self.assertEqual(r.status_code, 400, r.content)
 
+    def test_sitio_fuera_de_rango_da_400(self):
+        self._visita(self.sitio, self.empleado)
+        for valor in (2**31, 2**63):
+            with self.subTest(valor=valor):
+                r = self.api.get(self.URL, {"sitio": valor})
+                self.assertEqual(r.status_code, 400, r.content)
+        self.assertEqual(self.api.get(self.URL, {"sitio": 2**31 - 1}).status_code, 200)
+
     def test_realizada_o_sitio_inactivo_no_cuentan_y_solo_empleados(self):
         self._visita(self.sitio, self.empleado, Visita.Estado.REALIZADA)
         self._visita(self.sitio2, self.empleado)
@@ -582,6 +599,21 @@ class ModoCampoTests(TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertEqual(PuntoControl.objects.count(), 1)
 
+    def test_altas_usan_cupo_alta_campo(self):
+        sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        punto = sitio.puntos.get()
+        # El cupo se lee al instanciar el throttle: se baja a 2 por hora.
+        cupo = {"alta_campo": "2/hour"}
+        with mock.patch.dict(ScopedRateThrottle.THROTTLE_RATES, cupo):
+            self.assertEqual(self._sitio().status_code, 201)
+            r = self.api.post(self._url_punto(sitio), {"nombre": "X"}, format="json")
+            self.assertEqual(r.status_code, 201)
+            datos = {"latitud": "-36.1", "longitud": "-57.8", "precision_m": 5}
+            r = self.api.post(self._url_ubicacion(punto), datos, format="json")
+            self.assertEqual(r.status_code, 429, r.content)
+        vistas = (AltaSitioView, AltaPuntoView, UbicacionPuntoView)
+        self.assertEqual([v.throttle_scope for v in vistas], ["alta_campo"] * 3)
+
     def test_administrador_resuelve_qr_y_ve_mis_puntos(self):
         sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
         punto = sitio.puntos.get()
@@ -628,3 +660,75 @@ class ModoCampoTests(TestCase):
         visita = Visita.objects.get(pk=r.json()["id"])
         self.assertEqual(visita.empleado, self.admin)
         self.assertEqual(visita.estado, Visita.Estado.ABIERTA)
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
+class AltaPuntoTests(TestCase):
+    """Alta de puntos y sitios en campo: tamaño del pedido y precisión guardada."""
+
+    def setUp(self):
+        cache.clear()
+        self.cliente = Cliente.objects.create(razon_social="ACME")
+        self.admin = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.sitio = Sitio.objects.create(cliente=self.cliente, nombre="Planta")
+        self.api = APIClient()
+        self.api.force_authenticate(self.admin)
+        self.url = reverse("api:sitios:alta-punto", kwargs={"pk": self.sitio.pk})
+
+    def test_foto_enorme_da_400_sin_500(self):
+        enorme = SimpleUploadedFile(
+            "f.jpg", b"0" * (MAX_BYTES_PEDIDO_PUNTO + 1), "image/jpeg"
+        )
+        r = self.api.post(self.url, {"nombre": "X", "foto": enorme}, format="multipart")
+        self.assertEqual(r.status_code, 400, r.content[:200])
+        self.assertIn("detalle", r.json())
+        self.assertEqual(self.sitio.puntos.count(), 1)
+
+    def test_demasiados_campos_da_400(self):
+        datos = {f"campo{i}": "x" for i in range(1100)}
+        r = self.api.post(self.url, {"nombre": "X", **datos}, format="multipart")
+        self.assertEqual(r.status_code, 400, r.content[:200])
+        self.assertIn("detalle", r.json())
+        self.assertEqual(self.sitio.puntos.count(), 1)
+
+    def test_alta_guarda_precision_m(self):
+        r = self.api.post(
+            self.url,
+            {
+                "nombre": "Techo",
+                "latitud": "-36.1",
+                "longitud": "-57.8",
+                "precision_m": 12.5,
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        punto = PuntoControl.objects.get(pk=r.json()["id"])
+        self.assertEqual(punto.precision_m, Decimal("12.50"))
+        r = self.api.post(self.url, {"nombre": "Sin GPS"}, format="json")
+        self.assertIsNone(PuntoControl.objects.get(pk=r.json()["id"]).precision_m)
+        r = self.api.post(
+            reverse("api:sitios:ubicacion-punto", kwargs={"pk": punto.pk}),
+            {"latitud": "-36.2", "longitud": "-57.9", "precision_m": 7},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200, r.content)
+        punto.refresh_from_db()
+        self.assertEqual(punto.precision_m, Decimal("7.00"))
+        r = self.api.post(
+            reverse("api:sitios:alta-sitio"),
+            {
+                "cliente": self.cliente.id,
+                "nombre": "Galpón",
+                "latitud": "-36.1",
+                "longitud": "-57.8",
+                "precision_m": 33.25,
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(
+            Sitio.objects.get(pk=r.json()["id"]).precision_m, Decimal("33.25")
+        )

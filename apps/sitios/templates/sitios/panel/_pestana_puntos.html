@@ -8,7 +8,7 @@
     <tbody>
       {% for punto in puntos %}
       <tr>
-        <td>{{ punto.nombre }}{% if not punto.activo %} <span class="etiqueta-estado etiqueta-neutral">Inactivo</span>{% endif %}</td>
+        <td>{{ punto.nombre }}{% if not punto.activo %} <span class="etiqueta-estado etiqueta-neutral">Inactivo</span>{% endif %}{% if punto.ubicacion_fijada_en %} <span class="etiqueta-estado etiqueta-neutral" title="{{ punto.ubicacion_fijada_en|date:'d/m/Y H:i' }}">Punto fijado por escaneo</span>{% endif %}</td>
         <td>{{ punto.sector|default:"—" }}</td>
         <td>{% if punto.activo %}<span class="etiqueta-estado etiqueta-{{ punto.estado_clase }}">{{ punto.estado_etiqueta }}</span>{% else %}—{% endif %}</td>
         <td>{{ punto.qr_impreso_el|date:"d/m/Y"|default:"No impreso" }}</td>

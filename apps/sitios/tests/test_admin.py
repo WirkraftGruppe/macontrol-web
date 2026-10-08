@@ -6,7 +6,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.sitios import services
-from apps.sitios.models import PuntoControl, Sitio
+from apps.sitios.models import Plano, PuntoControl, Sitio
 
 
 class SitioAdminTests(TestCase):
@@ -113,6 +113,20 @@ class PuntoControlAdminTests(TestCase):
         self.punto.refresh_from_db()
         self.assertEqual(self.punto.qr_codigo, anterior)
 
+    def test_sitio_y_foto_de_solo_lectura_al_editar(self):
+        modelo_admin = admin.site._registry[PuntoControl]
+        request = RequestFactory().get(self.url)
+        request.user = self.administrador
+        alta = modelo_admin.get_readonly_fields(request)
+        self.assertNotIn("sitio", alta)
+        self.assertNotIn("foto", alta)
+        edicion = modelo_admin.get_readonly_fields(request, self.punto)
+        for campo in ("sitio", "foto", "qr_codigo", "ubicacion_fijada_en"):
+            self.assertIn(campo, edicion)
+        self.client.force_login(self.administrador)
+        url = reverse("admin:sitios_puntocontrol_change", args=[self.punto.pk])
+        self.assertEqual(self.client.get(url).status_code, 200)
+
     def test_regenerar_qr_pide_confirmacion(self):
         self.client.force_login(self.administrador)
         anterior = self.punto.qr_codigo
@@ -142,3 +156,23 @@ class PuntoControlAdminTests(TestCase):
         self.punto.refresh_from_db()
         self.assertEqual(self.punto.qr_codigo, nuevo)
         self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class PlanoAdminTests(TestCase):
+    def test_sitio_de_solo_lectura_al_editar(self):
+        administrador = User.objects.create_superuser(
+            username="root", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        sitio = Sitio.objects.create(
+            cliente=Cliente.objects.create(razon_social="ACME"), nombre="Planta 1"
+        )
+        plano = Plano(sitio=sitio, nombre="PB", imagen="p.png")
+        plano.ancho_px = plano.alto_px = 10
+        Plano.objects.bulk_create([plano])
+        modelo_admin = admin.site._registry[Plano]
+        request = RequestFactory().get("/")
+        request.user = administrador
+        self.assertNotIn("sitio", modelo_admin.get_readonly_fields(request))
+        edicion = modelo_admin.get_readonly_fields(request, Plano.objects.get())
+        self.assertIn("sitio", edicion)
+        self.assertIn("ancho_px", edicion)

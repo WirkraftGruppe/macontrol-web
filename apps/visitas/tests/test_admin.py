@@ -3,6 +3,7 @@ import tempfile
 from io import BytesIO
 
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
@@ -265,3 +266,34 @@ class AdminPendienteTests(TestCase):
         self.assertIsNone(pendiente.cerrada_en)
         self.assertEqual(pendiente.datos, {})
         self.assertFalse(pendiente.revisiones.exists())
+
+    def test_pendiente_no_asignable_a_administrador(self):
+        administrador = User.objects.create_superuser(
+            username="root-asig", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        base = crear_visita()
+        empleado = base.empleado
+        # El modelo lo rechaza aunque no pase por el admin.
+        base.empleado = administrador
+        with self.assertRaises(ValidationError) as ctx:
+            base.full_clean()
+        self.assertIn("empleado", ctx.exception.message_dict)
+        # El admin ofrece solo empleados al crear una pendiente.
+        self.client.force_login(administrador)
+        url = reverse("admin:visitas_visita_add")
+        form = self.client.get(url).context["adminform"].form
+        self.assertEqual(set(form.fields["empleado"].queryset), {empleado})
+        antes = Visita.objects.count()
+        datos = {
+            "proyecto": base.proyecto_id,
+            "empleado": administrador.pk,
+            "origen": Visita.Origen.APP,
+        }
+        respuesta = self.client.post(url, datos)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("empleado", respuesta.context["adminform"].form.errors)
+        self.assertEqual(Visita.objects.count(), antes)
+        # Con un empleado el mismo alta funciona.
+        respuesta = self.client.post(url, {**datos, "empleado": empleado.pk})
+        self.assertEqual(respuesta.status_code, 302, respuesta.content[:300])
+        self.assertEqual(Visita.objects.count(), antes + 1)

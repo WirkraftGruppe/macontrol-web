@@ -13,4 +13,4 @@ django-csp>=4.0,<5
 drf-spectacular>=0.28,<0.31
 drf-spectacular-sidecar
 jsonschema
-pypdfium2
+pypdfium2>=5.14,<6

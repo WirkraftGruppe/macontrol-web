@@ -251,6 +251,26 @@ class QuitarPropuestaTests(TransactionTestCase):
         self.assertIsNone(Punto.objects.get(pk=lejos.pk).longitud)
         self.assertEqual(Punto.objects.get(pk=cerca.pk).latitud, Decimal("-34.0001"))
 
+    def test_sitio_sin_coordenadas_aplica(self):
+        """Sin coordenadas en el sitio no hay referencia: la revisión vieja aplica."""
+        apps = self._escenario()
+        self._punto(0, None)
+        Sitio = apps.get_model("sitios", "Sitio")
+        self.assertIsNone(Sitio.objects.get(pk=self.sitio.pk).latitud)
+        vieja = {"distancia_m": None, "incidencia_ubicacion": False}
+        lejos, _ = self._punto_propuesto(
+            1,
+            revision={
+                **vieja,
+                "latitud": Decimal("-10.0"),
+                "longitud": Decimal("-20.0"),
+            },
+        )
+        apps = _migrar(self.DESPUES)
+        punto = apps.get_model("sitios", "PuntoControl").objects.get(pk=lejos.pk)
+        self.assertEqual(punto.latitud, Decimal("-10.0"))
+        self.assertEqual(punto.longitud, Decimal("-20.0"))
+
     def test_revision_de_otro_punto_no_se_aplica(self):
         self._escenario()
         otro = self._punto(0, None)
@@ -282,3 +302,91 @@ class QuitarPropuestaTests(TransactionTestCase):
         Punto = apps.get_model("sitios", "PuntoControl")
         self.assertEqual(Punto.objects.get(pk=punto.pk).latitud, Decimal("-35.1"))
         self.assertEqual(Punto.objects.get(pk=punto.pk).longitud, Decimal("-57.5"))
+
+
+class UbicacionFijadaTests(TransactionTestCase):
+    ANTES = [("sitios", "0007_quitar_ubicacion_propuesta")]
+    DESPUES = [("sitios", "0008_ubicacion_fijada_y_precision")]
+    MOTIVO = "Ubicación fijada por el primer escaneo"
+
+    def tearDown(self):
+        ejecutor = MigrationExecutor(connection)
+        ejecutor.migrate(ejecutor.loader.graph.leaf_nodes())
+
+    def _fila(self, apps, punto, fecha, motivo, usuario=None, lat=None, lng=None):
+        apps.get_model("sitios", "HistoricalPuntoControl").objects.create(
+            id=punto.pk,
+            sitio_id=punto.sitio_id,
+            nombre=punto.nombre,
+            orden=punto.orden,
+            activo=True,
+            qr_codigo=punto.qr_codigo,
+            history_date=fecha,
+            history_type="~",
+            history_change_reason=motivo,
+            history_user_id=usuario.pk if usuario else None,
+            latitud=lat,
+            longitud=lng,
+        )
+
+    def test_backfill_ignora_puntos_corregidos_despues(self):
+        apps = _migrar(self.ANTES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        sitio = apps.get_model("sitios", "Sitio").objects.create(
+            cliente=apps.get_model("clientes", "Cliente").objects.create(
+                razon_social="ACME"
+            ),
+            nombre="Planta",
+        )
+        usuario = apps.get_model("accounts", "User").objects.create(
+            username="uno", rol="empleado"
+        )
+        dia = datetime.datetime(2026, 3, 1, 9, tzinfo=datetime.UTC)
+        un_dia = datetime.timedelta(days=1)
+        corregido = Punto.objects.create(sitio=sitio, nombre="Corregido", orden=1)
+        intacto = Punto.objects.create(sitio=sitio, nombre="Intacto", orden=2)
+        for punto in (corregido, intacto):
+            self._fila(apps, punto, dia, self.MOTIVO, usuario, "-36.1", "-57.8")
+            self._fila(apps, punto, dia + un_dia, "Otro", usuario, "-36.1", "-57.8")
+        self._fila(
+            apps, corregido, dia + 2 * un_dia, "Corrección", usuario, "-36.2", "-57.9"
+        )
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        self.assertIsNone(Punto.objects.get(pk=corregido.pk).ubicacion_fijada_por_id)
+        self.assertEqual(
+            Punto.objects.get(pk=intacto.pk).ubicacion_fijada_por_id, usuario.pk
+        )
+
+    def test_backfill_desde_historial(self):
+        apps = _migrar(self.ANTES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        User = apps.get_model("accounts", "User")
+        sitio = apps.get_model("sitios", "Sitio").objects.create(
+            cliente=apps.get_model("clientes", "Cliente").objects.create(
+                razon_social="ACME"
+            ),
+            nombre="Planta",
+        )
+        primero = User.objects.create(username="uno", rol="empleado")
+        segundo = User.objects.create(username="dos", rol="empleado")
+        escaneado = Punto.objects.create(sitio=sitio, nombre="Escaneado", orden=1)
+        manual = Punto.objects.create(sitio=sitio, nombre="Manual", orden=2)
+        sin_historial = Punto.objects.create(sitio=sitio, nombre="Nada", orden=3)
+        dia = datetime.datetime(2026, 3, 1, 9, tzinfo=datetime.UTC)
+        mas_tarde = dia + datetime.timedelta(days=2)
+        self._fila(apps, escaneado, dia, self.MOTIVO, primero)
+        self._fila(apps, escaneado, mas_tarde, self.MOTIVO, segundo)
+        self._fila(
+            apps, escaneado, mas_tarde + datetime.timedelta(days=1), "Otro", primero
+        )
+        self._fila(apps, manual, dia, "Ubicación fijada en el mapa", primero)
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        punto = Punto.objects.get(pk=escaneado.pk)
+        self.assertEqual(punto.ubicacion_fijada_por_id, segundo.pk)
+        self.assertEqual(punto.ubicacion_fijada_en, mas_tarde)
+        for ajeno in (manual, sin_historial):
+            punto = Punto.objects.get(pk=ajeno.pk)
+            self.assertIsNone(punto.ubicacion_fijada_por_id)
+            self.assertIsNone(punto.ubicacion_fijada_en)

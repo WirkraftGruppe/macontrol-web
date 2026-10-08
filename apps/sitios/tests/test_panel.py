@@ -8,6 +8,7 @@ from django.core.exceptions import FieldDoesNotExist
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import NoReverseMatch, reverse
+from django.utils import timezone
 from PIL import Image
 
 from apps.clientes.models import Cliente
@@ -344,6 +345,28 @@ class PuntoPanelTests(_BaseAdminTests):
         )
         self.assertIn("latitud", r.context["form"].fields)
 
+    def test_aviso_punto_fijado_por_escaneo(self):
+        otro = PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
+        ficha = reverse("panel:sitios:ficha", args=[self.sitio.pk])
+        editar = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        for url in (ficha, editar):
+            self.assertNotContains(self.client.get(url), "Punto fijado por escaneo")
+        PuntoControl.objects.filter(pk=self.general.pk).update(
+            ubicacion_fijada_en=timezone.now(), ubicacion_fijada_por=self.admin
+        )
+        r = self.client.get(ficha, {"pestana": "puntos"})
+        self.assertContains(r, "Punto fijado por escaneo", count=1)
+        self.assertContains(self.client.get(editar), "Punto fijado por escaneo")
+        editar_otro = reverse("panel:sitios:punto_editar", args=[otro.pk])
+        self.assertNotContains(self.client.get(editar_otro), "Punto fijado por escaneo")
+
+    def test_desactivar_el_ultimo_punto_se_rechaza_con_aviso(self):
+        baja = reverse("panel:sitios:punto_desactivar", args=[self.general.pk])
+        r = self.client.post(baja, follow=True)
+        self.assertContains(r, "último punto activo")
+        self.general.refresh_from_db()
+        self.assertTrue(self.general.activo)
+
     def test_qr_png_por_punto_y_regenerar(self):
         punto = PuntoControl.objects.create(
             sitio=self.sitio, nombre="Cocina", sector="Planta alta", orden=1
@@ -384,6 +407,7 @@ class PuntoPanelTests(_BaseAdminTests):
         self.general.refresh_from_db()
         self.assertEqual(self.general.nombre, "Entrada")
         self.assertEqual(str(self.general.qr_impreso_el), "2026-10-01")
+        PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
         baja = reverse("panel:sitios:punto_desactivar", args=[self.general.pk])
         self.assertContains(self.client.get(baja), "Desactivar")
         self.client.post(baja)

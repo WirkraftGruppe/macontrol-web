@@ -1,10 +1,12 @@
 """Carga datos de demostración genéricos: clientes, sitios, puntos, planos y visitas."""
 
+import logging
 import uuid
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -20,6 +22,8 @@ from apps.sitios import services as servicios_sitio
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas import services as servicios_visita
 from apps.visitas.models import Visita
+
+logger = logging.getLogger(__name__)
 
 CLAVE_DEMO = "demo1234"
 LATITUD_BASE = Decimal("-36.090000")
@@ -59,18 +63,32 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opciones):
         exigir_entorno_demo("cargar_demo")
-        with transaction.atomic():
-            empleado = self._usuarios()
-            tipo, _ = TipoServicio.objects.get_or_create(
-                slug="demo-control-de-plagas",
-                defaults={"nombre": "Control de plagas (demo)"},
-            )
-            sitios = [self._sitio(*datos) for datos in SITIOS]
-            proyectos = [self._proyecto(sitio, tipo, empleado) for sitio in sitios]
+        # La transacción revierte la base, no los archivos de plano ya escritos.
+        self._planos_creados = []
+        try:
+            with transaction.atomic():
+                empleado = self._usuarios()
+                tipo, _ = TipoServicio.objects.get_or_create(
+                    slug="demo-control-de-plagas",
+                    defaults={"nombre": "Control de plagas (demo)"},
+                )
+                sitios = [self._sitio(*datos) for datos in SITIOS]
+                proyectos = [self._proyecto(sitio, tipo, empleado) for sitio in sitios]
+        except Exception:
+            self._borrar_planos()
+            raise
         # Los servicios de visitas abren su propia transacción: van fuera.
         for orden, proyecto in enumerate(proyectos):
             self._visitas(proyecto, empleado, orden)
         self.stdout.write("Demo lista.")
+
+    def _borrar_planos(self):
+        """Borra del almacenamiento los planos creados por una corrida fallida."""
+        for plano in self._planos_creados:
+            try:
+                plano.imagen.storage.delete(plano.imagen.name)
+            except Exception:  # noqa: BLE001
+                logger.exception("No se pudo borrar un plano de la demo.")
 
     def _usuarios(self):
         """Crea los usuarios demo y devuelve el empleado.
@@ -133,6 +151,7 @@ class Command(BaseCommand):
                 imagen=_imagen(800, 500, "#d9e2ec", "PNG", "plano.png"),
             )
             plano.save()
+            self._planos_creados.append(plano)
         for numero, punto in enumerate(puntos):
             if punto.plano_id is None:
                 punto.plano = plano
@@ -157,15 +176,23 @@ class Command(BaseCommand):
         return proyecto
 
     def _visitas(self, proyecto, empleado, orden):
-        """Visitas por los servicios del dominio, solo si el proyecto no tiene."""
-        if proyecto.visitas.exists():
+        """Visitas por los servicios del dominio, solo si el proyecto no las tiene.
+
+        Se mira lo que esa corrida deja: jornadas realizadas, o la abierta del
+        último proyecto. Así una corrida fallida se completa en la siguiente.
+        """
+        esperada = Visita.Estado.ABIERTA if orden == 2 else Visita.Estado.REALIZADA
+        if proyecto.visitas.filter(estado=esperada).exists():
             return
         puntos = list(proyecto.sitio.puntos.filter(activo=True))
         ahora = timezone.now()
         # El primer proyecto tiene dos jornadas realizadas, el segundo una y el
         # último queda con una visita abierta.
         jornadas = {0: [timedelta(days=3), timedelta(days=1)], 1: [timedelta(hours=5)]}
+        # Una revisión más atrasada que el máximo configurado sería rechazada.
+        tope = timedelta(hours=settings.ATRASO_MAXIMO_HORAS - 1)
         for atraso in jornadas.get(orden, []):
+            atraso = min(atraso, tope)
             visita = self._jornada(proyecto, empleado, puntos, ahora - atraso)
             servicios_visita.cerrar_visita(
                 visita, quien=empleado, cierre=Visita.Cierre.EMPLEADO

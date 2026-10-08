@@ -25,6 +25,12 @@ FRAGMENTOS_SENSIBLES = (
 OCULTO = "[oculto]"
 # Detalle de IntegrityError de PostgreSQL: "Key (cuit)=(2012…) already exists".
 _CLAVE_VALOR_DB = re.compile(r"Key \(([^)]*)\)=\(.*?\)(?= |$|\.)")
+# Detalle de NOT NULL o CHECK de PostgreSQL: "Failing row contains (…)", la fila entera.
+# Cubre hasta el fin del mensaje de esa excepción: un valor puede tener saltos de línea.
+_FILA_DB = re.compile(
+    r"Failing row contains \(.*?(?=\n\n(?:The above exception|During handling)|\Z)",
+    re.DOTALL,
+)
 PROFUNDIDAD_MAXIMA = 5
 _ESTANDAR = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",
@@ -69,6 +75,9 @@ class FiltroDatosPersonales(logging.Filter):
         if record.exc_text:
             record.exc_text = _CLAVE_VALOR_DB.sub(
                 lambda m: f"Key ({m.group(1)})=({OCULTO})", record.exc_text
+            )
+            record.exc_text = _FILA_DB.sub(
+                f"Failing row contains ({OCULTO}).", record.exc_text
             )
         for clave, valor in list(record.__dict__.items()):
             if clave in _ESTANDAR:

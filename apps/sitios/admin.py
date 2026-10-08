@@ -86,8 +86,18 @@ class PuntoControlAdmin(_AdministradorMixin, SimpleHistoryAdmin):
     list_display = ("nombre", "sitio", "sector", "orden", "activo")
     search_fields = ("nombre", "sector", "sitio__nombre")
     list_filter = ("activo",)
-    readonly_fields = ("qr_codigo",)
+    readonly_fields = (
+        "qr_codigo",
+        "precision_m",
+        "ubicacion_fijada_por",
+        "ubicacion_fijada_en",
+    )
     actions = ["regenerar_qr"]
+
+    def get_readonly_fields(self, request, obj=None):
+        """Al editar, el sitio y la foto no se cambian desde el admin."""
+        campos = super().get_readonly_fields(request, obj)
+        return (*campos, "sitio", "foto") if obj else campos
 
     def has_regenerar_qr_permission(self, request):
         return self._es_administrador_activo(request) and self.has_change_permission(
@@ -122,3 +132,8 @@ class PlanoAdmin(_AdministradorMixin, SimpleHistoryAdmin):
     search_fields = ("nombre", "sitio__nombre")
     list_filter = ("activo",)
     readonly_fields = ("ancho_px", "alto_px")
+
+    def get_readonly_fields(self, request, obj=None):
+        """Al editar, el plano no se cambia de sitio."""
+        campos = super().get_readonly_fields(request, obj)
+        return (*campos, "sitio") if obj else campos

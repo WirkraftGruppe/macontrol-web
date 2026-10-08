@@ -71,7 +71,10 @@ class VisitaTests(TestCase):
 
     def test_empleado_acepta_empleado_o_administrador_y_rechaza_otro_rol(self):
         self.visita.empleado = self.admin
+        self.visita.estado = Visita.Estado.ABIERTA
+        self.visita.abierta_en = timezone.now()
         self.visita.full_clean()
+        self.visita.estado = Visita.Estado.PENDIENTE
         self.visita.empleado = User.objects.create_user(
             username="otro-rol", password="x", rol="visitante"
         )

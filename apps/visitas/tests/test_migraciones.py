@@ -6,7 +6,8 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 
 ANTES = ("visitas", "0004_historicalvisita_incidencia_revisada_en_and_more")
-DESPUES = ("visitas", "0008_ubicacion_y_administrador")
+ANTES_9 = ("visitas", "0008_ubicacion_y_administrador")
+DESPUES = DESPUES_9 = ("visitas", "0009_cuenta_como_servicio_y_precision")
 
 
 def _destino(visitas):
@@ -170,6 +171,10 @@ class MigracionRevisionesTests(TransactionTestCase):
         )
 
         # Con los modelos reales: no se reutiliza y, si se abriera, no se cierra.
+        # Los modelos reales exigen todas las apps en su hoja (sitios incluida).
+        MigrationExecutor(connection).migrate(
+            MigrationExecutor(connection).loader.graph.leaf_nodes()
+        )
         from apps.accounts.models import User
         from apps.visitas.models import Visita as VisitaReal
         from apps.visitas.services import abrir_visita
@@ -208,3 +213,80 @@ class MigracionRevisionesTests(TransactionTestCase):
         self.assertEqual((punto.nombre, punto.orden), ("General", 0))
         self.assertEqual(Revision.objects.filter(punto_id=punto.pk).count(), 2)
         self.assertEqual(datos["app"].pk, Revision.objects.first().visita_id)
+
+
+class CuentaComoServicioTests(TransactionTestCase):
+    def tearDown(self):
+        ejecutor = MigrationExecutor(connection)
+        ejecutor.migrate(ejecutor.loader.graph.leaf_nodes())
+
+    def test_backfill_por_rol(self):
+        apps = _migrar(_destino(ANTES_9))
+        Cliente = apps.get_model("clientes", "Cliente")
+        Sitio = apps.get_model("sitios", "Sitio")
+        Servicio = apps.get_model("servicios", "TipoServicio")
+        Proyecto = apps.get_model("proyectos", "Proyecto")
+        Usuario = apps.get_model("accounts", "User")
+        Visita = apps.get_model("visitas", "Visita")
+        sitio = Sitio.objects.create(
+            cliente=Cliente.objects.create(razon_social="ACME"), nombre="Planta 1"
+        )
+        empleado = Usuario.objects.create(username="emp-cs", rol="empleado")
+        administrador = Usuario.objects.create(username="adm-cs", rol="administrador")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=Servicio.objects.create(nombre="Roedores", slug="roe-cs"),
+            titulo="Mensual",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+        de_empleado = Visita.objects.create(
+            proyecto=proyecto, empleado=empleado, origen="app"
+        )
+        de_admin = Visita.objects.create(
+            proyecto=proyecto, empleado=administrador, origen="app", estado="abierta"
+        )
+
+        apps = _migrar(_destino(DESPUES_9))
+        Visita = apps.get_model("visitas", "Visita")
+        self.assertTrue(Visita.objects.get(pk=de_empleado.pk).cuenta_como_servicio)
+        self.assertFalse(Visita.objects.get(pk=de_admin.pk).cuenta_como_servicio)
+        self.assertIsNone(Visita.objects.get(pk=de_admin.pk).precision_m)
+
+        # Vuelta atrás: quita los campos y conserva las visitas.
+        apps = _migrar(_destino(ANTES_9))
+        self.assertEqual(apps.get_model("visitas", "Visita").objects.count(), 2)
+
+    def test_backfill_no_toca_pendientes(self):
+        apps = _migrar(_destino(ANTES_9))
+        Cliente = apps.get_model("clientes", "Cliente")
+        Sitio = apps.get_model("sitios", "Sitio")
+        Servicio = apps.get_model("servicios", "TipoServicio")
+        Proyecto = apps.get_model("proyectos", "Proyecto")
+        Usuario = apps.get_model("accounts", "User")
+        Visita = apps.get_model("visitas", "Visita")
+        sitio = Sitio.objects.create(
+            cliente=Cliente.objects.create(razon_social="ACME"), nombre="Planta 1"
+        )
+        empleado = Usuario.objects.create(username="emp-pend", rol="empleado")
+        administrador = Usuario.objects.create(username="adm-pend", rol="administrador")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=Servicio.objects.create(nombre="Roedores", slug="roe-pend"),
+            titulo="Mensual",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+        # Los modelos históricos no pasan por `clean`: la pendiente puede ser
+        # de un administrador.
+        pendiente = Visita.objects.create(
+            proyecto=proyecto, empleado=administrador, origen="app", estado="pendiente"
+        )
+        abierta = Visita.objects.create(
+            proyecto=proyecto, empleado=administrador, origen="app", estado="abierta"
+        )
+
+        apps = _migrar(_destino(DESPUES_9))
+        Visita = apps.get_model("visitas", "Visita")
+        self.assertTrue(Visita.objects.get(pk=pendiente.pk).cuenta_como_servicio)
+        self.assertFalse(Visita.objects.get(pk=abierta.pk).cuenta_como_servicio)

@@ -214,6 +214,8 @@ REST_FRAMEWORK = {
         "token": "10/min",
         "qr": "30/min",
         "crear_visita": "120/hour",
+        # Altas de campo (sitio, punto, ubicación): no agotan crear_visita.
+        "alta_campo": "300/hour",
     },
     "NUM_PROXIES": NUM_PROXIES,
 }

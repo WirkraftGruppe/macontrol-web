@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db.models import BooleanField, Exists, ExpressionWrapper, OuterRef, Q
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -17,7 +18,7 @@ from apps.accounts.models import User
 from apps.panel.listados import ListadoPanelMixin
 from apps.proyectos.models import Proyecto
 
-from .models import Foto, Visita
+from .models import Foto, Revision, Visita
 from .panel_forms import FormSetProductos, FormularioAsignar, FormularioManual
 from .planillas import filas_planilla
 from .services import marcar_incidencia_revisada, registrar_visita_manual
@@ -25,7 +26,11 @@ from .services import marcar_incidencia_revisada, registrar_visita_manual
 logger = logging.getLogger(__name__)
 
 FILTROS = ("empleado", "proyecto", "estado", "incidencia")
-INCIDENCIAS = (("sin_revisar", "Sin revisar"), ("todas", "Todas las incidencias"))
+INCIDENCIAS = (
+    ("sin_revisar", "Sin revisar"),
+    ("todas", "Todas las incidencias"),
+    ("ubicacion", "Ubicación sin revisar"),
+)
 TIPOS_IMAGEN = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 CAMPOS_OCULTOS = {"datos"}
 TIPOS_CAMBIO = {"+": "Creación", "~": "Modificación", "-": "Eliminación"}
@@ -44,7 +49,21 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
         return {f: v for f, v in valores.items() if v}
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("proyecto__sitio", "empleado")
+        # Subconsulta: un join con las revisiones multiplicaría las visitas.
+        en_revision = Revision.objects.filter(
+            visita=OuterRef("pk"), incidencia_ubicacion=True
+        )
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related("proyecto__sitio", "empleado")
+            .annotate(
+                con_ubicacion=ExpressionWrapper(
+                    Q(incidencia_ubicacion=True) | Exists(en_revision),
+                    output_field=BooleanField(),
+                )
+            )
+        )
         filtros = self.get_filtros()
         for parametro, campo in (
             ("empleado", "empleado_id"),
@@ -59,6 +78,10 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
             queryset = queryset.filter(incidencia=True)
             if filtros["incidencia"] == "sin_revisar":
                 queryset = queryset.filter(incidencia_revisada_en__isnull=True)
+        elif filtros.get("incidencia") == "ubicacion":
+            queryset = queryset.filter(
+                con_ubicacion=True, incidencia_revisada_en__isnull=True
+            )
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -111,6 +134,9 @@ class FichaVisita(AdministradorRequeridoMixin, DetailView):
         visita = contexto["visita"]
         contexto["filas"] = filas_planilla(visita.esquema_planilla, visita.datos)
         contexto["revisiones"] = list(visita.revisiones.all())
+        contexto["con_ubicacion"] = visita.incidencia_ubicacion or any(
+            r.incidencia_ubicacion for r in contexto["revisiones"]
+        )
         for revision in contexto["revisiones"]:
             revision.filas = filas_planilla(revision.esquema_planilla, revision.datos)
         contexto["historial"] = _historial(visita)
@@ -158,7 +184,8 @@ class AsignarVisita(AdministradorRequeridoMixin, FormView):
     @cached_property
     def proyecto(self):
         return get_object_or_404(
-            Proyecto.objects.select_related("sitio"), pk=self.kwargs["proyecto_pk"]
+            Proyecto.objects.select_related("sitio__cliente"),
+            pk=self.kwargs["proyecto_pk"],
         )
 
     def get_context_data(self, **kwargs):
@@ -169,6 +196,9 @@ class AsignarVisita(AdministradorRequeridoMixin, FormView):
     def form_valid(self, form):
         if self.proyecto.estado != Proyecto.Estado.ACTIVO:
             form.add_error(None, "Solo se asignan visitas a proyectos activos.")
+            return self.form_invalid(form)
+        if not (self.proyecto.sitio.activo and self.proyecto.sitio.cliente.activo):
+            form.add_error(None, "El sitio o el cliente del proyecto están de baja.")
             return self.form_invalid(form)
         Visita.objects.create(
             proyecto=self.proyecto,
@@ -192,7 +222,9 @@ class RegistrarVisitaManual(AdministradorRequeridoMixin, FormView):
     @cached_property
     def proyecto(self):
         return get_object_or_404(
-            Proyecto.objects.select_related("sitio", "tipo_servicio"),
+            Proyecto.objects.select_related(
+                "sitio__cliente", "tipo_servicio"
+            ).prefetch_related("tipo_servicio__campos"),
             pk=self.kwargs["proyecto_pk"],
         )
 

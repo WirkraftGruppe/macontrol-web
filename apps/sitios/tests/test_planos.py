@@ -95,6 +95,36 @@ class PlanoTests(TestCase):
             plano.delete()
         self.assertFalse(almacenamiento.exists(nombre))
 
+    def test_reemplazar_imagen_borra_la_anterior(self):
+        plano = Plano(sitio=self.sitio, nombre="Techo")
+        plano.imagen = _subida(_imagen("PNG"))
+        plano.save()
+        almacenamiento, anterior = plano.imagen.storage, plano.imagen.name
+        plano.imagen = _subida(_imagen("JPEG", (500, 400)))
+        with self.captureOnCommitCallbacks(execute=True):
+            plano.save()
+        self.assertNotEqual(plano.imagen.name, anterior)
+        self.assertFalse(almacenamiento.exists(anterior))
+        self.assertTrue(almacenamiento.exists(plano.imagen.name))
+        nombre = plano.imagen.name
+        with self.captureOnCommitCallbacks(execute=True):
+            plano.nombre = "Techo norte"
+            plano.save()
+        self.assertTrue(almacenamiento.exists(nombre))
+
+    def test_save_respeta_update_fields(self):
+        plano = Plano(sitio=self.sitio, nombre="Techo")
+        plano.imagen = _subida(_imagen("PNG"))
+        plano.save()
+        almacenamiento, anterior = plano.imagen.storage, plano.imagen.name
+        plano.nombre = "Techo norte"
+        with self.assertNumQueries(2):  # UPDATE + historial; sin leer el anterior
+            plano.save(update_fields=["nombre"])
+        plano.imagen = _subida(_imagen("JPEG", (500, 400)))
+        with self.captureOnCommitCallbacks(execute=True):
+            plano.save(update_fields=["imagen", "ancho_px", "alto_px"])
+        self.assertFalse(almacenamiento.exists(anterior))
+
     def test_clean_rechaza_un_archivo_invalido(self):
         plano = Plano(sitio=self.sitio, nombre="Techo")
         plano.imagen = _subida(b"no es imagen")

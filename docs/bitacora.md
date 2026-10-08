@@ -1,19 +1,26 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-07-robustez-datos.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | elegir el próximo plan; candidato: `robustez-datos` | sesión 2026-10-07 cerrada |
+| `robustez-datos` | plan/robustez-datos | cierre (T1–T10 hechas) | decisión del usuario: corregir P-robustez-datos-8/-9 antes del merge o fusionar en `main`; `congelado.sh` FALLA solo por CONTRATO MODIFICADO (01d5d1f) | sesión 2026-10-08 |
 
 Siguiente: 79 abiertos, todos con destino (`py -3 .claude/hooks/pendientes.py --etiqueta <destino>`): `robustez-datos` 28 (candidato natural al próximo plan; trae decisiones ya tomadas en el triage: P-cierre-puntos-13, P-panel-24, -25, P-cierre-puntos-10, P-auditoria-p31-1), `despliegue` 24, `robustez-panel` 13, `expo` 8, `empresa` 4, `informes` 2. La etiqueta `panel-cierre` desapareció: no hay plan `panel-cierre`. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-08 — Plan `robustez-datos`: 28 pendientes cerrados, sin fusionar
+Hecho:
+- Plan Completo `robustez-datos` (07191c7) en `plan/robustez-datos`: T1 y T10 en línea (config), ola 1 con T2 (visitas) y T3 (sitios), ola 2 con T5 (panel), T6→T8 (visitas) y T9 (sitios). Contrato ampliado por el usuario el 2026-10-08 (01d5d1f) con T8, T9 y T10 para los 7 hallazgos de la auditoría de la ola 1.
+- Cierra los 28 `robustez-datos` y P-cierre-puntos-2. Migraciones nuevas: `visitas.0009` (`cuenta_como_servicio`, `precision_m`) y `sitios.0008` (`precision_m`, `ubicacion_fijada_por/en`, con backfill).
+- Verificación TODO en 923f396: 83/84 PASA en los dos verificadores; la única FALLA es `congelado.sh` por el contrato modificado. Suite 578 OK. Auditoría final: 0 bloqueantes; quedan P-robustez-datos-1 a -12 (dos importantes nuevos: -8 corrección de ubicación desde el panel no limpia `ubicacion_fijada_*`, -9 `sitios/estado.py` cuenta revisiones de administradores).
+Sigue: decisión del usuario sobre -8/-9 y sobre el merge a `main` (sin push).
 
 ### 2026-10-07 — Plan `triage-2026-10-07`: triage de pendientes, fusión en `main`
 Hecho:

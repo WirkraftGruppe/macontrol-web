@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
+from django.db import OperationalError
 from django.utils import timezone
 
 from apps.visitas.models import Visita
@@ -31,6 +32,10 @@ class Command(BaseCommand):
                 cerrar_visita(visita, quien=None, cierre=Visita.Cierre.SISTEMA)
             except ValidationError:
                 logger.exception("No se pudo cerrar la visita %s.", visita.pk)
+                continue
+            except OperationalError:
+                # Bloqueo no disponible o interbloqueo: queda para la próxima corrida.
+                logger.exception("Falla de base al cerrar la visita %s.", visita.pk)
                 continue
             cerradas += 1
         self.stdout.write(f"Visitas cerradas por sistema: {cerradas}")

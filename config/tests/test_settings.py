@@ -28,6 +28,14 @@ def _correr(args, **entorno):
 
 
 class SettingsTests(SimpleTestCase):
+    def test_cupo_alta_campo_definido(self):
+        """Las altas de campo tienen su propio cupo, separado de crear_visita."""
+        from config.settings import base
+
+        cupos = base.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
+        self.assertEqual(cupos.get("alta_campo"), "300/hour")
+        self.assertEqual(cupos["crear_visita"], "120/hour")
+
     def test_samesite_lax_fijado(self):
         """SameSite y el tope de archivos se fijan explícitos en base.py."""
         from config.settings import base
