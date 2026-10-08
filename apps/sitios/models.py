@@ -164,7 +164,8 @@ class Plano(models.Model):
     def save(self, *args, **kwargs):
         nuevo = self._sin_confirmar()
         anterior = None
-        if self.pk:
+        campos = kwargs.get("update_fields")
+        if self.pk and (campos is None or "imagen" in campos):
             anterior = (
                 Plano.objects.filter(pk=self.pk)
                 .values_list("imagen", flat=True)

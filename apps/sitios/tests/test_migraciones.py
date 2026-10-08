@@ -313,7 +313,7 @@ class UbicacionFijadaTests(TransactionTestCase):
         ejecutor = MigrationExecutor(connection)
         ejecutor.migrate(ejecutor.loader.graph.leaf_nodes())
 
-    def _fila(self, apps, punto, fecha, motivo, usuario=None):
+    def _fila(self, apps, punto, fecha, motivo, usuario=None, lat=None, lng=None):
         apps.get_model("sitios", "HistoricalPuntoControl").objects.create(
             id=punto.pk,
             sitio_id=punto.sitio_id,
@@ -325,6 +325,37 @@ class UbicacionFijadaTests(TransactionTestCase):
             history_type="~",
             history_change_reason=motivo,
             history_user_id=usuario.pk if usuario else None,
+            latitud=lat,
+            longitud=lng,
+        )
+
+    def test_backfill_ignora_puntos_corregidos_despues(self):
+        apps = _migrar(self.ANTES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        sitio = apps.get_model("sitios", "Sitio").objects.create(
+            cliente=apps.get_model("clientes", "Cliente").objects.create(
+                razon_social="ACME"
+            ),
+            nombre="Planta",
+        )
+        usuario = apps.get_model("accounts", "User").objects.create(
+            username="uno", rol="empleado"
+        )
+        dia = datetime.datetime(2026, 3, 1, 9, tzinfo=datetime.UTC)
+        un_dia = datetime.timedelta(days=1)
+        corregido = Punto.objects.create(sitio=sitio, nombre="Corregido", orden=1)
+        intacto = Punto.objects.create(sitio=sitio, nombre="Intacto", orden=2)
+        for punto in (corregido, intacto):
+            self._fila(apps, punto, dia, self.MOTIVO, usuario, "-36.1", "-57.8")
+            self._fila(apps, punto, dia + un_dia, "Otro", usuario, "-36.1", "-57.8")
+        self._fila(
+            apps, corregido, dia + 2 * un_dia, "Corrección", usuario, "-36.2", "-57.9"
+        )
+        apps = _migrar(self.DESPUES)
+        Punto = apps.get_model("sitios", "PuntoControl")
+        self.assertIsNone(Punto.objects.get(pk=corregido.pk).ubicacion_fijada_por_id)
+        self.assertEqual(
+            Punto.objects.get(pk=intacto.pk).ubicacion_fijada_por_id, usuario.pk
         )
 
     def test_backfill_desde_historial(self):

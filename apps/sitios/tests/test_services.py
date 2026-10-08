@@ -177,6 +177,8 @@ class FijarUbicacionTests(_BaseSitio):
         with mock.patch.object(
             QuerySet, "select_for_update", autospec=True, side_effect=original
         ) as bloqueo:
+            # Regla nueva: FOR NO KEY UPDATE, para no chocar con los inserts
+            # que referencian el punto.
             services.fijar_ubicacion(punto, Decimal("-36.1"), Decimal("-57.8"))
             self.assertEqual(bloqueo.call_count, 1)
             services.fijar_ubicacion_en_campo(
@@ -187,9 +189,35 @@ class FijarUbicacionTests(_BaseSitio):
                 precision_m=9.5,
             )
             self.assertEqual(bloqueo.call_count, 2)
+            for llamada in bloqueo.call_args_list:
+                self.assertTrue(llamada.kwargs["no_key"])
         punto.refresh_from_db()
         self.assertEqual(punto.latitud, Decimal("-36.2"))
         self.assertEqual(punto.precision_m, Decimal("9.50"))
+
+    def test_corregir_ubicacion_limpia_fijada_por_escaneo(self):
+        administrador = User.objects.create_user(
+            username="adm", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        for corregir in (
+            lambda p: services.fijar_ubicacion(p, Decimal("-36.1"), Decimal("-57.8")),
+            lambda p: services.fijar_ubicacion_en_campo(
+                administrador=administrador,
+                punto=p,
+                latitud=Decimal("-36.2"),
+                longitud=Decimal("-57.9"),
+                precision_m=9.5,
+            ),
+        ):
+            punto = self.sitio.puntos.get()
+            PuntoControl.objects.filter(pk=punto.pk).update(
+                ubicacion_fijada_por=administrador,
+                ubicacion_fijada_en=datetime.datetime(2026, 3, 1, tzinfo=datetime.UTC),
+            )
+            corregir(punto)
+            punto.refresh_from_db()
+            self.assertIsNone(punto.ubicacion_fijada_por)
+            self.assertIsNone(punto.ubicacion_fijada_en)
 
     def test_fijar_ubicacion_usa_la_fila_releida(self):
         """El punto en memoria quedó viejo: manda lo que hay en la base."""

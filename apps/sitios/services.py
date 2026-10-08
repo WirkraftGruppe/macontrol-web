@@ -77,7 +77,7 @@ def regenerar_qr_lote(puntos):
 def _bloquear_punto(punto):
     """Relee el punto bloqueando la fila (dentro de un ``atomic``), con su sitio."""
     return (
-        PuntoControl.objects.select_for_update(of=("self",))
+        PuntoControl.objects.select_for_update(no_key=True, of=("self",))
         .select_related("sitio__cliente")
         .get(pk=punto.pk)
     )
@@ -89,8 +89,17 @@ def fijar_ubicacion(punto, latitud, longitud):
         bloqueado = _bloquear_punto(punto)
         bloqueado.latitud = latitud
         bloqueado.longitud = longitud
+        bloqueado.ubicacion_fijada_por = None
+        bloqueado.ubicacion_fijada_en = None
         bloqueado._change_reason = "Ubicación fijada en el mapa"
-        bloqueado.save(update_fields=["latitud", "longitud"])
+        bloqueado.save(
+            update_fields=[
+                "latitud",
+                "longitud",
+                "ubicacion_fijada_por",
+                "ubicacion_fijada_en",
+            ]
+        )
     punto.latitud, punto.longitud = bloqueado.latitud, bloqueado.longitud
 
 
@@ -220,8 +229,18 @@ def fijar_ubicacion_en_campo(*, administrador, punto, latitud, longitud, precisi
         bloqueado.latitud = latitud
         bloqueado.longitud = longitud
         bloqueado.precision_m = precision_m
+        bloqueado.ubicacion_fijada_por = None
+        bloqueado.ubicacion_fijada_en = None
         bloqueado._history_user = administrador
         bloqueado._change_reason = "Ubicación fijada en campo desde la app"
-        bloqueado.save(update_fields=["latitud", "longitud", "precision_m"])
+        bloqueado.save(
+            update_fields=[
+                "latitud",
+                "longitud",
+                "precision_m",
+                "ubicacion_fijada_por",
+                "ubicacion_fijada_en",
+            ]
+        )
     punto.latitud, punto.longitud = bloqueado.latitud, bloqueado.longitud
     punto.precision_m = bloqueado.precision_m
