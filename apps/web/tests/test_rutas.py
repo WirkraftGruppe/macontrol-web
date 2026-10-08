@@ -14,7 +14,9 @@ class RutasTests(TestCase):
         codigo = uuid.uuid4()
         respuesta = self.client.get(f"/q/{codigo}/")
         self.assertEqual(respuesta.status_code, 200)
-        self.assertContains(respuesta, "Sitio de MAControl S.A. — use la app")
+        self.assertContains(
+            respuesta, "Punto de control de MAControl S.A. — use la app"
+        )
         self.assertNotContains(respuesta, str(codigo))
 
     def test_q_no_uuid_da_404(self):

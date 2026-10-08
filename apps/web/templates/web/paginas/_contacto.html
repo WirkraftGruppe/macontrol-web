@@ -1,0 +1,11 @@
+<div class="contacto">
+  <span class="eyebrow">Llámenos</span>
+  {% if config.telefono_href %}<a class="contacto-telefono" href="{{ config.telefono_href }}">{{ config.telefono }}</a>{% endif %}
+  <div class="contacto-acciones">
+    {% if config.telefono_href %}<a class="btn btn-primario" href="{{ config.telefono_href }}">Llamar ahora</a>{% endif %}
+    {% if config.whatsapp_href %}<a class="btn btn-secundario" href="{{ config.whatsapp_href }}">WhatsApp</a>{% endif %}
+  </div>
+  {% if config.horario %}<p class="texto-suave">{{ config.horario }}</p>{% endif %}
+  {% for d in config.direcciones %}<p class="texto-suave">{{ d.localidad }}: {{ d.direccion }}</p>{% endfor %}
+  {% if config.correo %}<p><a class="enlace" href="mailto:{{ config.correo }}">{{ config.correo }}</a></p>{% endif %}
+</div>

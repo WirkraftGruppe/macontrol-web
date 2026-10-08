@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /panel/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /q/
+
+Sitemap: {{ sitemap }}
