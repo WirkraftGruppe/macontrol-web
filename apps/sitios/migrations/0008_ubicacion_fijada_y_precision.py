@@ -9,21 +9,25 @@ def llenar_ubicacion_fijada(apps, schema_editor):
     """RunPython justificado: el historial ya dice quién y cuándo fijó la ubicación
     de cada punto por el primer escaneo; se copia a los campos nuevos para que el
     panel no tenga que recorrer el historial. De cada punto manda la fila más
-    reciente con ese motivo; los demás puntos quedan sin dato."""
+    reciente con ese motivo, solo si después no cambió la latitud ni la longitud
+    (una corrección posterior deja el punto sin dato); los demás quedan sin dato."""
     Punto = apps.get_model("sitios", "PuntoControl")
     Historico = apps.get_model("sitios", "HistoricalPuntoControl")
-    vistos = set()
-    filas = Historico.objects.filter(history_change_reason=MOTIVO_ESCANEO).order_by(
-        "-history_date", "-history_id"
-    )
-    for fila in filas:
-        if fila.id in vistos:
-            continue
-        vistos.add(fila.id)
-        Punto.objects.filter(pk=fila.id).update(
-            ubicacion_fijada_por_id=fila.history_user_id,
-            ubicacion_fijada_en=fila.history_date,
-        )
+    escaneo = {}
+    anterior = {}
+    for fila in Historico.objects.order_by("id", "history_date", "history_id"):
+        coordenadas = (fila.latitud, fila.longitud)
+        if fila.id in anterior and anterior[fila.id] != coordenadas:
+            escaneo[fila.id] = None  # corrección posterior al escaneo
+        anterior[fila.id] = coordenadas
+        if fila.history_change_reason == MOTIVO_ESCANEO:
+            escaneo[fila.id] = fila
+    for pk, fila in escaneo.items():
+        if fila is not None:
+            Punto.objects.filter(pk=pk).update(
+                ubicacion_fijada_por_id=fila.history_user_id,
+                ubicacion_fijada_en=fila.history_date,
+            )
 
 
 class Migration(migrations.Migration):
