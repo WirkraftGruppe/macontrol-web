@@ -3,6 +3,7 @@
 from csp.decorators import csp_update
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -228,6 +229,26 @@ class PuntoEdicion(_PuntoMixin, UpdateView):
 
     def get_form_kwargs(self):
         return {**super().get_form_kwargs(), "sitio": self.object.sitio}
+
+    def form_valid(self, form):
+        """Coordenadas corregidas limpian la marca de escaneo; baja por el servicio."""
+        if {"latitud", "longitud"} & set(form.changed_data):
+            form.instance.ubicacion_fijada_por = None
+            form.instance.ubicacion_fijada_en = None
+        if "activo" not in form.changed_data or form.cleaned_data["activo"]:
+            return super().form_valid(form)
+        # Se guarda activo y luego se desactiva con el servicio, que bloquea el
+        # sitio y rechaza el último punto activo; si lo rechaza, no se guarda nada.
+        form.instance.activo = True
+        with transaction.atomic():
+            respuesta = super().form_valid(form)
+            try:
+                services.desactivar_punto(self.object)
+            except ValidationError as error:
+                transaction.set_rollback(True)
+                form.add_error("activo", error)
+                return self.form_invalid(form)
+        return respuesta
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)

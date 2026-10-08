@@ -54,6 +54,7 @@ def estado_revision(punto, proyecto):
         punto=punto,
         visita__proyecto=proyecto,
         visita__estado__in=_VISITAS_QUE_CUENTAN,
+        visita__cuenta_como_servicio=True,
     ).aggregate(ultima=Max("realizada_en"))["ultima"]
     return _estado(ultima, proyecto.frecuencia_dias, timezone.localdate())
 
@@ -81,6 +82,7 @@ def estados_de_puntos(puntos):
                 pk for lista in proyectos.values() for pk, _ in lista
             ],
             visita__estado__in=_VISITAS_QUE_CUENTAN,
+            visita__cuenta_como_servicio=True,
         )
         .values("punto_id", "visita__proyecto_id")
         .annotate(ultima=Max("realizada_en"))
