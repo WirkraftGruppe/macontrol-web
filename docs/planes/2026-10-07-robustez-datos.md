@@ -40,7 +40,7 @@
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
 | 1 | T1 (principal, en línea, antes de los worktrees), T2, T3, T4 (integración) | visitas `0009`, sitios `0008` |
-| 2 | T5, T6, T7 (integración y cierre) | ninguna |
+| 2 | T10 (principal, en línea, antes de los worktrees), T5, T6 → T8 (mismo worktree, en serie), T9, T7 (integración y cierre) | se editan visitas `0009` y sitios `0008` (creadas en este plan, sin desplegar) |
 
 ## Subtareas
 
@@ -208,10 +208,10 @@
 
 ### T7 — Integración ola 2 y cierre (principal)
 
-- **Ola**: 2 · **Depende de**: T5, T6
+- **Ola**: 2 · **Depende de**: T5, T6, T8, T9, T10
 - **Pasos**:
-  1. Correr `verificador` y `verificador-b` sobre T5 y T6.
-  2. Integrar T6 y después T5.
+  1. Correr `verificador` y `verificador-b` sobre T5, T6, T8, T9 y T10.
+  2. Integrar T6 (lleva también los commits de T8), después T9 y después T5.
   3. Correr `auditor-seguridad` sobre el plan entero (bloqueos de A, archivos de B).
   4. Escribir en `### Cierra` una línea `- cierra:` por cada uno de los 28 pendientes más P-cierre-puntos-2.
   5. Correr `verificador TODO`.
@@ -219,8 +219,72 @@
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/robustez-datos | grep -q "T5: integra robustez-datos-T5"`
   - `[cmd]` `git log --oneline plan/robustez-datos | grep -q "T6: integra robustez-datos-T6"`
+  - `[cmd]` `git log --oneline plan/robustez-datos | grep -q "T9: integra robustez-datos-T9"`
   - `[cmd]` `test "$(py -3 .claude/hooks/pendientes.py --etiqueta robustez-datos --json | py -3 -c 'import json,sys; print(len(json.load(sys.stdin)["abiertos"]))')" -eq 0`
   - `[cmd]` `test "$(py -3 .claude/hooks/pendientes.py --json | py -3 -c 'import json,sys; print(sum(p["id"] == "P-cierre-puntos-2" for p in json.load(sys.stdin)["abiertos"]))')" -eq 0`
+
+## Ampliación del 2026-10-08: correcciones de la auditoría de la ola 1
+
+El usuario aprobó ampliar el plan con los hallazgos del `auditor-seguridad` sobre la ola 1 (HEAD 030216b): 2 importantes y 5 menores, sin bloqueantes. También decidió que una incidencia solo se marca como revisada con la visita cerrada. `visitas.0009` y `sitios.0008` se crearon en este plan y no se desplegaron, así que se editan en lugar de agregar migraciones nuevas (mismo criterio que la decisión del 2026-10-07 sobre `sitios/0007`).
+
+### T10 — Enmascarar "Failing row contains" cuando la fila tiene saltos de línea
+
+- **Ola**: 2 · **Depende de**: T4
+- **Worktree**: no. Es un archivo del principal y va en un commit `T10:` en `plan/robustez-datos`, antes de crear los worktrees de la ola 2. **Ruta**: inline.
+- **Puede tocar**: `config/registro.py`, `config/tests/test_registro.py`
+- **No puede tocar**: `docs/planes/`, `apps/**`
+- **Skill a leer antes**: `.claude/skills/convenciones-proyecto/SKILL.md` § Prohibiciones
+- **Presupuesto**: 60 líneas agregadas
+- **Qué hacer**: `_FILA_DB` cubre desde `Failing row contains (` hasta el final del mensaje de esa excepción (DOTALL; se corta antes de una línea en blanco seguida de `The above exception` o `During handling`, o al final del texto) y deja `Failing row contains ([oculto]).`. No hay ReDoS: el cuantificador perezoso está anclado a un literal.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_registro.RegistroTests.test_enmascara_failing_row_multilinea --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 60 --subtarea T10`
+
+### T8 — Visitas: correcciones de la auditoría (bloqueos de la carga manual, revisada solo con la visita cerrada, precisión, cuenta como servicio)
+
+- **Ola**: 2 · **Depende de**: T6 (va en el mismo worktree `worktrees/robustez-datos-T6`, en serie después de T6, con commits `T8:`)
+- **Worktree**: sí (`worktrees/robustez-datos-T6`)
+- **Puede tocar**: `apps/visitas/services.py`, `apps/visitas/serializers.py`, `apps/visitas/migrations/0009_cuenta_como_servicio_y_precision.py`, `apps/visitas/templates/visitas/panel/ficha.html`, `apps/visitas/tests/**`
+- **No puede tocar**: `docs/planes/`, `config/`, `apps/sitios/**`, `apps/panel/**`, migraciones anteriores a `0009`
+- **Skill a leer antes**: `.claude/skills/convenciones-proyecto/SKILL.md` § Prohibiciones
+- **Presupuesto**: 220 líneas agregadas
+- **Qué hacer**:
+  - `registrar_visita_manual` bloquea el Proyecto antes que la pendiente, con el orden Proyecto → Visita del contrato.
+  - `marcar_incidencia_revisada` rechaza una visita que no está realizada. La ficha no muestra el botón en ese caso.
+  - `AbrirVisitaSerializer.precision_m` lleva `max_value=Decimal("99999.9")`, para que nunca supere lo que admite `Visita.precision_m` (7,2).
+  - Al abrir una pendiente propia o completarla en la carga manual, `cuenta_como_servicio = True`. El backfill de `0009` excluye las pendientes.
+  - `_fijar_ubicacion_por_escaneo` bloquea el punto con `select_for_update(no_key=True)`, para que no choque con el `KEY SHARE` del INSERT de la revisión.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_services.BloqueosTests.test_manual_bloquea_proyecto_antes_que_pendiente --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_services.BloqueosTests.test_escaneo_bloquea_punto_sin_clave --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_services.BloqueosTests.test_pendiente_usada_cuenta_como_servicio --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_incidencias.UbicacionTests.test_no_marca_revisada_una_visita_abierta --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_api.AbrirVisitaTests.test_precision_fuera_de_rango_da_400 --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_migraciones.CuentaComoServicioTests.test_backfill_no_toca_pendientes --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 220 --subtarea T8`
+
+### T9 — Sitios: correcciones de la auditoría (ubicación corregida, backfill y update_fields)
+
+- **Ola**: 2 · **Depende de**: T4
+- **Worktree**: sí (`worktrees/robustez-datos-T9`)
+- **Puede tocar**: `apps/sitios/models.py`, `apps/sitios/services.py`, `apps/sitios/migrations/0008_ubicacion_fijada_y_precision.py`, `apps/sitios/tests/**`
+- **No puede tocar**: `docs/planes/`, `config/`, `apps/visitas/**`, `apps/panel/**`, migraciones anteriores a `0008`
+- **Skill a leer antes**: `.claude/skills/convenciones-proyecto/SKILL.md` § Prohibiciones
+- **Presupuesto**: 160 líneas agregadas
+- **Qué hacer**:
+  - `fijar_ubicacion` y `fijar_ubicacion_en_campo` ponen `ubicacion_fijada_por/en` en nulo, porque una corrección de un administrador deja de ser "fijado por escaneo". Bloquean con `select_for_update(no_key=True)`.
+  - El backfill de `0008` saltea los puntos cuya última fila histórica con cambio de latitud o longitud no es la del escaneo.
+  - `Plano.save` respeta `update_fields`, como `PuntoControl.save`.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_services.FijarUbicacionTests.test_corregir_ubicacion_limpia_fijada_por_escaneo --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_migraciones.UbicacionFijadaTests.test_backfill_ignora_puntos_corregidos_despues --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_planos.PlanoTests.test_save_respeta_update_fields --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 160 --subtarea T9`
 
 ## Criterios de cierre global
 
@@ -245,6 +309,9 @@ commit_base: 07191c7
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
+| T8 | pendiente |
+| T9 | pendiente |
+| T10 | pendiente |
 
 ### Corridas
 
@@ -255,6 +322,9 @@ commit_base: 07191c7
 | 2026-10-07 | T3 | f69ba3d (worktree) | PASA (verificador 18/18, verificador-b 18/18) | integrada en 030216b; suite 562 OK |
 | | T5 | | | |
 | | T6 | | | |
+| | T8 | | | |
+| | T9 | | | |
+| | T10 | | | |
 | | TODO | | | |
 
 ## Pendientes que deja este plan
@@ -266,6 +336,8 @@ commit_base: 07191c7
 - P-robustez-datos-4 [observación] La regla de P-panel-7 "una sola llamada a `esquema_planilla` en `panel_forms.py`" se resolvió con prefetch: siguen dos llamadas (una por ámbito) y una sola consulta, cubierta por `ManualTests.test_pide_los_campos_del_esquema_una_sola_vez` (informe de T2).
 
 ### Decisiones
+- 2026-10-08 — Una incidencia (general o de ubicación) se marca como revisada solo con la visita realizada — hallazgo del auditor de la ola 1, decisión del usuario — reemplaza a: (nada)
+- 2026-10-08 — El plan se amplía con T8, T9 y T10 para corregir los hallazgos de la auditoría de la ola 1; `visitas.0009` y `sitios.0008` se editan porque nacieron en este plan sin desplegar — decisión del usuario — reemplaza a: (nada)
 - 2026-10-07 — Al reactivar un sitio se reactivan solo los puntos que apagó el sitio (última fila histórica "Sitio desactivado") — P-puntos-control-27, decisión del usuario al planificar — reemplaza a: (nada)
 - 2026-10-07 — `Visita.cuenta_como_servicio` guarda el rol al abrir; `visitas.0009` lo llena con el rol actual del empleado — P-cierre-puntos-10, decisión del usuario al planificar — reemplaza a: (nada)
 - 2026-10-07 — El orden de bloqueo único es Proyecto → Visita → PuntoControl — P-puntos-control-9 — reemplaza a: (nada) — decidida por Claude, revisable
