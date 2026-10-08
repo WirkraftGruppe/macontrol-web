@@ -152,6 +152,7 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .tarjeta-enlace:hover .tarjeta { border-color: var(--brand); }
 .bloque-invertido { background: var(--brand); color: var(--on-brand); border-radius: 8px; padding: 32px; }
 .bloque-invertido .tarjeta { background: var(--bg); }
+.seccion-amarilla .tarjeta { background: var(--bg); color: var(--text); }
 .etiqueta {
   display: inline-block; padding: 4px 8px; border-radius: 999px;
   font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
