@@ -172,6 +172,23 @@ class PuntoControlAdminTests(TestCase):
         self.punto.refresh_from_db()
         self.assertFalse(self.punto.activo)
 
+    def test_alta_inactiva_con_otro_punto_activo(self):
+        self.client.force_login(self.administrador)
+        url = reverse("admin:sitios_puntocontrol_add")
+        datos = {"sitio": self.sitio.pk, "nombre": "Cocina", "orden": 1}
+        respuesta = self.client.post(url, {**datos, "_save": "Guardar"})
+        self.assertEqual(respuesta.status_code, 302)
+        creado = PuntoControl.objects.get(nombre="Cocina")
+        self.assertFalse(creado.activo)
+
+    def test_alta_en_sitio_inactivo(self):
+        self.client.force_login(self.administrador)
+        Sitio.objects.filter(pk=self.sitio.pk).update(activo=False)
+        url = reverse("admin:sitios_puntocontrol_add")
+        datos = {"sitio": self.sitio.pk, "nombre": "Cocina", "orden": 1}
+        respuesta = self.client.post(url, {**datos, "_save": "Guardar"})
+        self.assertEqual(respuesta.status_code, 302)
+
     def test_regenerar_qr_pide_confirmacion(self):
         self.client.force_login(self.administrador)
         anterior = self.punto.qr_codigo

@@ -92,11 +92,17 @@ class PuntoControlAdminForm(forms.ModelForm):
 
     def clean(self):
         datos = super().clean()
-        if "activo" in self.changed_data and not datos.get("activo"):
-            otros = PuntoControl.objects.filter(
-                sitio_id=self.instance.sitio_id, activo=True
-            ).exclude(pk=self.instance.pk)
-            if not otros.exists():
+        if (
+            self.instance.pk
+            and "activo" in self.changed_data
+            and not datos.get("activo")
+        ):
+            activos = list(
+                PuntoControl.objects.select_for_update()
+                .filter(sitio_id=self.instance.sitio_id, activo=True)
+                .values_list("pk", flat=True)
+            )
+            if activos == [self.instance.pk]:
                 self.add_error(
                     "activo", "No se puede desactivar el último punto activo."
                 )
@@ -127,17 +133,15 @@ class PuntoControlAdmin(_AdministradorMixin, SimpleHistoryAdmin):
         if {"latitud", "longitud"} & set(form.changed_data):
             obj.ubicacion_fijada_por = None
             obj.ubicacion_fijada_en = None
+            obj.precision_m = None
         if not change or "activo" not in form.changed_data or obj.activo:
             return super().save_model(request, obj, form, change)
-        # La validación del formulario no bloquea filas: el servicio es quien decide.
+        # El formulario ya rechazó el último punto activo; si el servicio lo
+        # rechaza igual, la excepción hace fallar la petición.
         obj.activo = True
-        try:
-            with transaction.atomic():
-                super().save_model(request, obj, form, change)
-                services.desactivar_punto(obj)
-        except ValidationError as error:
-            obj.activo = True
-            self.message_user(request, " ".join(error.messages), level=messages.ERROR)
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            services.desactivar_punto(obj)
 
     def has_regenerar_qr_permission(self, request):
         return self._es_administrador_activo(request) and self.has_change_permission(

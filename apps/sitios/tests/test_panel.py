@@ -390,6 +390,16 @@ class PuntoPanelTests(_BaseAdminTests):
         self.assertIsNone(self.general.ubicacion_fijada_por)
         self.assertIsNone(self.general.ubicacion_fijada_en)
 
+    def test_corregir_coordenadas_limpia_precision(self):
+        self._fijar_por_escaneo()
+        PuntoControl.objects.filter(pk=self.general.pk).update(precision_m=12)
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        self.client.post(
+            url, self._datos_edicion(latitud="-35.2", longitud="-58.100000")
+        )
+        self.general.refresh_from_db()
+        self.assertIsNone(self.general.precision_m)
+
     def test_editar_sin_cambiar_coordenadas_conserva_fijada(self):
         self._fijar_por_escaneo()
         url = reverse("panel:sitios:punto_editar", args=[self.general.pk])

@@ -235,20 +235,18 @@ class PuntoEdicion(_PuntoMixin, UpdateView):
         if {"latitud", "longitud"} & set(form.changed_data):
             form.instance.ubicacion_fijada_por = None
             form.instance.ubicacion_fijada_en = None
+            form.instance.precision_m = None
         if "activo" not in form.changed_data or form.cleaned_data["activo"]:
             return super().form_valid(form)
-        # Se guarda activo y luego se desactiva con el servicio, que bloquea el
-        # sitio y rechaza el último punto activo; si lo rechaza, no se guarda nada.
-        form.instance.activo = True
+        # El servicio bloquea las filas de los puntos activos y rechaza el último;
+        # si lo rechaza, no se guarda nada.
         with transaction.atomic():
-            respuesta = super().form_valid(form)
             try:
-                services.desactivar_punto(self.object)
+                services.desactivar_punto(form.instance)
             except ValidationError as error:
-                transaction.set_rollback(True)
                 form.add_error("activo", error)
                 return self.form_invalid(form)
-        return respuesta
+            return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)

@@ -91,6 +91,7 @@ def fijar_ubicacion(punto, latitud, longitud):
         bloqueado.longitud = longitud
         bloqueado.ubicacion_fijada_por = None
         bloqueado.ubicacion_fijada_en = None
+        bloqueado.precision_m = None
         bloqueado._change_reason = "Ubicación fijada en el mapa"
         bloqueado.save(
             update_fields=[
@@ -98,6 +99,7 @@ def fijar_ubicacion(punto, latitud, longitud):
                 "longitud",
                 "ubicacion_fijada_por",
                 "ubicacion_fijada_en",
+                "precision_m",
             ]
         )
     punto.latitud, punto.longitud = bloqueado.latitud, bloqueado.longitud
