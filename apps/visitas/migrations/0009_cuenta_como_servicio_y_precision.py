@@ -7,14 +7,15 @@ def llenar_cuenta_como_servicio(apps, schema_editor):
     """RunPython: las visitas existentes toman el rol actual de su empleado.
 
     Es lo único que se sabe de ellas: el rol al abrir no se guardaba. Las de un
-    administrador quedan en `False` (no cuentan como servicio); el resto conserva
-    el valor por defecto. No tiene vuelta atrás que deshacer: quitar el campo
+    administrador quedan en `False` (no cuentan como servicio), salvo las
+    pendientes, que solo las abre un empleado; el resto conserva el valor por
+    defecto. No tiene vuelta atrás que deshacer: quitar el campo
     borra el dato.
     """
     Visita = apps.get_model("visitas", "Visita")
-    Visita.objects.filter(empleado__rol="administrador").update(
-        cuenta_como_servicio=False
-    )
+    Visita.objects.filter(empleado__rol="administrador").exclude(
+        estado="pendiente"
+    ).update(cuenta_como_servicio=False)
 
 
 class Migration(migrations.Migration):

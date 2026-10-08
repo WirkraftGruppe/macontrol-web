@@ -98,6 +98,16 @@ class UbicacionTests(TestCase):
         self.assertContains(respuesta, "12 m")
         self.assertNotContains(respuesta, "Marcar como revisada")
 
+    def test_no_marca_revisada_una_visita_abierta(self):
+        abierta = self._visita(
+            estado=Visita.Estado.ABIERTA, cerrada_en=None, cierre="", incidencia=True
+        )
+        with self.assertRaises(ValidationError):
+            marcar_incidencia_revisada(abierta, self.admin)
+        abierta.refresh_from_db()
+        self.assertIsNone(abierta.incidencia_revisada_en)
+        self.assertNotContains(self._ficha(abierta), "Marcar como revisada")
+
     def test_marcar_revisada_bloquea_la_fila(self):
         visita = self._visita(incidencia_ubicacion=True)
         with (

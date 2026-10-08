@@ -26,7 +26,7 @@
     {% if con_ubicacion %}<p>Hay una apertura o una revisión registrada lejos del punto de control.</p>{% endif %}
     {% if visita.incidencia_revisada_en %}
       <p>Revisada por {{ visita.incidencia_revisada_por.get_full_name|default:visita.incidencia_revisada_por.username }} el {{ visita.incidencia_revisada_en|date:"d/m/Y H:i" }}.</p>
-    {% else %}
+    {% elif visita.estado == 'realizada' %}
       <form method="post" action="{% url 'panel:visitas:revisar_incidencia' visita.pk %}">
         {% csrf_token %}
         <button class="boton boton-primario" type="submit">Marcar como revisada</button>
