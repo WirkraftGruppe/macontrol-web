@@ -26,7 +26,11 @@ OCULTO = "[oculto]"
 # Detalle de IntegrityError de PostgreSQL: "Key (cuit)=(2012…) already exists".
 _CLAVE_VALOR_DB = re.compile(r"Key \(([^)]*)\)=\(.*?\)(?= |$|\.)")
 # Detalle de NOT NULL o CHECK de PostgreSQL: "Failing row contains (…)", la fila entera.
-_FILA_DB = re.compile(r"Failing row contains \(.*?\)\.?$", re.MULTILINE)
+# Cubre hasta el fin del mensaje de esa excepción: un valor puede tener saltos de línea.
+_FILA_DB = re.compile(
+    r"Failing row contains \(.*?(?=\n\n(?:The above exception|During handling)|\Z)",
+    re.DOTALL,
+)
 PROFUNDIDAD_MAXIMA = 5
 _ESTANDAR = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
     "message",

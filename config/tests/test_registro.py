@@ -101,6 +101,28 @@ class RegistroTests(SimpleTestCase):
         self.assertIn("Failing row contains ([oculto])", salida)
         self.assertIn("cerrada_en", salida)
 
+    def test_enmascara_failing_row_multilinea(self):
+        """Un TextField con saltos de línea no deja escapar el resto de la fila."""
+        try:
+            try:
+                raise ValueError(
+                    "DETAIL:  Failing row contains (5, 20123456786, Av. X 123\n"
+                    "Piso 2 (fondo), null)."
+                )
+            except ValueError as error:
+                raise RuntimeError("envoltorio") from error
+        except RuntimeError:
+            r = logging.LogRecord(
+                "t", logging.ERROR, __file__, 1, "falla", (), sys.exc_info()
+            )
+        FiltroDatosPersonales().filter(r)
+        salida = logging.Formatter().format(r)
+        for dato in ("20123456786", "Av. X 123", "Piso 2"):
+            self.assertNotIn(dato, salida)
+        self.assertIn("Failing row contains ([oculto]).", salida)
+        # El resto del traceback (la excepción que envuelve) sigue visible.
+        self.assertIn("RuntimeError: envoltorio", salida)
+
 
 def _filtrar(msg, args=(), **extra):
     r = _record(msg, args, **extra)
