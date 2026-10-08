@@ -74,8 +74,10 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - Un [test] tiene que ser NUEVO respecto de commit_base.
 - Prohibido: "funciona", "tests pasando", "revisado", "sin regresiones", "quedó implementado".
 - Dos subtareas no escriben el mismo archivo ni crean migraciones en la misma app en paralelo.
-- Presupuesto: `presupuesto.sh . '<commit_base>' <N> --subtarea T<n>` mide los commits `T<n>:` y
-  `T<n>b:` (sin merges). Si se usan rutas en lugar de `--subtarea`, las rutas de presupuesto
+- Presupuesto: `presupuesto.sh . '<commit_base>' <N> --subtarea T<n>` mide los commits `T<n>:`
+  (sin merges; también suma `T<n>b:`, por eso ese sufijo no se usa: si el trabajo no entra,
+  lo que falta va en una subtarea nueva `T<m>` con presupuesto y criterios propios, como
+  contrato modificado). Si se usan rutas en lugar de `--subtarea`, las rutas de presupuesto
   no se solapan entre subtareas: un archivo cuenta en el presupuesto de una sola.
 - `Puede tocar` respeta la tabla de propiedad de `convenciones-proyecto`: nada de otro dueño.
 -->
