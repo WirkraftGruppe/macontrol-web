@@ -7,13 +7,37 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | elegir el próximo plan; candidato: `robustez-panel` (trae P-robustez-datos-8 y -9) | sesión 2026-10-08 cerrada |
+| — | main | — | elegir el próximo plan; candidatos: `robustez-panel` (P-robustez-datos-8 y -9) y `sitio-cierre` (P-sitio-publico-1, -2, -6, -7, -12) | sesiones 2026-10-08 cerradas (robustez-datos y sitio-publico) |
 
-Siguiente: 62 abiertos: `despliegue` 24, `robustez-panel` 14 (incluye P-robustez-datos-8 y -9, decisión del usuario), `expo` 8, `empresa` 5, `informes` 2, `saneamiento` 1, y 10 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12, a etiquetar en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
+Siguiente: 79 abiertos: `despliegue` 24, `robustez-panel` 14, `expo` 8, `empresa` 6, `sitio-cierre` 5, `informes` 2, `saneamiento` 1, y 21 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12; P-sitio-publico-3, -5, -8 a -11 y -13 a -17), a etiquetar en el próximo triage. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-08 — Plan `sitio-publico`: sitio público, fusión en `main`
+Hecho:
+- Plan Completo `sitio-publico` (seguridad: sí) en dos olas:
+  - T1 (modelos `Configuracion`, `PaginaServicio`, `ClienteDestacado`, `Sector`) y T7 (fixture `contenido_inicial`: 9 servicios, 13 clientes).
+  - T2 (`web.css`, `base_web.html`, 5 WebP).
+  - T4 (edición del contenido desde el panel).
+  - T5 (home, servicio, empresa, contacto, `/q/<uuid>/`, sitemap, robots, Open Graph, 404/500).
+  - T8 y T9 (imágenes subidas sin EXIF, formato real, nombres uuid, redes solo https).
+  - T10 (contraste de los sectores y dimensiones del logo).
+- Contrato modificado cuatro veces y aprobado por escrito en el Registro:
+  - 9ac7c9d y 56ea85f: T1 y T8 partidas por presupuesto.
+  - 5c01419: T8 por la auditoría.
+  - a9f80a5: T10 por la prueba en el navegador.
+- `auditor-seguridad`: H1-H4 cerrados. Los hallazgos de severidad baja quedan como P-sitio-publico-12 a -14.
+- Verificación TODO: 99/100 con los dos verificadores; única FALLA `congelado.sh` por el contrato modificado.
+- Lighthouse móvil sobre la home, hecho por el usuario: 93/100/100/100.
+- Fusión de `plan/sitio-publico` en `main` con `--no-ff` (25e188a), sin conflictos con `robustez-datos`. En `main`: check, makemigrations, ruff y 613 tests en PASA. 23 decisiones copiadas a `docs/decisiones.md`. Sin push.
+- Decisiones del usuario al cierre:
+  - El fixture no debe incluir `TipoServicio` (P-6 es defecto).
+  - `media/publico/` se sirve en abierto solo para logos y portadas.
+  - P-7 y los textos fijos de las plantillas se resuelven juntos.
+  - Etiqueta `sitio-cierre` para P-1, -2, -6, -7, -12.
+Sigue: el usuario trae objeciones y cambios visuales del sitio en otra sesión (P-sitio-publico-17); elegir entre `robustez-panel` y `sitio-cierre`.
 
 ### 2026-10-08 — Plan `robustez-datos`: fusión en `main`
 Hecho:
