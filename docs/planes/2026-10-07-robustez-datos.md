@@ -325,7 +325,7 @@ commit_base: 07191c7
 | 2026-10-08 | T8 | 9383ca4 (worktree) | PASA en criterios (verificador 9/9, verificador-b 9/9); contrato MODIFICADO por 01d5d1f | |
 | 2026-10-08 | T9 | 3dbba2b (worktree) | PASA en criterios (verificador 6/6, verificador-b 6/6); contrato MODIFICADO por 01d5d1f | integrada en 336db2b; suite 573 OK |
 | 2026-10-08 | T10 | b192435 | PASA en criterios (verificador 3/3, verificador-b 3/3); veredicto global FALLA solo por CONTRATO MODIFICADO (01d5d1f, ampliación aprobada por el usuario) | |
-| | TODO | | | |
+| 2026-10-08 | TODO | 923f396 | FALLA 1/84 (verificador y verificador-b): solo `congelado.sh`, CONTRATO MODIFICADO por 01d5d1f (ampliación aprobada por el usuario); 83/84 PASA, suite 578 OK | auditoría final: 0 bloqueantes, P-robustez-datos-8 a -12 abiertos |
 
 ## Pendientes que deja este plan
 
