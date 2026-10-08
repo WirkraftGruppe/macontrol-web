@@ -267,7 +267,8 @@ commit_base: 21b20be
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-10-08 | T1 (ronda 1) | 5beddf5 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: 1 importante (alta en admin rechazada, regresión de T1), 2 menores, 2 observaciones; el usuario decide corregir en T1 antes de integrar |
+| | T1 (ronda 2) | | | |
 | | T2 | | | |
 | | T3 | | | |
 | | T4 | | | |
@@ -348,6 +349,8 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 
 ### Decisiones
 
+- 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
+- 2026-10-08 — la ronda 2 de T1 puede tocar `apps/sitios/services.py` (solo `fijar_ubicacion`), fuera de su `Puede tocar`, sin modificar el contrato congelado — lo exige la decisión anterior sobre `precision_m` — decisión del usuario — reemplaza a: (nada)
 - 2026-10-08 — partición por presupuesto siempre en subtarea nueva (T<m>) con presupuesto y criterios propios, declarada como contrato modificado; no se usan sufijos T<n>b — presupuesto.sh --subtarea T<n> suma los T<n>b: y hace fallar el criterio — reemplaza a: 2026-10-04
 - 2026-10-08 — P-sitio-publico-3 pasa a `sitio-cierre` y no entra en este plan — depende de que el fixture deje de incluir `TipoServicio` (P-sitio-publico-6) — decisión del usuario — reemplaza a: (nada)
 - 2026-10-08 — el filtro de incidencias de visitas suma la opción "ubicación (revisadas)" — P-robustez-datos-3 — decisión del usuario — reemplaza a: (nada)
