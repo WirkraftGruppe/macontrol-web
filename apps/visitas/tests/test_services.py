@@ -82,6 +82,20 @@ def espiar_bloqueos():
         yield modelos
 
 
+@contextmanager
+def espiar_bloqueos_con_argumentos():
+    """Lista `(modelo, kwargs)` de cada `select_for_update`, en orden."""
+    pedidos = []
+    original = models.QuerySet.select_for_update
+
+    def espia(self, *args, **kwargs):
+        pedidos.append((self.model, kwargs))
+        return original(self, *args, **kwargs)
+
+    with mock.patch.object(models.QuerySet, "select_for_update", espia):
+        yield pedidos
+
+
 class SinArchivosMixin:
     @classmethod
     def tearDownClass(cls):
@@ -979,6 +993,73 @@ class BloqueosTests(SinArchivosMixin, TestCase):
         with espiar_bloqueos() as al_abrir:
             abrir(empleado=otro, proyecto=self.proyecto)
         self.assertLess(al_abrir.index(Proyecto), al_abrir.index(Visita))
+
+    def test_manual_bloquea_proyecto_antes_que_pendiente(self):
+        pendiente = crear_visita(programada_para=date(2026, 9, 1))
+        admin = User.objects.create_user(
+            username="adm-orden", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        with espiar_bloqueos() as modelos:
+            registrar_visita_manual(
+                proyecto=pendiente.proyecto,
+                empleado=pendiente.empleado,
+                administrador=admin,
+                motivo="Sin señal",
+                realizada_en=timezone.now(),
+                puntos=[punto_de(pendiente)],
+                datos={},
+                productos_aplicados=[],
+                fotos=[jpeg_chico()],
+                pendiente=pendiente,
+            )
+        self.assertLess(modelos.index(Proyecto), modelos.index(Visita))
+
+    def test_escaneo_bloquea_punto_sin_clave(self):
+        punto = punto_de(self.visita)
+        with espiar_bloqueos_con_argumentos() as pedidos:
+            registrar_revision(
+                visita=self.visita,
+                empleado=self.empleado,
+                qr_codigo=punto.qr_codigo,
+                cliente_uuid=uuid4(),
+                realizada_en=timezone.now() - timedelta(minutes=5),
+                latitud=Decimal("-35.1"),
+                longitud=Decimal("-57.7"),
+                precision_m=Decimal("8.5"),
+                datos={},
+                productos_aplicados=[],
+                fotos=[jpeg_chico()],
+            )
+        self.assertIn((PuntoControl, {"no_key": True}), pedidos)
+
+    def test_pendiente_usada_cuenta_como_servicio(self):
+        pendiente = crear_visita(programada_para=date(2026, 9, 1))
+        Visita.objects.filter(pk=pendiente.pk).update(cuenta_como_servicio=False)
+        visita, _ = abrir(empleado=pendiente.empleado, proyecto=pendiente.proyecto)
+        self.assertEqual(visita.pk, pendiente.pk)
+        visita.refresh_from_db()
+        self.assertTrue(visita.cuenta_como_servicio)
+
+        otra = crear_visita(programada_para=date(2026, 9, 2))
+        Visita.objects.filter(pk=otra.pk).update(cuenta_como_servicio=False)
+        admin = User.objects.create_user(
+            username="adm-cs", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        manual = registrar_visita_manual(
+            proyecto=otra.proyecto,
+            empleado=otra.empleado,
+            administrador=admin,
+            motivo="Sin señal",
+            realizada_en=timezone.now(),
+            puntos=[punto_de(otra)],
+            datos={},
+            productos_aplicados=[],
+            fotos=[jpeg_chico()],
+            pendiente=otra,
+        )
+        self.assertEqual(manual.pk, otra.pk)
+        manual.refresh_from_db()
+        self.assertTrue(manual.cuenta_como_servicio)
 
     def test_revision_filtra_por_empleado_al_bloquear(self):
         ajeno = User.objects.create_user(

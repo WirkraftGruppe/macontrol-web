@@ -2,6 +2,7 @@ import json
 import shutil
 import tempfile
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from io import BytesIO
 from types import SimpleNamespace
 from unittest import mock
@@ -268,6 +269,17 @@ class AbrirVisitaTests(ApiVisitasBase):
         self.assertTrue(nueva.incidencia_asignacion)
         ajena.refresh_from_db()
         self.assertEqual(ajena.estado, Visita.Estado.PENDIENTE)
+
+    def test_precision_fuera_de_rango_da_400(self):
+        for precision in ("100000", "99999.9"):
+            r = self._abrir(precision_m=precision)
+            with self.subTest(precision=precision):
+                self.assertEqual(r.status_code, 400 if precision == "100000" else 201)
+                if r.status_code == 400:
+                    self.assertIn("precision_m", r.data["campos"])
+                else:
+                    visita = Visita.objects.get(pk=r.data["id"])
+                    self.assertEqual(visita.precision_m, Decimal("99999.90"))
 
     def test_proyecto_inexistente_o_pausado_da_400(self):
         r = self._abrir(proyecto=999999)

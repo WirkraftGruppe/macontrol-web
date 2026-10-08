@@ -276,6 +276,7 @@ def abrir_visita(
             propia.abierta_en = ahora
             propia.origen = Visita.Origen.APP
             propia.motivo_manual = ""
+            propia.cuenta_como_servicio = True
             propia.save()
             return propia, True
         visita = Visita.objects.create(
@@ -306,14 +307,23 @@ def _fijar_ubicacion_por_escaneo(punto, revision, usuario):
     precision = revision.precision_m
     if precision is None or precision > settings.PRECISION_MAXIMA_M:
         return
-    bloqueado = PuntoControl.objects.select_for_update().get(pk=punto.pk)
+    bloqueado = PuntoControl.objects.select_for_update(no_key=True).get(pk=punto.pk)
     if bloqueado.latitud is not None and bloqueado.longitud is not None:
         return
     bloqueado.latitud = revision.latitud
     bloqueado.longitud = revision.longitud
+    bloqueado.ubicacion_fijada_por = usuario
+    bloqueado.ubicacion_fijada_en = timezone.now()
     bloqueado._history_user = usuario
     bloqueado._change_reason = MOTIVO_UBICACION_FIJADA
-    bloqueado.save(update_fields=["latitud", "longitud"])
+    bloqueado.save(
+        update_fields=[
+            "latitud",
+            "longitud",
+            "ubicacion_fijada_por",
+            "ubicacion_fijada_en",
+        ]
+    )
 
 
 def _guardar_fotos_y_productos(revision, fotos, aplicados, guardadas):
@@ -693,6 +703,8 @@ def registrar_visita_manual(
             errores["fotos"] = [f"Se permiten hasta {MAX_FOTOS} fotos por revisión."]
         visita = None
         if pendiente is not None:
+            # Orden Proyecto -> Visita, como en `abrir_visita` y `cerrar_visita`.
+            Proyecto.objects.select_for_update(of=("self",)).get(pk=proyecto.pk)
             visita = Visita.objects.select_for_update().get(pk=pendiente.pk)
             if (
                 visita.proyecto_id != proyecto.pk
@@ -716,6 +728,7 @@ def registrar_visita_manual(
         visita.origen = Visita.Origen.MANUAL
         visita.motivo_manual = motivo.strip()
         visita.asignada_por = administrador
+        visita.cuenta_como_servicio = True
         visita.estado = Visita.Estado.ABIERTA
         visita.abierta_en = realizada_en
         visita.save()
@@ -760,6 +773,8 @@ def marcar_incidencia_revisada(visita, administrador):
     """
     with transaction.atomic():
         visita = Visita.objects.select_for_update().get(pk=visita.pk)
+        if visita.estado != Visita.Estado.REALIZADA:
+            raise ValidationError("La incidencia se revisa con la visita cerrada.")
         con_ubicacion = (
             visita.incidencia_ubicacion
             or visita.revisiones.filter(incidencia_ubicacion=True).exists()

@@ -72,6 +72,7 @@ class AbrirVisitaSerializer(serializers.Serializer):
         max_digits=7,
         decimal_places=1,
         min_value=Decimal("0"),
+        max_value=Decimal("99999.9"),
         required=False,
         allow_null=True,
         default=None,
