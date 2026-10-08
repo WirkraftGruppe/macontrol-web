@@ -382,6 +382,7 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
 commit_base: 45fb49c
 
 Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 9ac7c9d, 5c01419 y 56ea85f."
+Aprobación del usuario (2026-10-08, literal): "Apruebo el cambio de contrato a9f80a5."
 
 ### Estado de subtareas
 | Tarea | Estado |
@@ -391,7 +392,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | pendiente |
+| T6 | hecha |
 | T7 | hecha |
 | T8 | hecha |
 | T9 | hecha |
