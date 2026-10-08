@@ -306,11 +306,11 @@ commit_base: 07191c7
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
-| T6 | pendiente |
+| T5 | hecha |
+| T6 | hecha |
 | T7 | pendiente |
-| T8 | pendiente |
-| T9 | pendiente |
+| T8 | hecha |
+| T9 | hecha |
 | T10 | hecha |
 
 ### Corridas
@@ -320,10 +320,10 @@ commit_base: 07191c7
 | 2026-10-07 | T1 | 9b80d5f | PASA (verificador 5/5, verificador-b 5/5) | |
 | 2026-10-07 | T2 | a18b3e9 (worktree) | PASA (verificador 20/20, verificador-b 20/20) | T2b f7f58bf: test de migración con todas las apps en su hoja, para integrar con sitios.0008 |
 | 2026-10-07 | T3 | f69ba3d (worktree) | PASA (verificador 18/18, verificador-b 18/18) | integrada en 030216b; suite 562 OK |
-| | T5 | | | |
-| | T6 | | | |
-| | T8 | | | |
-| | T9 | | | |
+| 2026-10-08 | T5 | 0585c93 (worktree) | PASA en criterios (verificador 7/7, verificador-b 7/7); contrato MODIFICADO por 01d5d1f | integrada en 81d417d; suite 578 OK |
+| 2026-10-08 | T6 | 9383ca4 (worktree) | PASA en criterios (verificador 3/3, verificador-b 3/3); contrato MODIFICADO por 01d5d1f | integrada en e6e46e9 junto con T8; suite 570 OK |
+| 2026-10-08 | T8 | 9383ca4 (worktree) | PASA en criterios (verificador 9/9, verificador-b 9/9); contrato MODIFICADO por 01d5d1f | |
+| 2026-10-08 | T9 | 3dbba2b (worktree) | PASA en criterios (verificador 6/6, verificador-b 6/6); contrato MODIFICADO por 01d5d1f | integrada en 336db2b; suite 573 OK |
 | 2026-10-08 | T10 | b192435 | PASA en criterios (verificador 3/3, verificador-b 3/3); veredicto global FALLA solo por CONTRATO MODIFICADO (01d5d1f, ampliación aprobada por el usuario) | |
 | | TODO | | | |
 
@@ -333,6 +333,9 @@ commit_base: 07191c7
 - P-robustez-datos-1 [importante] `PuntoForm` (`apps/sitios/panel_forms.py`) deja destildar "activo" al editar un punto: se puede desactivar el último punto activo de un sitio sin pasar por `desactivar_punto` (informe de T3).
 - P-robustez-datos-2 [menor] `test_foto_enorme_da_400_sin_500` pasaría también sin el corte por `CONTENT_LENGTH` (la validación de la foto ya daba 400): no prueba que el cuerpo no se lea (verificador de T3).
 - P-robustez-datos-3 [menor] `?incidencia=ubicacion` lista solo las no revisadas (igual que el contador del tablero); no hay forma de ver las de ubicación ya revisadas (informe de T2).
+- P-robustez-datos-5 [menor] `Plano.save` con un archivo nuevo sin confirmar y un `update_fields` sin `imagen` escribe el archivo nuevo sin que la base lo referencie: queda huérfano. Ningún test lo cubre (verificador de T9).
+- P-robustez-datos-6 [observación] `cerrar_visita` no comprueba que `visita_bd.proyecto_id` siga siendo el `proyecto_id` leído sin bloqueo; hoy no hay escenario (solo se edita el proyecto de una pendiente, que no se cierra) (auditoría de la ola 1).
+- P-robustez-datos-7 [observación] Los bloqueos (`FOR NO KEY UPDATE`, orden Proyecto → Visita) y el desborde de `numeric(7,2)` solo se prueban con espías en SQLite; falta una corrida contra PostgreSQL antes del despliegue.
 - P-robustez-datos-4 [observación] La regla de P-panel-7 "una sola llamada a `esquema_planilla` en `panel_forms.py`" se resolvió con prefetch: siguen dos llamadas (una por ámbito) y una sola consulta, cubierta por `ManualTests.test_pide_los_campos_del_esquema_una_sola_vez` (informe de T2).
 
 ### Decisiones
@@ -347,5 +350,33 @@ commit_base: 07191c7
 - 2026-10-07 — P-cierre-puntos-2 (etiqueta `robustez-panel`) entra en este plan porque el usuario lo pidió en forma explícita — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
-(se completa en T7)
+- cierra: P-cierre-puntos-13 — T2 (servicio, filtro `ubicacion`, distancia y botón en la ficha) y T5 (contador sin administradores)
+- cierra: P-cierre-puntos-14 — T5: el `Max` de "Última visita" filtra `cuenta_como_servicio`
+- cierra: P-panel-7 — T2: `prefetch_related("tipo_servicio__campos")` en `_cargar_proyecto`, `cerrar_visita` y la carga manual; `ResolverQRView` ya lo tenía
+- cierra: P-panel-15 — T2: `marcar_incidencia_revisada` con `atomic` + `select_for_update`
+- cierra: P-panel-24 — T2: la carga manual rechaza `realizada_en < proyecto.creado`
+- cierra: P-panel-25 — T2: la carga manual y la asignación rechazan sitio o cliente de baja
+- cierra: P-panel-26 — T2: motivo "Reasignada en carga manual por <usuario>" en el historial
+- cierra: P-saneamiento-3 — T1 y T10: `_FILA_DB` enmascara `Failing row contains (…)`, también con saltos de línea
+- cierra: P-puntos-control-7 — T3 y T9: `Plano.save` y `PuntoControl.save` borran el archivo anterior al confirmar; `suprimir_sitio` ya alcanzaba los planos por `post_delete`
+- cierra: P-puntos-control-8 — T3: `sitio` de solo lectura al editar punto y plano en el admin
+- cierra: P-puntos-control-9 — T2 y T8: orden único Proyecto → Visita → PuntoControl; `cerrar_visitas_abiertas` captura `OperationalError` por visita
+- cierra: P-puntos-control-11 — T1: `pypdfium2>=5.14,<6`
+- cierra: P-puntos-control-24 — T3: `max_value=2**31 - 1` en el parámetro `sitio`
+- cierra: P-puntos-control-27 — T3: `desactivar_punto` rechaza el último punto activo y reactivar el sitio reactiva los puntos que apagó; el camino de `PuntoForm` queda en P-robustez-datos-1
+- cierra: P-puntos-control-32 — T5: `cargar_demo` borra los planos creados si falla la transacción
+- cierra: P-puntos-control-33 — T5: atraso de la demo acotado a `ATRASO_MAXIMO_HORAS - 1 h` e idempotencia por visitas realizadas
+- cierra: P-puntos-control-35 — T5: `test_recorrido` crea y borra su MEDIA_ROOT en `setUpClass`/`tearDownClass`
+- cierra: P-cierre-puntos-2 — T1: `DISTANCIA_MAXIMA_M` documentada en `.env.example`
+- cierra: P-cierre-puntos-4 — T2 (`Visita.precision_m`) y T3 (`Sitio`/`PuntoControl.precision_m` en altas y ubicación)
+- cierra: P-cierre-puntos-5 — T3: `AltaPuntoView` corta por `CONTENT_LENGTH` y captura `RequestDataTooBig`/`TooManyFieldsSent`/`TooManyFilesSent` con 400 (el test de foto enorme queda débil: P-robustez-datos-2)
+- cierra: P-cierre-puntos-6 — T3: `foto` de solo lectura al editar el punto en el admin
+- cierra: P-cierre-puntos-7 — T2: `Visita.clean` rechaza una pendiente asignada a un administrador y `VisitaAdmin` limita el campo
+- cierra: P-cierre-puntos-8 — T3 y T9: `fijar_ubicacion*` con `atomic` + `select_for_update(no_key=True)`
+- cierra: P-cierre-puntos-9 — T2: `registrar_revision` filtra por `empleado` dentro del `select_for_update`
+- cierra: P-cierre-puntos-10 — T2 y T8: `Visita.cuenta_como_servicio` se fija al abrir (backfill en `visitas.0009`, sin pendientes)
+- cierra: P-cierre-puntos-11 — T1 y T3: cupo `alta_campo` (300/h) para altas de sitio, punto y ubicación
+- cierra: P-cierre-puntos-12 — T2: opción `--proyecto` en `registrar_revision_demo`
+- cierra: P-auditoria-p31-1 — T3, T6 y T9: `ubicacion_fijada_por/en`, aviso "Punto fijado por escaneo" en el panel, limpieza al corregir
+- cierra: P-auditoria-p31-2 — T3: `QuitarPropuestaTests.test_sitio_sin_coordenadas_aplica`
 
