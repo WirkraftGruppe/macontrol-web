@@ -251,7 +251,7 @@ commit_base: 21b20be
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
@@ -268,7 +268,7 @@ commit_base: 21b20be
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-08 | T1 (ronda 1) | 5beddf5 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: 1 importante (alta en admin rechazada, regresión de T1), 2 menores, 2 observaciones; el usuario decide corregir en T1 antes de integrar |
-| | T1 (ronda 2) | | | |
+| 2026-10-08 | T1 (ronda 2) | c516ab7 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: hallazgos 1-3 y la observación de precision_m cerrados; queda 1 Baja ya existente antes de T1 (P-robustez-panel-2) y el historial doble (P-robustez-panel-1) |
 | | T2 | | | |
 | | T3 | | | |
 | | T4 | | | |
@@ -347,6 +347,8 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 
 ### Problemas
 
+- P-robustez-panel-1 [observación] Una baja desde la edición del panel o del admin deja dos filas de historial, ambas con el motivo "Punto desactivado": `desactivar_punto` guarda con `update_fields=["activo"]` (`apps/sitios/services.py:143-145`) y después el formulario hace el guardado completo con `_change_reason` todavía puesto. Se resuelve con un `desactivar_punto` que acepte los campos extra en un solo `save`, o borrando `_change_reason` antes del guardado completo (auditor-seguridad, T1 ronda 2).
+- P-robustez-panel-2 [menor] La edición de un punto en el panel o el admin no tiene bloqueo optimista: si un escaneo fija la ubicación entre el GET y el POST, el guardado borra coordenadas y marca de escaneo y el historial lo atribuye al administrador (`apps/sitios/panel_views.py:235-240`, `apps/sitios/admin.py:133-138`, `apps/visitas/services.py:310-325`). Ya existía antes de T1. Corrección propuesta: campo oculto con `ubicacion_fijada_en` o un contador de versión, validado en `clean()`.
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
