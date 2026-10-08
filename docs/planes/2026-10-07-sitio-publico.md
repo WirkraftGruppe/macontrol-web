@@ -414,6 +414,8 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo el cambio de contrato a9
 | 2026-10-08 | TODO (T1-T10 + cierre global) | d1bf54d | verificador: 99/100 PASA; verificador-b: 99/100 PASA | única FALLA: congelado.sh (CONTRATO MODIFICADO, 5 commits docs(plan)); 562 tests, ruff OK |
 | 2026-10-08 | prueba en el navegador tras T10 (usuario) | d1bf54d | Lighthouse móvil home: Performance 93, Accessibility 100, Best practices 100, SEO 100; color-contrast y unsized-images PASA | quedan LCP 3,2 s, render-blocking y caché de /static/ (P-15, P-16); el usuario trae objeciones visuales en otra sesión (P-17) |
 
+- 2026-10-08 — ajustes visuales del usuario, commit 80f8ed7, posteriores al cierre; verificados con los criterios de cierre global
+
 ## Pendientes que deja este plan
 ### Problemas
 - P-sitio-publico-1 [importante] `media/` no se sirve en ninguna parte: los logos y portadas que se suban desde el panel no se ven hasta definir el servido público de `media/clientes/` y `media/servicios/` sin exponer las fotos de visitas.
