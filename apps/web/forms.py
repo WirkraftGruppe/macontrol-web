@@ -3,8 +3,25 @@
 import json
 
 from django import forms
+from django.core.files.uploadedfile import UploadedFile
 
+from .imagenes import reprocesar_imagen
 from .models import ClienteDestacado, Configuracion, PaginaServicio, Sector
+
+
+class ReprocesaImagenesMixin:
+    """Reprocesa las imágenes nuevas (sin metadatos y con formato real)."""
+
+    # campo -> formato de salida
+    formatos_imagen = {}
+
+    def _reprocesar(self, campo):
+        archivo = self.cleaned_data.get(campo)
+        if isinstance(archivo, UploadedFile):
+            return reprocesar_imagen(
+                archivo, formato_salida=self.formatos_imagen[campo]
+            )
+        return archivo
 
 
 class ListaDeObjetosField(forms.JSONField):
@@ -61,7 +78,9 @@ class ConfiguracionForm(forms.ModelForm):
         ]
 
 
-class PaginaServicioForm(forms.ModelForm):
+class PaginaServicioForm(ReprocesaImagenesMixin, forms.ModelForm):
+    formatos_imagen = {"imagen_portada": "JPEG"}
+
     metodos = ListaDeObjetosField(claves=("titulo", "descripcion"), label="Métodos")
     faq = ListaDeObjetosField(
         claves=("pregunta", "respuesta"), label="Preguntas frecuentes"
@@ -87,8 +106,16 @@ class PaginaServicioForm(forms.ModelForm):
             "publicado",
         ]
 
+    def clean_imagen_portada(self):
+        return self._reprocesar("imagen_portada")
 
-class ClienteDestacadoForm(forms.ModelForm):
+
+class ClienteDestacadoForm(ReprocesaImagenesMixin, forms.ModelForm):
+    formatos_imagen = {"logo": "PNG"}
+
     class Meta:
         model = ClienteDestacado
         fields = ["nombre", "logo", "orden", "activo"]
+
+    def clean_logo(self):
+        return self._reprocesar("logo")
