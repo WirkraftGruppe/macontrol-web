@@ -245,13 +245,13 @@ Toda subtarea que corrige un defecto lleva al menos un `[test]` que lo reproduce
 
 ## Registro de verificación
 
-commit_base: (se anota tras el commit `docs(plan): robustez-panel`)
+commit_base: 21b20be
 
 ### Estado de subtareas
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | en curso |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
