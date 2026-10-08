@@ -311,7 +311,7 @@ commit_base: 07191c7
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
-| T10 | pendiente |
+| T10 | hecha |
 
 ### Corridas
 
@@ -324,7 +324,7 @@ commit_base: 07191c7
 | | T6 | | | |
 | | T8 | | | |
 | | T9 | | | |
-| | T10 | | | |
+| 2026-10-08 | T10 | b192435 | PASA en criterios (verificador 3/3, verificador-b 3/3); veredicto global FALLA solo por CONTRATO MODIFICADO (01d5d1f, ampliación aprobada por el usuario) | |
 | | TODO | | | |
 
 ## Pendientes que deja este plan
