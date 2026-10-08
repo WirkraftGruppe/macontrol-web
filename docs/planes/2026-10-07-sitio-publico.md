@@ -331,7 +331,8 @@ commit_base: 45fb49c
 | 2026-10-07 | T2 | 8285189 | verificador: 17/17 PASA; verificador-b: 17/17 PASA | ambos marcan CONTRATO MODIFICADO (9ac7c9d, aprobado por el usuario); el bloque de T2 no cambió |
 | 2026-10-07 | T1, T7 | 04e4410 | verificador: 21/21 PASA; verificador-b: 18/18 PASA | CONTRATO MODIFICADO (9ac7c9d); T1 490/900, T7 491/600; direcciones del fixture entregadas por el usuario en el pedido |
 | 2026-10-07 | T3 (integración ola 1) | 9007d07 | worktree-integrar: makemigrations --check y test --keepdb OK (538 tests) | T1 (con T7) y T2 integradas |
-| 2026-10-07 | T4 | 2ed1344 | verificador: 9/9 PASA; verificador-b: 9/9 PASA | CONTRATO MODIFICADO (9ac7c9d); 385/400; las 6 vistas exigen administrador || 2026-10-07 | T5 | e02ac4a | verificador: 19/19 PASA (+4 comprobaciones); verificador-b: 19/19 PASA | CONTRATO MODIFICADO (9ac7c9d); 740/900; qr sin consultas; textos fijos literales de la Carta |
+| 2026-10-07 | T4 | 2ed1344 | verificador: 9/9 PASA; verificador-b: 9/9 PASA | CONTRATO MODIFICADO (9ac7c9d); 385/400; las 6 vistas exigen administrador |
+| 2026-10-07 | T5 | e02ac4a | verificador: 19/19 PASA (+4 comprobaciones); verificador-b: 19/19 PASA | CONTRATO MODIFICADO (9ac7c9d); 740/900; qr sin consultas; textos fijos literales de la Carta |
 
 ## Pendientes que deja este plan
 ### Problemas
