@@ -252,7 +252,7 @@ commit_base: 21b20be
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
+| T2 | hecha |
 | T3 | pendiente |
 | T4 | pendiente |
 | T5 | pendiente |
@@ -269,7 +269,7 @@ commit_base: 21b20be
 |---|---|---|---|---|
 | 2026-10-08 | T1 (ronda 1) | 5beddf5 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: 1 importante (alta en admin rechazada, regresión de T1), 2 menores, 2 observaciones; el usuario decide corregir en T1 antes de integrar |
 | 2026-10-08 | T1 (ronda 2) | c516ab7 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: hallazgos 1-3 y la observación de precision_m cerrados; queda 1 Baja ya existente antes de T1 (P-robustez-panel-2) y el historial doble (P-robustez-panel-1) |
-| | T2 | | | |
+| 2026-10-08 | T2 | a5c66bc | criterio `T1: integra robustez-panel-T1` PASA (principal) | worktree-integrar.sh: merge, makemigrations --check y 624 tests OK; falló solo el `git branch -d` final (P-robustez-panel-3); rama borrada a mano tras comprobar que estaba contenida |
 | | T3 | | | |
 | | T4 | | | |
 | | T5 | | | |
@@ -349,6 +349,7 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 
 - P-robustez-panel-1 [observación] Una baja desde la edición del panel o del admin deja dos filas de historial, ambas con el motivo "Punto desactivado": `desactivar_punto` guarda con `update_fields=["activo"]` (`apps/sitios/services.py:143-145`) y después el formulario hace el guardado completo con `_change_reason` todavía puesto. Se resuelve con un `desactivar_punto` que acepte los campos extra en un solo `save`, o borrando `_change_reason` antes del guardado completo (auditor-seguridad, T1 ronda 2).
 - P-robustez-panel-2 [menor] La edición de un punto en el panel o el admin no tiene bloqueo optimista: si un escaneo fija la ubicación entre el GET y el POST, el guardado borra coordenadas y marca de escaneo y el historial lo atribuye al administrador (`apps/sitios/panel_views.py:235-240`, `apps/sitios/admin.py:133-138`, `apps/visitas/services.py:310-325`). Ya existía antes de T1. Corrección propuesta: campo oculto con `ubicacion_fijada_en` o un contador de versión, validado en `clean()`.
+- P-robustez-panel-3 [menor] `worktree-integrar.sh` borra la rama de la subtarea con `git -C "$raiz" branch -d`, que compara contra el HEAD de la raíz (`main`) y no contra la rama destino: cuando el destino es `plan/<slug>` en otro worktree, el script sale con exit 1 después de un merge correcto (pasó al integrar T1). Corrección: `git branch -d` desde el worktree destino, o comprobar `merge-base --is-ancestor` contra el destino y usar `-D`.
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
@@ -368,6 +369,10 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-08 — la desactivación desde el admin también pasa por `desactivar_punto` — mismo hueco que P-robustez-datos-1 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-08 — el worktree del plan se crea con `git worktree add` y una junction — `worktree-crear.sh` solo crea `<slug>-T<n>` — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-08 — etiquetas nuevas `robustez-dominio` (concurrencia y archivos del dominio), `robustez-api` y `rendimiento-web` — ningún destino existente encaja — reemplaza a: (nada) — decidida por Claude, revisable
+
+- 2026-10-08 — -8 en el panel y el admin limpia `ubicacion_fijada_por/en` y `precision_m` en el formulario, sin llamar a `services.fijar_ubicacion` — el formulario guarda los demás campos en un solo `save` — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-08 — la regla del último punto activo en el admin se valida en `PuntoControlAdminForm.clean()` (solo en edición, con `select_for_update`) y `save_model` llama a `services.desactivar_punto` — el error aparece en el formulario y el servicio sigue siendo la regla que decide — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-08 — en el panel, `desactivar_punto(form.instance)` corre antes del guardado completo del formulario, dentro del mismo `atomic` — toma los bloqueos antes de escribir y evita el deadlock de la ronda 1 — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 
