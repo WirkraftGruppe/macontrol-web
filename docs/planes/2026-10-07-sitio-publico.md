@@ -410,6 +410,8 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 | 2026-10-08 | reauditoría T8, T9 | 173e689 | H1-H4 cerrados en el panel; 3 hallazgos nuevos de severidad baja (N1-N3, P-12 a P-14) | fuzzing de 4000 mutaciones sin excepciones sin manejar |
 | 2026-10-08 | prueba en el navegador (usuario) | 2c7bc27 | Lighthouse móvil home: Performance 93, Accessibility 95, Best practices 100, SEO 100; FALLA color-contrast 1.07:1 en los 12 sectores | primeras dos corridas inválidas (panel y servidor de `main`); se agrega T10 |
 | 2026-10-08 | T10 | ddd7b72 | verificador: 6/6 PASA; verificador-b: 6/6 PASA | CONTRATO MODIFICADO (+a9f80a5); 28/80; el test de contraste falla con el CSS anterior (spot check del principal) |
+| 2026-10-08 | TODO (T1-T10 + cierre global) | d1bf54d | verificador: 99/100 PASA; verificador-b: 99/100 PASA | única FALLA: congelado.sh (CONTRATO MODIFICADO, 5 commits docs(plan)); 562 tests, ruff OK |
+| 2026-10-08 | prueba en el navegador tras T10 (usuario) | d1bf54d | Lighthouse móvil home: Performance 93, Accessibility 100, Best practices 100, SEO 100; color-contrast y unsized-images PASA | quedan LCP 3,2 s, render-blocking y caché de /static/ (P-15, P-16); el usuario trae objeciones visuales en otra sesión (P-17) |
 
 ## Pendientes que deja este plan
 ### Problemas
