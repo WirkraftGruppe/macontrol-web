@@ -228,6 +228,25 @@ class EstadoRevisionTests(TestCase):
             estados_de_puntos([self.punto]), {self.punto.pk: EstadoPunto.AL_DIA}
         )
 
+    def _revision_de_administrador(self, dias_atras):
+        """Revisión de una visita manual que no cuenta como servicio."""
+        revision = self._revision(self.proyecto, dias_atras)
+        Visita.objects.filter(pk=revision.visita_id).update(cuenta_como_servicio=False)
+
+    def test_estado_revision_ignora_visitas_de_administrador(self):
+        self._revision(self.proyecto, 40)
+        self._revision_de_administrador(1)
+        self.assertEqual(
+            estado_revision(self.punto, self.proyecto), EstadoPunto.VENCIDA
+        )
+
+    def test_estados_de_puntos_ignora_visitas_de_administrador(self):
+        self._revision(self.proyecto, 40)
+        self._revision_de_administrador(1)
+        self.assertEqual(
+            estados_de_puntos([self.punto]), {self.punto.pk: EstadoPunto.VENCIDA}
+        )
+
     def test_punto_toma_el_peor_estado_de_los_proyectos_activos(self):
         self._revision(self.proyecto, 1)
         self._proyecto("Pausado", estado=Proyecto.Estado.PAUSADO)

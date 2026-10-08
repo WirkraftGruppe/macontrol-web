@@ -367,6 +367,77 @@ class PuntoPanelTests(_BaseAdminTests):
         self.general.refresh_from_db()
         self.assertTrue(self.general.activo)
 
+    def _datos_edicion(self, **extra):
+        return {"nombre": "General", "orden": 0, "activo": "on", **extra}
+
+    def _fijar_por_escaneo(self):
+        PuntoControl.objects.filter(pk=self.general.pk).update(
+            latitud="-35.100000",
+            longitud="-58.100000",
+            ubicacion_fijada_en=timezone.now(),
+            ubicacion_fijada_por=self.admin,
+        )
+
+    def test_corregir_coordenadas_limpia_fijada_por_escaneo(self):
+        self._fijar_por_escaneo()
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        r = self.client.post(
+            url, self._datos_edicion(latitud="-35.2", longitud="-58.100000")
+        )
+        self.assertEqual(r.status_code, 302)
+        self.general.refresh_from_db()
+        self.assertEqual(str(self.general.latitud), "-35.200000")
+        self.assertIsNone(self.general.ubicacion_fijada_por)
+        self.assertIsNone(self.general.ubicacion_fijada_en)
+
+    def test_corregir_coordenadas_limpia_precision(self):
+        self._fijar_por_escaneo()
+        PuntoControl.objects.filter(pk=self.general.pk).update(precision_m=12)
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        self.client.post(
+            url, self._datos_edicion(latitud="-35.2", longitud="-58.100000")
+        )
+        self.general.refresh_from_db()
+        self.assertIsNone(self.general.precision_m)
+
+    def test_editar_sin_cambiar_coordenadas_conserva_fijada(self):
+        self._fijar_por_escaneo()
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        r = self.client.post(
+            url,
+            self._datos_edicion(
+                nombre="Entrada", latitud="-35.100000", longitud="-58.100000"
+            ),
+        )
+        self.assertEqual(r.status_code, 302)
+        self.general.refresh_from_db()
+        self.assertEqual(self.general.nombre, "Entrada")
+        self.assertEqual(self.general.ubicacion_fijada_por, self.admin)
+        self.assertIsNotNone(self.general.ubicacion_fijada_en)
+
+    def test_destildar_activo_del_ultimo_punto_se_rechaza(self):
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        datos = self._datos_edicion(nombre="Otro nombre")
+        del datos["activo"]
+        r = self.client.post(url, datos)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(
+            "último punto activo", " ".join(r.context["form"].errors["activo"])
+        )
+        self.general.refresh_from_db()
+        self.assertTrue(self.general.activo)
+        self.assertEqual(self.general.nombre, "General")
+
+    def test_destildar_activo_con_otro_activo_desactiva(self):
+        PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
+        url = reverse("panel:sitios:punto_editar", args=[self.general.pk])
+        datos = self._datos_edicion()
+        del datos["activo"]
+        r = self.client.post(url, datos)
+        self.assertEqual(r.status_code, 302)
+        self.general.refresh_from_db()
+        self.assertFalse(self.general.activo)
+
     def test_qr_png_por_punto_y_regenerar(self):
         punto = PuntoControl.objects.create(
             sitio=self.sitio, nombre="Cocina", sector="Planta alta", orden=1
