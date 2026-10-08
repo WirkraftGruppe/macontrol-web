@@ -1,11 +1,27 @@
 """Modelos del contenido del sitio público."""
 
+import os
 import re
+import uuid
 
 from django.db import models
 from django.urls import reverse
 
 from .validators import VALIDADORES_IMAGEN, validar_sectores
+
+
+def _ruta_con_uuid(carpeta, nombre_original):
+    """`<carpeta>/<uuid4hex>.<ext>`: descarta el nombre que eligió quien subió."""
+    extension = os.path.splitext(nombre_original)[1].lower()
+    return f"{carpeta}/{uuid.uuid4().hex}{extension}"
+
+
+def ruta_portada(instancia, nombre_original):
+    return _ruta_con_uuid("servicios", nombre_original)
+
+
+def ruta_logo(instancia, nombre_original):
+    return _ruta_con_uuid("clientes", nombre_original)
 
 
 class Sector(models.TextChoices):
@@ -132,7 +148,7 @@ class PaginaServicio(models.Model):
     )
     imagen_portada = models.ImageField(
         "imagen de portada",
-        upload_to="servicios/",
+        upload_to=ruta_portada,
         blank=True,
         validators=VALIDADORES_IMAGEN,
     )
@@ -163,7 +179,7 @@ class ClienteDestacado(models.Model):
     nombre = models.CharField("nombre", max_length=120)
     logo = models.ImageField(
         "logo",
-        upload_to="clientes/",
+        upload_to=ruta_logo,
         blank=True,
         validators=VALIDADORES_IMAGEN,
     )

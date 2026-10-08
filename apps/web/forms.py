@@ -4,16 +4,23 @@ import json
 
 from django import forms
 from django.core.files.uploadedfile import UploadedFile
+from django.core.validators import URLValidator
 
 from .imagenes import reprocesar_imagen
 from .models import ClienteDestacado, Configuracion, PaginaServicio, Sector
 
 
 class ReprocesaImagenesMixin:
-    """Reprocesa las imágenes nuevas (sin metadatos y con formato real)."""
+    """Reprocesa las imágenes nuevas y borra del storage la que se reemplaza."""
 
     # campo -> formato de salida
     formatos_imagen = {}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._anteriores = {
+            campo: getattr(self.instance, campo).name for campo in self.formatos_imagen
+        }
 
     def _reprocesar(self, campo):
         archivo = self.cleaned_data.get(campo)
@@ -22,6 +29,15 @@ class ReprocesaImagenesMixin:
                 archivo, formato_salida=self.formatos_imagen[campo]
             )
         return archivo
+
+    def save(self, commit=True):
+        instancia = super().save(commit=commit)
+        if commit:
+            for campo, anterior in self._anteriores.items():
+                actual = getattr(instancia, campo).name
+                if anterior and anterior != actual:
+                    getattr(instancia, campo).storage.delete(anterior)
+        return instancia
 
 
 class ListaDeObjetosField(forms.JSONField):
@@ -62,6 +78,18 @@ class ConfiguracionForm(forms.ModelForm):
         claves=("localidad", "direccion"), label="Direcciones"
     )
     redes = ListaDeObjetosField(claves=("nombre", "url"), label="Redes sociales")
+
+    def clean_redes(self):
+        validar_https = URLValidator(schemes=["https"])
+        redes = self.cleaned_data["redes"]
+        for red in redes:
+            try:
+                validar_https(red["url"])
+            except forms.ValidationError:
+                raise forms.ValidationError(
+                    f"La URL de «{red['nombre']}» debe ser una dirección https válida."
+                ) from None
+        return redes
 
     class Meta:
         model = Configuracion

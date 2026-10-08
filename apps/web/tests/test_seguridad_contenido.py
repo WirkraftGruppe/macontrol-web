@@ -1,5 +1,7 @@
-"""Seguridad del contenido del sitio: imágenes subidas."""
+"""Seguridad del contenido del sitio: imágenes subidas y redes sociales."""
 
+import json
+import os
 import shutil
 import tempfile
 from io import BytesIO
@@ -11,7 +13,7 @@ from PIL import Image
 
 from apps.accounts.models import User
 from apps.servicios.models import TipoServicio
-from apps.web.models import ClienteDestacado, PaginaServicio
+from apps.web.models import ClienteDestacado, Configuracion, PaginaServicio
 
 MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="web-media-")
 
@@ -98,3 +100,41 @@ class ImagenesSubidasTests(BaseSubidas):
         )
         self.assertIn("logo", respuesta.context["form"].errors)
         self.assertFalse(ClienteDestacado.objects.filter(nombre="GIF").exists())
+
+    def test_nombre_uuid_y_reemplazo_borra_el_anterior(self):
+        def subir(url, nombre):
+            return SimpleUploadedFile(nombre, imagen_bytes("PNG"), "image/png")
+
+        self.client.post(
+            reverse("panel:web:cliente_alta"),
+            {"nombre": "Uno", "orden": 0, "logo": subir(None, "Mi Logo Original.png")},
+        )
+        cliente = ClienteDestacado.objects.get(nombre="Uno")
+        primero = cliente.logo.name
+        self.assertRegex(primero, r"^clientes/[0-9a-f]{32}\.png$")
+        self.assertTrue(os.path.exists(cliente.logo.path))
+        self.client.post(
+            reverse("panel:web:cliente_editar", args=[cliente.pk]),
+            {"nombre": "Uno", "orden": 0, "logo": subir(None, "otro.png")},
+        )
+        cliente.refresh_from_db()
+        self.assertNotEqual(cliente.logo.name, primero)
+        self.assertFalse(cliente.logo.storage.exists(primero))
+        self.assertTrue(os.path.exists(cliente.logo.path))
+
+
+class RedesTests(BaseSubidas):
+    def test_redes_rechaza_url_que_no_es_https(self):
+        url = reverse("panel:web:configuracion")
+        base = {
+            "razon_social": "MAControl S.A.",
+            "telefono": "02241 49 6047",
+            "direcciones": "[]",
+        }
+        for mala in ("javascript:alert(1)", "http://sitio.com", "ftp://x.com/a"):
+            redes = json.dumps([{"nombre": "Red", "url": mala}])
+            respuesta = self.client.post(url, {**base, "redes": redes})
+            self.assertIn("redes", respuesta.context["form"].errors, mala)
+        buena = json.dumps([{"nombre": "Red", "url": "https://sitio.com/perfil"}])
+        self.client.post(url, {**base, "redes": buena})
+        self.assertEqual(Configuracion.obtener().redes[0]["nombre"], "Red")
