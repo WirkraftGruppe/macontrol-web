@@ -279,14 +279,43 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 900 --subtarea T5`
 
+### T8 — Imágenes subidas sin metadatos y redes solo https (hallazgos H1-H4 de la auditoría)
+- **Ola**: 2 (después de integrar T4 y T5 y de la auditoría)
+- **Depende de**: T4, T5
+- **Puede tocar**: `apps/web/imagenes.py` (nuevo), `apps/web/models.py` (solo `upload_to` de `logo` e `imagen_portada`), `apps/web/forms.py`, `apps/web/migrations/**` (solo una migración nueva por el cambio de `upload_to`), `apps/web/tests/test_seguridad_contenido.py` (nuevo)
+- **No puede tocar**: `docs/planes/`, `config/`, `apps/visitas/**` (la sesión paralela la está modificando; no se importa de ahí), `apps/web/validators.py`, `apps/web/views.py`, `apps/web/panel_views.py`, `templates/**`, `static/**`, el resto de `apps/web/tests/`
+- **Skill a leer antes**: `.agents/skills/django-security/SKILL.md` (§ subida de archivos) y `.agents/skills/django-conventions/SKILL.md` § Forms
+- **Worktree**: sí
+- **Ruta**: delegada (implementador)
+- **Presupuesto**: 250 líneas agregadas
+- **Qué hacer**:
+  - En `apps/web/imagenes.py`, reprocesar cada imagen subida:
+    - Abrir con `Image.open(f, formats=("JPEG", "PNG", "WEBP"))` respetando el tope de píxeles de Pillow, aplicar `exif_transpose` y re-codificar sin `exif` ni `info`.
+    - La portada sale en JPEG RGB. El logo sale en PNG y conserva el canal alfa.
+  - `clean_logo` y `clean_imagen_portada` en `apps/web/forms.py` usan ese reprocesado solo cuando el archivo es nuevo.
+  - `upload_to` como función: `clientes/<uuid4hex>.<ext>` y `servicios/<uuid4hex>.<ext>`.
+  - Al reemplazar una imagen en el formulario se borra el archivo anterior del storage.
+  - `clean_redes` de `ConfiguracionForm`: cada `url` pasa `URLValidator(schemes=["https"])`.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_portada_subida_pierde_exif_y_gps --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_logo_conserva_transparencia_y_pierde_metadatos --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_rechaza_gif_con_extension_png --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_nombre_uuid_y_reemplazo_borra_el_anterior --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.RedesTests.test_redes_rechaza_url_que_no_es_https --keepdb`
+  - `[grep-0]` `grep -rn "apps.visitas" apps/web/`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T8`
+
 ### T6 — Integración de la ola 2, auditoría y verificación TODO (principal)
 - **Ola**: 2 (después de verificar T4 y T5)
-- **Depende de**: T4, T5
+- **Depende de**: T4, T5, T8
 - **Pasos**:
   1. `verificador` y `verificador-b` sobre T4 y T5 (`refutador` si discrepan). Revisar `cambios.sh` de cada worktree.
   2. Integrar desde la raíz del worktree del plan:
      - `bash .claude/hooks/worktree-integrar.sh sitio-publico T4 plan/sitio-publico apps/web/panel_views.py apps/web/panel_urls.py apps/web/forms.py apps/web/templates/web/panel apps/web/tests/test_panel.py`
      - `bash .claude/hooks/worktree-integrar.sh sitio-publico T5 plan/sitio-publico apps/web/views.py apps/web/urls.py apps/web/templates/web/paginas apps/web/templates/404.html apps/web/templates/500.html apps/web/tests/test_paginas.py apps/web/tests/test_recorrido.py apps/web/tests/test_diseno.py apps/web/tests/test_rutas.py apps/web/tests/test_contenido.py`
+- Después de la auditoría (modificado 2026-10-08): `bash .claude/hooks/worktree-integrar.sh sitio-publico T8 plan/sitio-publico apps/web/imagenes.py apps/web/models.py apps/web/forms.py apps/web/migrations apps/web/tests/test_seguridad_contenido.py`, y repetir `auditor-seguridad` sobre T8.
   3. `auditor-seguridad` sobre:
      - `/q/<uuid>/` (sin consultas ni datos);
      - las vistas de panel (rol administrador);
@@ -298,6 +327,7 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T4: integra sitio-publico-T4"`
   - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T5: integra sitio-publico-T5"`
+  - `[cmd]` `git log --oneline plan/sitio-publico | grep -q "T8: integra sitio-publico-T8"`
   - `[grep-0]` `grep -rln "<form" templates/web/ apps/web/templates/`
   - `[grep-0]` `grep -rin "presupuesto" templates/web/ apps/web/templates/ apps/web/fixtures/`
   - `[existe]` `static/fonts/OFL.txt`
@@ -324,6 +354,7 @@ commit_base: 45fb49c
 | T5 | hecha |
 | T6 | pendiente |
 | T7 | hecha |
+| T8 | pendiente |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -364,6 +395,8 @@ commit_base: 45fb49c
 - 2026-10-07 — Los datos legales de la empresa para el certificado no entran en `Configuracion` en este plan; §3.12 lo anota — el sitio no los necesita y su forma depende del certificado actual, que todavía no llegó — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — T1 se parte en T1 (modelos, admin, migración, tests) y T7 (fixture) — T1 excedió su presupuesto (1036/900) y no se sube; aplica la decisión del 2026-10-04 — elección del usuario — reemplaza a: (nada)
 - 2026-10-07 — `sectores` del fixture solo lleva lo que la Carta asocia explícitamente (MIPU → gastronómicos y comercios; edificios → torres y condominios) — la Carta no relaciona servicios con sectores; no se inventa contenido — elección del usuario — reemplaza a: (nada)
+- 2026-10-08 — Se agrega T8 para corregir H1-H4 de `auditor-seguridad` (imágenes subidas con EXIF, nombre original, formato real sin restringir, redes sin esquema): EXIF/GPS se publicaría al servir `media/` — elección del usuario — reemplaza a: (nada)
+- 2026-10-08 — T8 no reutiliza `apps.visitas.imagenes.procesar_imagen` sino un módulo propio en `apps/web` — la sesión paralela modifica `apps/visitas` y el logo necesita conservar el canal alfa — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — El test de recorrido lo escribe T5, no el principal — necesita todas las páginas públicas, que son de T5 — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
