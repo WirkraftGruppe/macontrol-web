@@ -35,7 +35,9 @@ def contadores(hoy=None):
         visita=OuterRef("pk"), incidencia_ubicacion=True
     )
     ubicacion = (
-        Visita.objects.filter(incidencia_revisada_en__isnull=True)
+        Visita.objects.filter(
+            incidencia_revisada_en__isnull=True, cuenta_como_servicio=True
+        )
         .filter(Q(incidencia_ubicacion=True) | Exists(con_incidencia_en_revision))
         .count()
     )

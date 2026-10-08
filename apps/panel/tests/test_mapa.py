@@ -12,6 +12,7 @@ from apps.panel.mapa import ORIGEN_TESELAS
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import PuntoControl, Sitio
+from apps.visitas import services as servicios_visita
 from apps.visitas.models import Revision, Visita
 
 DATOS = "/panel/mapa/datos/"
@@ -120,6 +121,22 @@ class MapaTests(TestCase):
         self.assertEqual(sitios["Mezclado"]["lng"], -57.7)
         self.assertEqual(len(sitios["Mezclado"]["proyectos"]), 3)
         self.assertIn("vencida", {p["estado"] for p in sitios["Mezclado"]["proyectos"]})
+
+    def test_ultima_visita_ignora_administradores(self):
+        sitio = self.sitio()
+        proyecto = self.proyecto(sitio, 5)
+        punto = self.revisar(sitio, proyecto, 10)
+        propia = timezone.now() - timedelta(days=10)
+        visita, _ = servicios_visita.abrir_visita(
+            empleado=self.admin, proyecto=proyecto, qr_codigo=punto.qr_codigo
+        )
+        Visita.objects.filter(pk=visita.pk).update(
+            estado=Visita.Estado.REALIZADA, cerrada_en=timezone.now()
+        )
+
+        sitio_json = self.datos()["Planta"]
+
+        self.assertEqual(sitio_json["ultima_visita"][:16], propia.isoformat()[:16])
 
     def test_datos_incluye_ultima_visita_encargado_y_ficha(self):
         sitio = self.sitio()

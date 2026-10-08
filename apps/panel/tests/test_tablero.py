@@ -10,6 +10,7 @@ from apps.clientes.models import Cliente
 from apps.proyectos.models import UMBRAL_PROXIMA_DIAS, Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios.models import Sitio
+from apps.visitas import services as servicios_visita
 from apps.visitas.models import Visita
 from apps.visitas.tests.test_models import crear_revision
 
@@ -93,6 +94,20 @@ class TableroTests(TestCase):
 
         self.assertEqual(respuesta.context["contadores"]["incidencias_ubicacion"], 2)
         self.assertContains(respuesta, "Incidencias de ubicación")
+
+    def test_excluye_administradores_del_contador(self):
+        proyecto = self.proyecto(None)
+        qr = self.sitio.puntos.get(nombre="General").qr_codigo
+        visita, _ = servicios_visita.abrir_visita(
+            empleado=self.admin, proyecto=proyecto, qr_codigo=qr
+        )
+        self.assertFalse(visita.cuenta_como_servicio)
+        Visita.objects.filter(pk=visita.pk).update(incidencia_ubicacion=True)
+
+        self.client.force_login(self.admin)
+        respuesta = self.client.get("/panel/")
+
+        self.assertEqual(respuesta.context["contadores"]["incidencias_ubicacion"], 0)
 
     def test_diez_mas_urgentes_en_orden(self):
         for dias in range(12, 0, -1):

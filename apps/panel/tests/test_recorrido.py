@@ -21,8 +21,6 @@ from apps.servicios.models import TipoServicio
 from apps.sitios.models import Plano, PuntoControl, Sitio
 from apps.visitas.models import Foto, Visita
 
-MEDIA_RECORRIDO = tempfile.mkdtemp(prefix="macontrol-recorrido-test-")
-
 
 def _jpeg():
     salida = BytesIO()
@@ -30,12 +28,19 @@ def _jpeg():
     return salida.getvalue()
 
 
-@override_settings(MEDIA_ROOT=MEDIA_RECORRIDO)
 class RecorridoTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.media = tempfile.mkdtemp(prefix="macontrol-recorrido-test-")
+        cls._ajuste = override_settings(MEDIA_ROOT=cls.media)
+        cls._ajuste.enable()
+        super().setUpClass()
+
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
-        shutil.rmtree(MEDIA_RECORRIDO, ignore_errors=True)
+        cls._ajuste.disable()
+        shutil.rmtree(cls.media, ignore_errors=True)
 
     @classmethod
     def setUpTestData(cls):
