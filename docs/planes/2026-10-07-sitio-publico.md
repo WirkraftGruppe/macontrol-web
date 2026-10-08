@@ -320,8 +320,8 @@ commit_base: 45fb49c
 | T1 | hecha |
 | T2 | hecha |
 | T3 | hecha |
-| T4 | pendiente |
-| T5 | pendiente |
+| T4 | hecha |
+| T5 | hecha |
 | T6 | pendiente |
 | T7 | hecha |
 
@@ -331,6 +331,7 @@ commit_base: 45fb49c
 | 2026-10-07 | T2 | 8285189 | verificador: 17/17 PASA; verificador-b: 17/17 PASA | ambos marcan CONTRATO MODIFICADO (9ac7c9d, aprobado por el usuario); el bloque de T2 no cambió |
 | 2026-10-07 | T1, T7 | 04e4410 | verificador: 21/21 PASA; verificador-b: 18/18 PASA | CONTRATO MODIFICADO (9ac7c9d); T1 490/900, T7 491/600; direcciones del fixture entregadas por el usuario en el pedido |
 | 2026-10-07 | T3 (integración ola 1) | 9007d07 | worktree-integrar: makemigrations --check y test --keepdb OK (538 tests) | T1 (con T7) y T2 integradas |
+| 2026-10-07 | T4 | 2ed1344 | verificador: 9/9 PASA; verificador-b: 9/9 PASA | CONTRATO MODIFICADO (9ac7c9d); 385/400; las 6 vistas exigen administrador || 2026-10-07 | T5 | e02ac4a | verificador: 19/19 PASA (+4 comprobaciones); verificador-b: 19/19 PASA | CONTRATO MODIFICADO (9ac7c9d); 740/900; qr sin consultas; textos fijos literales de la Carta |
 
 ## Pendientes que deja este plan
 ### Problemas
@@ -341,6 +342,7 @@ commit_base: 45fb49c
 - P-sitio-publico-5 [menor] `docs/02-diseno.md:77` sigue diciendo "12 tarjetas" de servicios y "8 tarjetas" de sectores — se actualiza al fusionar.
 - P-sitio-publico-6 [importante] `loaddata contenido_inicial` sobreescribe `nombre`, `descripcion` y `activo` de los `TipoServicio` pk 1-9. Además falla con IntegrityError si una base tiene alguno de esos slugs con otro pk. En producción se carga una sola vez, sobre una base vacía — destino: `despliegue`.
 - P-sitio-publico-7 [importante] `Configuracion` no lleva todavía los datos legales, las habilitaciones ni el director técnico que pide `informes.Certificado` (§3.10) — destino: `informes`.
+- P-sitio-publico-8 [menor] `Configuracion.obtener()` crea la fila pk=1 en un GET público si falta (la home escribe en la base la primera vez) — destino: `robustez-datos`.- P-sitio-publico-9 [observación] `404.html` y `500.html` son globales: también se ven en 404 de `/panel/` y `/admin/` (autónomas, sin datos) — destino: `robustez-panel`.- P-sitio-publico-10 [observación] Las portadas estáticas por servicio (`PORTADA_POR_SLUG` en `apps/web/views.py`) son una asignación provisoria: 5 fotos para 9 servicios; murciélagos y tanques usan la del hero. Las portadas subidas se muestran con `width=1200 height=675` fijos — destino: `empresa`.- P-sitio-publico-11 [observación] Los cuatro pasos de "Cómo trabajamos" muestran solo el título (la Carta no trae descripción por paso) — destino: `empresa`.
 
 ### Decisiones
 - 2026-10-07 — El sitio publica 9 páginas de servicio, una por `TipoServicio` del fixture — confirmado por el usuario; aplica la decisión del 2026-10-02 al sitio — reemplaza a: "12 tarjetas numeradas" de `docs/02-diseno.md:77`
