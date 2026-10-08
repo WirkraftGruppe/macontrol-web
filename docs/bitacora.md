@@ -1,19 +1,26 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-07-robustez-datos.md
+Plan activo: (ninguno)
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| `robustez-datos` | plan/robustez-datos | cierre (T1–T10 hechas) | decisión del usuario: corregir P-robustez-datos-8/-9 antes del merge o fusionar en `main`; `congelado.sh` FALLA solo por CONTRATO MODIFICADO (01d5d1f) | sesión 2026-10-08 |
+| — | main | — | elegir el próximo plan; candidato: `robustez-panel` (trae P-robustez-datos-8 y -9) | sesión 2026-10-08 cerrada |
 
-Siguiente: 79 abiertos, todos con destino (`py -3 .claude/hooks/pendientes.py --etiqueta <destino>`): `robustez-datos` 28 (candidato natural al próximo plan; trae decisiones ya tomadas en el triage: P-cierre-puntos-13, P-panel-24, -25, P-cierre-puntos-10, P-auditoria-p31-1), `despliegue` 24, `robustez-panel` 13, `expo` 8, `empresa` 4, `informes` 2. La etiqueta `panel-cierre` desapareció: no hay plan `panel-cierre`. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
+Siguiente: 62 abiertos: `despliegue` 24, `robustez-panel` 14 (incluye P-robustez-datos-8 y -9, decisión del usuario), `expo` 8, `empresa` 5, `informes` 2, `saneamiento` 1, y 10 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12, a etiquetar en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-08 — Plan `robustez-datos`: fusión en `main`
+Hecho:
+- P-robustez-datos-8 y -9 pasan a `robustez-panel` por decisión del usuario: se corrigen en el próximo plan, no antes del merge.
+- Fusión de `plan/robustez-datos` en `main` con `--no-ff` (55ec1db); 10 decisiones copiadas a `docs/decisiones.md` (f031b4c).
+- Criterios de cierre global en `main`: check, makemigrations, 578 tests, ruff y árbol limpio en PASA; `congelado.sh` exit 1 solo por CONTRATO MODIFICADO (ampliación 01d5d1f aprobada por el usuario). Rama `plan/robustez-datos` borrada. Sin push.
+Sigue: elegir el próximo plan (candidato `robustez-panel`); etiquetar los 10 pendientes nuevos sin etiqueta.
 
 ### 2026-10-08 — Plan `robustez-datos`: 28 pendientes cerrados, sin fusionar
 Hecho:
