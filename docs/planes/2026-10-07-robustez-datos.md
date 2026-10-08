@@ -344,6 +344,7 @@ commit_base: 07191c7
 - P-robustez-datos-4 [observación] La regla de P-panel-7 "una sola llamada a `esquema_planilla` en `panel_forms.py`" se resolvió con prefetch: siguen dos llamadas (una por ámbito) y una sola consulta, cubierta por `ManualTests.test_pide_los_campos_del_esquema_una_sola_vez` (informe de T2).
 
 ### Decisiones
+- 2026-10-08 — P-robustez-datos-8 y -9 (hallazgos importantes de la auditoría final) se fusionan abiertos y se corrigen en el próximo plan, con la etiqueta `robustez-panel` — decisión del usuario al cerrar — reemplaza a: (nada)
 - 2026-10-08 — Una incidencia (general o de ubicación) se marca como revisada solo con la visita realizada — hallazgo del auditor de la ola 1, decisión del usuario — reemplaza a: (nada)
 - 2026-10-08 — El plan se amplía con T8, T9 y T10 para corregir los hallazgos de la auditoría de la ola 1; `visitas.0009` y `sitios.0008` se editan porque nacieron en este plan sin desplegar — decisión del usuario — reemplaza a: (nada)
 - 2026-10-07 — Al reactivar un sitio se reactivan solo los puntos que apagó el sitio (última fila histórica "Sitio desactivado") — P-puntos-control-27, decisión del usuario al planificar — reemplaza a: (nada)
@@ -353,6 +354,11 @@ commit_base: 07191c7
 - 2026-10-07 — Un pedido de alta de punto demasiado grande responde 400, no 413, para no cambiar el contrato actual de esa vista — P-cierre-puntos-5 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — El aviso "punto fijado por escaneo" va en la pestaña de puntos de la ficha del sitio y en la edición del punto, porque no existe una ficha propia del punto; los campos nuevos no se exponen en la API — P-auditoria-p31-1 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — P-cierre-puntos-2 (etiqueta `robustez-panel`) entra en este plan — el usuario lo pidió en forma explícita — reemplaza a: (nada) — decidida por Claude, revisable
+
+### Etiquetas
+
+- etiqueta: P-robustez-datos-8 → robustez-panel — decisión del usuario: se corrige en el próximo plan, no antes del merge
+- etiqueta: P-robustez-datos-9 → robustez-panel — decisión del usuario: se corrige en el próximo plan, no antes del merge
 
 ### Cierra
 - cierra: P-cierre-puntos-13 — T2 (servicio, filtro `ubicacion`, distancia y botón en la ficha) y T5 (contador sin administradores)
