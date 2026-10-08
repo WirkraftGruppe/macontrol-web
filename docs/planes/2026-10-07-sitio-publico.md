@@ -395,7 +395,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 | T7 | hecha |
 | T8 | hecha |
 | T9 | hecha |
-| T10 | pendiente |
+| T10 | hecha |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -409,6 +409,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 | 2026-10-08 | T8, T9 | 173e689 | verificador: 12/12 PASA; verificador-b: 12/12 PASA | CONTRATO MODIFICADO (9ac7c9d, 5c01419, 56ea85f); T8 176/250, T9 115/200; código idéntico a la versión previa a partir |
 | 2026-10-08 | reauditoría T8, T9 | 173e689 | H1-H4 cerrados en el panel; 3 hallazgos nuevos de severidad baja (N1-N3, P-12 a P-14) | fuzzing de 4000 mutaciones sin excepciones sin manejar |
 | 2026-10-08 | prueba en el navegador (usuario) | 2c7bc27 | Lighthouse móvil home: Performance 93, Accessibility 95, Best practices 100, SEO 100; FALLA color-contrast 1.07:1 en los 12 sectores | primeras dos corridas inválidas (panel y servidor de `main`); se agrega T10 |
+| 2026-10-08 | T10 | ddd7b72 | verificador: 6/6 PASA; verificador-b: 6/6 PASA | CONTRATO MODIFICADO (+a9f80a5); 28/80; el test de contraste falla con el CSS anterior (spot check del principal) |
 
 ## Pendientes que deja este plan
 ### Problemas
@@ -426,7 +427,7 @@ Aprobación del usuario (2026-10-08, literal): "Apruebo los cambios de contrato 
 - P-sitio-publico-12 [menor] El admin de Django (`apps/web/admin.py`) no usa los formularios del panel: un superusuario puede subir logo o portada con EXIF/GPS, un GIF renombrado, dejar archivos huérfanos o guardar `redes[].url` con `javascript:`. Corrección: `form=` en los ModelAdmin (con `tipo` en `PaginaServicioAdmin`) o `unregister`, y `validators=[validar_redes]` en el `JSONField`, con un test por admin (auditoría N1).
 - P-sitio-publico-13 [menor] `clean_redes` acepta URLs con usuario y contraseña (`https://facebook.com@evil.com/x`); rechazar `urlsplit(url).username/password` y agregar los casos al test (auditoría N2). Hoy ninguna plantilla muestra `redes` — destino: `robustez-panel`.
 - P-sitio-publico-14 [menor] `reprocesar_imagen` decodifica la imagen completa antes de cualquier tope (solo `MAX_IMAGE_PIXELS` ≈ 89 M): un PNG uniforme de 9400×9400 de menos de 1 MB reserva unos 350 MB; además el límite de 2 MB ahora mide la salida y no la subida. Validar bytes y píxeles antes de `load()` y acotar con `thumbnail` (auditoría N3, plausible según la memoria del contenedor) — destino: `despliegue`.
-- P-sitio-publico-15 [menor] Lighthouse móvil de la home (2026-10-08): LCP 3,2 s por la foto del hero (672×1536 servida igual en móvil) y `web.css` bloqueante (~620 ms). Mejoras: `fetchpriority="high"` en el hero, `srcset` con una versión más chica y CSS crítico — sin destino.
+- P-sitio-publico-15 [menor] Lighthouse móvil de la home (2026-10-08): LCP 3,2 s por la foto del hero (672×1536 servida igual en móvil) y `web.css` bloqueante (~620 ms). Mejoras: `fetchpriority="high"` en el hero, `srcset` con una versión más chica y CSS crítico; además `static/img/logo.png` mide 1080×1080 y se muestra a 44 px — sin destino.
 - P-sitio-publico-16 [observación] Lighthouse marca 370 KiB sin caché en `/static/`: es `runserver`; en producción lo resuelve WhiteNoise o el proxy con `Cache-Control` largo y nombres con hash — sin destino.
 - P-sitio-publico-17 [observación] El usuario repitió las pruebas visuales con el sitio nuevo y tiene objeciones y cambios sugeridos que trae en otra sesión — sin destino.
 
