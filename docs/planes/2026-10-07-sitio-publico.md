@@ -300,16 +300,30 @@ La ola 2 ramifica desde el commit de integración de T3. Las vistas dependen de 
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_portada_subida_pierde_exif_y_gps --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_logo_conserva_transparencia_y_pierde_metadatos --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_rechaza_gif_con_extension_png --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_nombre_uuid_y_reemplazo_borra_el_anterior --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.RedesTests.test_redes_rechaza_url_que_no_es_https --keepdb`
   - `[grep-0]` `grep -rn "apps.visitas" apps/web/`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T8`
 
+### T9 — Nombres uuid, borrado del archivo anterior y redes solo https (partida de T8)
+- **Ola**: 2
+- **Depende de**: T8 (mismo worktree y rama `sitio-publico-T8`)
+- **Puede tocar**: los mismos archivos que T8; T8 conserva `apps/web/imagenes.py`, el reprocesado (`clean_logo`, `clean_imagen_portada`) y sus tests; T9 lleva `upload_to` uuid y su migración, el borrado del archivo anterior, `clean_redes` y sus tests
+- **No puede tocar**: lo mismo que T8
+- **Worktree**: sí (`worktrees/sitio-publico-T8`)
+- **Ruta**: delegada (implementador)
+- **Presupuesto**: 200 líneas agregadas
+- **Qué hacer**: rehacer los commits del worktree de T8 en un `T8:` (reprocesado y control de formato) y un `T9:` (H2 y H3), sin cambiar el código ya escrito. Decisión del usuario del 2026-10-08: T8 excedió su presupuesto (288/250).
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.ImagenesSubidasTests.test_nombre_uuid_y_reemplazo_borra_el_anterior --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_seguridad_contenido.RedesTests.test_redes_rechaza_url_que_no_es_https --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 200 --subtarea T9`
+
 ### T6 — Integración de la ola 2, auditoría y verificación TODO (principal)
 - **Ola**: 2 (después de verificar T4 y T5)
-- **Depende de**: T4, T5, T8
+- **Depende de**: T4, T5, T8, T9
 - **Pasos**:
   1. `verificador` y `verificador-b` sobre T4 y T5 (`refutador` si discrepan). Revisar `cambios.sh` de cada worktree.
   2. Integrar desde la raíz del worktree del plan:
@@ -355,6 +369,7 @@ commit_base: 45fb49c
 | T6 | pendiente |
 | T7 | hecha |
 | T8 | pendiente |
+| T9 | pendiente |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
@@ -396,6 +411,7 @@ commit_base: 45fb49c
 - 2026-10-07 — T1 se parte en T1 (modelos, admin, migración, tests) y T7 (fixture) — T1 excedió su presupuesto (1036/900) y no se sube; aplica la decisión del 2026-10-04 — elección del usuario — reemplaza a: (nada)
 - 2026-10-07 — `sectores` del fixture solo lleva lo que la Carta asocia explícitamente (MIPU → gastronómicos y comercios; edificios → torres y condominios) — la Carta no relaciona servicios con sectores; no se inventa contenido — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — Se agrega T8 para corregir H1-H4 de `auditor-seguridad` (imágenes subidas con EXIF, nombre original, formato real sin restringir, redes sin esquema): EXIF/GPS se publicaría al servir `media/` — elección del usuario — reemplaza a: (nada)
+- 2026-10-08 — T8 se parte en T8 (reprocesado sin EXIF y formato real) y T9 (nombres uuid, borrado del anterior, redes https) — T8 excedió su presupuesto (288/250) y no se sube — elección del usuario — reemplaza a: (nada)
 - 2026-10-08 — T8 no reutiliza `apps.visitas.imagenes.procesar_imagen` sino un módulo propio en `apps/web` — la sesión paralela modifica `apps/visitas` y el logo necesita conservar el canal alfa — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-07 — El test de recorrido lo escribe T5, no el principal — necesita todas las páginas públicas, que son de T5 — reemplaza a: (nada) — decidida por Claude, revisable
 
