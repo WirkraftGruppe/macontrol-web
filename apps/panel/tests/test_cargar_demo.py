@@ -3,12 +3,14 @@
 import os
 import shutil
 import tempfile
+from datetime import timedelta
 from io import StringIO
 from unittest import mock
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
@@ -70,6 +72,43 @@ class CargarDemoTests(TestCase):
         # Segunda corrida: no duplica nada.
         self._cargar()
         self.assertEqual(self._conteos(), primera)
+
+    @override_settings(DEBUG=True)
+    def test_falla_tardia_no_deja_planos_huerfanos(self):
+        with (
+            tempfile.TemporaryDirectory() as media,
+            override_settings(MEDIA_ROOT=media),
+        ):
+            ruta = "apps.panel.management.commands.cargar_demo.Command._proyecto"
+            with mock.patch(ruta, side_effect=RuntimeError("falla tardía")):
+                with self.assertRaisesMessage(RuntimeError, "falla tardía"):
+                    self._cargar()
+            self.assertEqual(Plano.objects.count(), 0)
+            archivos = [f for _, _, fs in os.walk(media) for f in fs]
+            self.assertEqual(archivos, [])
+
+    @override_settings(DEBUG=True, ATRASO_MAXIMO_HORAS=48)
+    def test_atraso_acotado_al_maximo(self):
+        antes = timezone.now()
+        self._cargar()
+        limite = antes - timedelta(hours=48)
+        self.assertEqual(
+            Visita.objects.filter(estado=Visita.Estado.REALIZADA).count(), 3
+        )
+        self.assertFalse(Revision.objects.filter(realizada_en__lt=limite).exists())
+
+    @override_settings(DEBUG=True)
+    def test_corrida_incompleta_se_completa_en_la_siguiente(self):
+        self._cargar()
+        # Una corrida fallida dejó la primera jornada abierta, sin cerrar.
+        primera = Visita.objects.filter(estado=Visita.Estado.REALIZADA).first()
+        Visita.objects.filter(proyecto=primera.proyecto).update(
+            estado=Visita.Estado.ABIERTA
+        )
+        self._cargar()
+        self.assertEqual(
+            Visita.objects.filter(estado=Visita.Estado.REALIZADA).count(), 3
+        )
 
     @override_settings(DEBUG=False)
     def test_rechaza_sin_debug_y_no_toca_la_base(self):
