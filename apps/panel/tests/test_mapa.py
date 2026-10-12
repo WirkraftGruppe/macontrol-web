@@ -204,15 +204,38 @@ class MapaTests(TestCase):
 
     def test_mapa_permite_teselas_osm_en_csp(self):
         self.client.force_login(self.admin)
-        for ruta in ("/panel/mapa/", DATOS):
-            politica = self.client.get(ruta).headers["Content-Security-Policy"]
-            img = next(
-                d for d in politica.split(";") if d.strip().startswith("img-src")
-            )
-            self.assertIn(ORIGEN_TESELAS, img)
+        politica = self.client.get("/panel/mapa/").headers["Content-Security-Policy"]
+        img = next(d for d in politica.split(";") if d.strip().startswith("img-src"))
+        self.assertIn(ORIGEN_TESELAS, img)
         # Las demás páginas del panel no reciben el origen de teselas.
         politica = self.client.get("/panel/").headers["Content-Security-Policy"]
         self.assertNotIn(ORIGEN_TESELAS, politica)
+
+    def test_datos_del_mapa_sin_csp_de_teselas(self):
+        self.client.force_login(self.admin)
+        politica = self.client.get(DATOS).headers["Content-Security-Policy"]
+        self.assertNotIn(ORIGEN_TESELAS, politica)
+
+    def _sitios_con_filtro(self, valor):
+        respuesta = self.client.get(DATOS, {"cliente": valor, "servicio": valor})
+        self.assertEqual(respuesta.status_code, 200)
+        return [s["nombre"] for s in respuesta.json()["sitios"]]
+
+    def test_filtro_numerico_no_ascii_no_da_500(self):
+        self.sitio("Uno")
+        self.client.force_login(self.admin)
+        for valor in ("\u00b2", "\u0663", "\uff11\uff12"):  # isdigit() sí, ASCII no
+            with self.subTest(valor=valor):
+                self.assertIn("Uno", self._sitios_con_filtro(valor))
+
+    def test_filtro_numerico_fuera_de_rango_no_da_500(self):
+        self.sitio("Uno")
+        self.client.force_login(self.admin)
+        for valor in ("9" * 5000, "9" * 20, str(2**63), "0" * 30 + "1"):
+            with self.subTest(largo=len(valor)):
+                self.assertIn("Uno", self._sitios_con_filtro(valor))
+        # El máximo de BigAutoField sigue siendo un filtro válido (no hay cliente así).
+        self.assertEqual(self._sitios_con_filtro(str(2**63 - 1)), [])
 
     def test_mapa_carga_leaflet_y_el_script_propio(self):
         self.client.force_login(self.admin)

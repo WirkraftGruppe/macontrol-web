@@ -59,9 +59,13 @@ class TableroTests(TestCase):
         self.visita(programada_para=self.hoy)
         self.visita(programada_para=self.hoy + timedelta(days=1))
         self.visita(programada_para=self.hoy, estado=Visita.Estado.CANCELADA)
-        self.visita(incidencia=True)
-        self.visita(incidencia=True)
-        self.visita(incidencia=True, incidencia_revisada_en=timezone.now())
+        self.visita(incidencia=True, estado=Visita.Estado.REALIZADA)
+        self.visita(incidencia=True, estado=Visita.Estado.REALIZADA)
+        self.visita(
+            incidencia=True,
+            estado=Visita.Estado.REALIZADA,
+            incidencia_revisada_en=timezone.now(),
+        )
 
         self.client.force_login(self.admin)
         respuesta = self.client.get("/panel/")
@@ -79,21 +83,36 @@ class TableroTests(TestCase):
         )
 
     def test_cuenta_incidencias_de_ubicacion(self):
-        self.visita(incidencia_ubicacion=True)
-        en_revision = self.visita()
+        self.visita(incidencia_ubicacion=True, estado=Visita.Estado.REALIZADA)
+        en_revision = self.visita(estado=Visita.Estado.REALIZADA)
         for _ in range(2):  # dos revisiones con incidencia: la visita cuenta una vez
             crear_revision(en_revision, incidencia_ubicacion=True)
         revisada = self.visita(
-            incidencia_ubicacion=True, incidencia_revisada_en=timezone.now()
+            incidencia_ubicacion=True,
+            estado=Visita.Estado.REALIZADA,
+            incidencia_revisada_en=timezone.now(),
         )
         crear_revision(revisada, incidencia_ubicacion=True)
-        self.visita()  # sin incidencia
+        self.visita(estado=Visita.Estado.REALIZADA)  # sin incidencia
 
         self.client.force_login(self.admin)
         respuesta = self.client.get("/panel/")
 
         self.assertEqual(respuesta.context["contadores"]["incidencias_ubicacion"], 2)
         self.assertContains(respuesta, "Incidencias de ubicación")
+
+    def test_incidencias_no_cuentan_visitas_abiertas(self):
+        for estado in (Visita.Estado.ABIERTA, Visita.Estado.PENDIENTE):
+            self.visita(incidencia=True, incidencia_ubicacion=True, estado=estado)
+        self.visita(
+            incidencia=True, incidencia_ubicacion=True, estado=Visita.Estado.REALIZADA
+        )
+
+        self.client.force_login(self.admin)
+        contadores = self.client.get("/panel/").context["contadores"]
+
+        self.assertEqual(contadores["incidencias"], 1)
+        self.assertEqual(contadores["incidencias_ubicacion"], 1)
 
     def test_excluye_administradores_del_contador(self):
         proyecto = self.proyecto(None)
@@ -102,7 +121,9 @@ class TableroTests(TestCase):
             empleado=self.admin, proyecto=proyecto, qr_codigo=qr
         )
         self.assertFalse(visita.cuenta_como_servicio)
-        Visita.objects.filter(pk=visita.pk).update(incidencia_ubicacion=True)
+        Visita.objects.filter(pk=visita.pk).update(
+            incidencia_ubicacion=True, estado=Visita.Estado.REALIZADA
+        )
 
         self.client.force_login(self.admin)
         respuesta = self.client.get("/panel/")
