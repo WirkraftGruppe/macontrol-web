@@ -1,11 +1,19 @@
 """Settings de desarrollo: valores por defecto cómodos, nunca para producción."""
 
 import ipaddress
+import os
 
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
 from .base import BASE_DIR, env
+
+# Un hosting nunca debe arrancar con DEBUG: expondría tracebacks y settings.
+if os.environ.get("RAILWAY_ENVIRONMENT"):
+    raise ImproperlyConfigured(
+        "RAILWAY_ENVIRONMENT está definida con DJANGO_ENV=development: en el "
+        "hosting hay que usar DJANGO_ENV=production."
+    )
 
 DEBUG = True
 
