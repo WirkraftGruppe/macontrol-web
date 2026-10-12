@@ -65,6 +65,16 @@ class SitioPanelTests(TestCase):
         )
         self.assertContains(r, "Planta Ñandú 1")
 
+    def test_filtro_cliente_fuera_de_rango_no_da_500(self):
+        # Más de 4300 dígitos rompe int(); más de 2**63 - 1 desborda la base.
+        for valor in ("9" * 4301, "9223372036854775808", "0" * 25):
+            r = self.client.get(reverse("panel:sitios:listado"), {"cliente": valor})
+            self.assertEqual(r.status_code, 200, valor[:30])
+        r = self.client.get(
+            reverse("panel:sitios:listado"), {"cliente": "9223372036854775807"}
+        )
+        self.assertEqual(r.status_code, 200)
+
     def test_ficha_muestra_atribucion_osm(self):
         url = reverse("panel:sitios:ficha", args=[self.sitio.pk])
         r = self.client.get(url, {"pestana": "mapa"})
