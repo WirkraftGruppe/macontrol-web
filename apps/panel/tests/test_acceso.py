@@ -22,9 +22,12 @@ from apps.visitas.models import Foto, Revision, Visita
 from apps.web.models import ClienteDestacado, PaginaServicio
 
 CLAVE = "clave-segura-123"
-MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="acceso-panel-test-")
 SENTINELA = "@PK@"
-UUID_FOTO = "00000000-0000-0000-0000-000000000001"
+SENTINELA_UUID = "@UUID@"
+UUID_VALIDO = "00000000-0000-0000-0000-000000000001"
+
+# Igual para las rutas con uuid: prefijo de ruta -> clave del código real.
+UUID_POR_RUTA = ((r"^/panel/visitas/fotos/@UUID@/", "foto"),)
 
 # Prefijo de ruta (con `@PK@` donde va el id) -> clave del objeto real. El orden
 # importa: gana la primera coincidencia, por eso van antes las más específicas.
@@ -110,26 +113,24 @@ class AccesoPanelTests(TestCase):
         self.assertNotContains(respuesta, "no tiene acceso", status_code=429)
 
 
-def _rutas_del_panel(patrones, prefijo="", pk="1"):
+def _rutas_del_panel(patrones, prefijo="", pk="1", codigo=UUID_VALIDO):
     """Recorre los patrones del namespace `panel` y arma una URL de ejemplo por ruta."""
     for patron in patrones:
         texto = prefijo + str(patron.pattern)
         if isinstance(patron, URLResolver):
-            yield from _rutas_del_panel(patron.url_patterns, texto, pk)
+            yield from _rutas_del_panel(patron.url_patterns, texto, pk, codigo)
         else:
-            ruta = re.sub(
-                r"<(?:uuid:)\w+>",
-                "00000000-0000-0000-0000-000000000001",
-                texto,
-            )
+            ruta = re.sub(r"<(?:uuid:)\w+>", codigo, texto)
             yield "/panel/" + re.sub(r"<(?:\w+:)?\w+>", pk, ruta)
 
 
-def _rutas_protegidas(pk="1"):
-    """Todas las rutas del panel salvo ingresar y salir, con `pk` en los parámetros."""
+def _rutas_protegidas(pk="1", codigo=UUID_VALIDO):
+    """Todas las rutas del panel salvo ingresar y salir, con `pk` y uuid de ejemplo."""
     return [
         ruta
-        for ruta in _rutas_del_panel(get_resolver(urls).url_patterns, pk=pk)
+        for ruta in _rutas_del_panel(
+            get_resolver(urls).url_patterns, pk=pk, codigo=codigo
+        )
         if ruta not in ("/panel/ingresar/", "/panel/salir/")
     ]
 
@@ -141,12 +142,14 @@ def _imagen(nombre):
     return SimpleUploadedFile(nombre, buffer.getvalue(), content_type="image/png")
 
 
-@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
 class AccesoTests(TestCase):
     @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        shutil.rmtree(MEDIA_TEMPORAL, ignore_errors=True)
+    def setUpClass(cls):
+        """Los archivos de `setUpTestData` van a un MEDIA_ROOT temporal."""
+        media = tempfile.mkdtemp(prefix="acceso-panel-test-")
+        cls.addClassCleanup(shutil.rmtree, media, ignore_errors=True)
+        cls.enterClassContext(override_settings(MEDIA_ROOT=media))
+        super().setUpClass()
 
     @classmethod
     def setUpTestData(cls):
@@ -199,7 +202,7 @@ class AccesoTests(TestCase):
             )[0].pk,
             "cliente_web": ClienteDestacado.objects.create(nombre="Cliente web").pk,
         }
-        cls.codigo_foto = str(foto.codigo)
+        cls.codigos = {"foto": str(foto.codigo)}
 
     def test_empleado_no_ve_ninguna_ruta_del_panel(self):
         self.client.login(username="emp", password=CLAVE)
@@ -225,9 +228,12 @@ class AccesoTests(TestCase):
         una ruta nueva no puede quedar sin probar en silencio.
         """
         rutas = []
-        for ruta in _rutas_protegidas(pk=SENTINELA):
-            if ruta == f"/panel/visitas/fotos/{UUID_FOTO}/":
-                rutas.append(ruta.replace(UUID_FOTO, self.codigo_foto))
+        for ruta in _rutas_protegidas(pk=SENTINELA, codigo=SENTINELA_UUID):
+            if SENTINELA_UUID in ruta:
+                clave = next((c for p, c in UUID_POR_RUTA if re.match(p, ruta)), None)
+                if clave is None:
+                    self.fail(f"Ruta con uuid sin objeto real en el test: {ruta}")
+                rutas.append(ruta.replace(SENTINELA_UUID, self.codigos[clave]))
             elif SENTINELA in ruta:
                 clave = next(
                     (c for patron, c in MODELO_POR_RUTA if re.match(patron, ruta)),
