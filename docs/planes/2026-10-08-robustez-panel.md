@@ -309,11 +309,13 @@ commit_base: 21b20be
 | T5 | hecha |
 | T6 | hecha |
 | T7 | hecha |
-| T8 | pendiente |
+| T8 | en curso |
 | T9 | pendiente |
 | T10 | pendiente |
 | T11 | pendiente |
 | T12 | hecha |
+| T13 | en curso |
+| T14 | en curso |
 
 ### Corridas
 
@@ -331,6 +333,8 @@ commit_base: 21b20be
 | 2026-10-12 | T12 (ronda 2) | bf482b5 | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA; test_geocodificacion estable 3/3); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T3-3, T12-1 y T12-2 cerrados (9 casos de goteo en HTTP y 8 en TLS cortan a 1 s; intercalado forzado da 503), sin hallazgos nuevos |
 | 2026-10-12 | T7 | 82df1a9 | criterios `T6: integra` y `T12: integra` PASA (principal) | T12 integrada en 82df1a9: merge, makemigrations --check y 641 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T8 | | | |
+| | T13 | | | |
+| | T14 | | | |
 | | T9 | | | |
 | | T10 | | | |
 | | T11 | | | |
@@ -437,6 +441,9 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-12 — T3-3 (P-robustez-panel-7) se resuelve en una subtarea nueva, T12, en la ola 3 junto a T6, con su integración en T7; contrato modificado en fa3397f, así que `congelado.sh` sale con 1 (CONTRATO MODIFICADO) hasta el cierre — el hallazgo quedó abierto tras las dos rondas de T3 — decisión del usuario — reemplaza a: (nada)
 - 2026-10-12 — los hallazgos T12-1 (`Connection: close` sin corte) y T12-2 (carrera con `SSLSocket.shutdown`) se corrigen en T12 antes de integrar — T12-1 es una variante del objetivo de T12 y T12-2 una regresión introducida por T12, mismo criterio que el usuario aplicó a T1 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-12 — la geocodificación deja de respetar `HTTPS_PROXY`/`no_proxy` del entorno al pasar a `HTTPSConnection` — no hay proxy de salida en el repo (auditor-seguridad, T12); si el hosting lo exige, falla visible con 503 y se repone con `set_tunnel` — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — P-robustez-panel-8 se resuelve en este plan: T8 (visitas) y T10 (panel) suman la cota a sus filtros, y T13 (sitios) y T14 (proyectos) son subtareas nuevas de la ola 4, integradas en T9; contrato modificado de nuevo — decisión del usuario — reemplaza a: (nada)
+- 2026-10-12 — un filtro numérico fuera de rango (más de 19 dígitos o mayor que `2**63 - 1`) se ignora, igual que un valor no numérico, en vez de devolver un listado vacío — coherente con el tratamiento de `isascii()` de T3/T6 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — P-robustez-panel-8 se reparte en una subtarea por app (T13 sitios, T14 proyectos) y no en una sola — cada app tiene un único dueño y así corren en paralelo con T8 — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 
