@@ -7,14 +7,31 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| robustez-panel | plan/robustez-panel | (lo lleva su sesión) | ver su plan | sesión paralela |
-| — | main | — | demo del cliente 2026-10-13 con `demo.bat`; robustez-panel debe rebasear sobre `main` (P-demo-cliente-2) | sesión 2026-10-12 cerrada (demo-cliente fusionado) |
+| — | main | — | demo del cliente 2026-10-13 con `demo.bat`; próximo plan a elegir entre los pendientes abiertos (robustez-dominio, despliegue, sitio-cierre) | sesión 2026-10-12 cerrada (robustez-panel fusionado) |
 
-Siguiente: 91 abiertos (con los 13 de `demo-cliente`; desglose por etiqueta del 2026-10-08: `despliegue` 24, `robustez-panel` 14, `expo` 8, `empresa` 6, `sitio-cierre` 5, `informes` 2, `saneamiento` 1, y 21 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12; P-sitio-publico-3, -5, -8 a -11 y -13 a -17), a etiquetar en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
+Siguiente: 82 abiertos según `pendientes.py` tras fusionar robustez-panel (incluye P-robustez-panel-1 a -6 y -9 a -14 y los de `demo-cliente`; las etiquetas se revisan en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-12 — Plan `robustez-panel`: puntos, geocodificación, filtros, incidencias y diseño del panel, fusión en `main`
+Hecho:
+- Plan Completo `robustez-panel` (`seguridad: sí`) en cinco olas, commit_base 21b20be; cada subtarea con verificador, verificador-b y auditor-seguridad:
+  - T1: corregir coordenadas desde panel o admin limpia `ubicacion_fijada_por/en` y `precision_m`; `estado.py` ignora visitas de administradores; destildar "activo" pasa por `desactivar_punto` (dos rondas por una regresión propia en el admin).
+  - T3 y T12: geocodificación con User-Agent con contacto, 503 ante JSON anidado, redirecciones y errores HTTP, y cota total de 5 s con `HTTPSConnection` y un vigilante que corta el socket (deja de honrar `HTTPS_PROXY`).
+  - T4: `clean_redes` rechaza URLs con usuario/contraseña; la 404 bajo `/panel/` y `/admin/` enlaza a su inicio.
+  - T6, T13, T14, T8 y T10: filtros numéricos con `isascii()`, a lo sumo 19 dígitos y `<= 2**63 - 1` en proyectos, sitios, visitas y mapa.
+  - T8: filtro de incidencias de ubicación revisadas, historial de visita en una consulta (últimos 50), ficha con incidencia de asignación.
+  - T10: `.enlace` y estilos de fichas en `panel.css`, CSS de tablero y mapa fuera de `<style nonce>`, contadores del tablero solo con visitas realizadas, sin CSP de teselas en el JSON del mapa, `AccesoTests` con objetos reales por modelo (dos rondas por defectos del propio test).
+- Dos contratos modificados por decisión del usuario: T12 (fa3397f) y P-robustez-panel-8 con T13/T14 (43cc3af).
+- Verificación TODO: 70/71 PASA en ambos verificadores (FALLA solo `congelado.sh`); auditor-seguridad sin hallazgos. Se trajo `main` (demo-cliente) sin conflictos: 669 tests OK. Fusión autorizada por el usuario.
+
+Queda:
+- P-robustez-panel-9 y -10 [menor]: `?orden=--x` y `?q=%00` (Postgres) dan 500 en los listados del panel (`apps/panel/listados.py`).
+- P-robustez-panel-3 [menor]: `worktree-integrar.sh` falla siempre en el `branch -d` final cuando el destino es `plan/<slug>`.
+- Resto de P-robustez-panel-1 a -14 en el plan.
+- El worktree `worktrees/robustez-panel` y la rama `plan/robustez-panel` siguen existiendo; se quitan cuando el usuario lo indique.
 
 ### 2026-10-12 — Plan `demo-cliente`: datos de demostración, `demo.bat` y preparación para alojar, fusión en `main`
 Hecho:
