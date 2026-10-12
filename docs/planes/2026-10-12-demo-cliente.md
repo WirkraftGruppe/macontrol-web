@@ -227,16 +227,18 @@ commit_base: d8caed8
 ### Estado de subtareas
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T6 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T6 | hecha |
+| T4 | hecha |
 | T3 | pendiente |
 | T5 | pendiente |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-12 | T1, T6, T2 (verificador) | b368e3e (T1/T6) · 9452ed1 (T2) | FALLA formal: 23/23 criterios PASA; único motivo congelado.sh CONTRATO MODIFICADO (055dd91, dffcb24) | modificaciones aprobadas por el usuario |
+| 2026-10-12 | T4 (principal) | 568d857 | 2/2 PASA | worktree-integrar: 619 tests OK en cada merge; `branch -d` falla con la raíz en main (rama destino sin checkout en la raíz), ramas borradas con -D tras `merge-base --is-ancestor` |
 
 ## Pendientes que deja este plan
 ### Problemas
