@@ -276,12 +276,12 @@ commit_base: 21b20be
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T7 | pendiente |
+| T7 | hecha |
 | T8 | pendiente |
 | T9 | pendiente |
 | T10 | pendiente |
 | T11 | pendiente |
-| T12 | en curso |
+| T12 | hecha |
 
 ### Corridas
 
@@ -296,7 +296,8 @@ commit_base: 21b20be
 | 2026-10-12 | T5 | 87e96af | criterios `T3: integra` y `T4: integra` PASA (principal) | T3 integrada en 87e96af: merge, makemigrations --check y 633 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | 2026-10-12 | T6 | e44f20b | verificador 3/3 PASA, verificador-b 3/3 PASA; veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f, T12 por decisión del usuario), bloque de T6 idéntico en 21b20be y fa3397f | auditor-seguridad: sin regresiones; dos Baja anteriores a T6 (P-robustez-panel-8). Integrada en 9060ba3 (634 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T12 (ronda 1) | dca443e | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T12-1 [Baja] con `Connection: close` el vigilante no corta la línea de trozo ni el trailer goteados; T12-2 [Baja, PLAUSIBLE] `SSLSocket.shutdown` desde el vigilante puede dar 500 o mandar el pedido en claro (regresión de T12); se corrigen en T12 ronda 2. Sin indicios de proxy de salida |
-| | T7 | | | |
+| 2026-10-12 | T12 (ronda 2) | bf482b5 | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA; test_geocodificacion estable 3/3); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T3-3, T12-1 y T12-2 cerrados (9 casos de goteo en HTTP y 8 en TLS cortan a 1 s; intercalado forzado da 503), sin hallazgos nuevos |
+| 2026-10-12 | T7 | 82df1a9 | criterios `T6: integra` y `T12: integra` PASA (principal) | T12 integrada en 82df1a9: merge, makemigrations --check y 641 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T8 | | | |
 | | T9 | | | |
 | | T10 | | | |
