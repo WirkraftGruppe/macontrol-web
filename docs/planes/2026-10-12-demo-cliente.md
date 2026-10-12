@@ -231,20 +231,33 @@ commit_base: d8caed8
 | T2 | hecha |
 | T6 | hecha |
 | T4 | hecha |
-| T3 | pendiente |
-| T5 | pendiente |
+| T3 | hecha |
+| T5 | hecha |
 
 ### Corridas
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-12 | T1, T6, T2 (verificador) | b368e3e (T1/T6) · 9452ed1 (T2) | FALLA formal: 23/23 criterios PASA; único motivo congelado.sh CONTRATO MODIFICADO (055dd91, dffcb24) | modificaciones aprobadas por el usuario |
 | 2026-10-12 | T4 (principal) | 568d857 | 2/2 PASA | worktree-integrar: 619 tests OK en cada merge; `branch -d` falla con la raíz en main (rama destino sin checkout en la raíz), ramas borradas con -D tras `merge-base --is-ancestor` |
+| 2026-10-12 | T3 (verificador) | 4188e67 | FALLA formal: 10/10 PASA; único motivo CONTRATO MODIFICADO | check --deploy: solo W005 y W021 (HSTS reversible) |
+| 2026-10-12 | T3 (auditor-seguridad) | 4188e67 | sin bloqueantes | I-1, I-2 importantes; M-1 menor; O-1 a O-3 observaciones → P-demo-cliente-4 a -9 |
+| 2026-10-12 | T5 (principal) | 60fc3a8 | 1/1 PASA | worktree-integrar: 623 tests OK; mismo fallo de `branch -d` (P-demo-cliente-10) |
 
 ## Pendientes que deja este plan
 ### Problemas
 - P-demo-cliente-1 [importante] [despliegue] `media/` queda en el disco local del contenedor, que sin volumen se pierde en cada despliegue. Antes de producción hace falta un volumen o almacenamiento de objetos (`django-storages` ya está instalado y no se configura).
 - P-demo-cliente-2 [observación] [robustez-panel] demo-cliente reescribió `apps/panel/management/commands/cargar_demo.py` y su test. robustez-panel T10, dueño de `apps/panel/**`, debe rebasear sobre `main` antes de empezar y no tocar esos archivos.
 - P-demo-cliente-3 [observación] [despliegue] Una instancia alojada queda sin datos de demo, porque `cargar_demo` exige SQLite (decisión 2026-10-06). Mostrar datos en un alojamiento requiere una decisión nueva del usuario.
+- P-demo-cliente-4 [importante] [despliegue] `config/settings/dev.py:12` aborta solo con `RAILWAY_ENVIRONMENT`; si Railway inyecta únicamente `RAILWAY_ENVIRONMENT_ID`/`_NAME`, `RAILWAY_PROJECT_ID` o `RAILWAY_SERVICE_ID`, un servicio con `DJANGO_ENV=development` arranca con DEBUG y expone la página técnica (auditor I-1, PLAUSIBLE). Comprobar con `railway ssh -- env | grep ^RAILWAY_` y ampliar la lista de variables.
+- P-demo-cliente-5 [importante] [despliegue] `docs/despliegue.md` genera un dominio público sin `NUM_PROXIES`: tras el proxy todos comparten `REMOTE_ADDR` y 20 logins fallidos de un anónimo bloquean el ingreso de todos (auditor I-2). Agregar `NUM_PROXIES` a la tabla con su verificación, o advertir que la instancia no se comparte hasta resolverlo.
+- P-demo-cliente-6 [menor] [despliegue] `CSRF_TRUSTED_ORIGINS` en `prod.py:21-24` acepta comodines y `http://`; `.env.example` y la guía lo llaman obligatorio cuando el propio dominio ya se acepta (auditor M-1). Rechazar orígenes no https o con `*` y corregir el texto.
+- P-demo-cliente-7 [observación] [despliegue] `ALLOWED_HOSTS='*'` pasa el aborto de `prod.py` (auditor O-1); hoy sin escenario concreto.
+- P-demo-cliente-8 [importante] [despliegue] Logos de clientes y portadas de servicios (`inicio.html:139`, `apps/web/views.py:73`) dan 404 en producción porque no hay ruta `/media/` (auditor O-2). No resolverlo con `WHITENOISE_ROOT = MEDIA_ROOT`, `static(MEDIA_URL)` ni `serve` sobre `MEDIA_ROOT`: publicaría fotos y planos sin autenticación. Vista pública acotada a esos campos o mover a `static/`.
+- P-demo-cliente-9 [observación] [despliegue] `STORAGE_BACKEND` de `.env.example:16` no lo lee ningún setting (auditor O-3).
+- P-demo-cliente-10 [menor] [hooks] `worktree-integrar.sh` corre `git branch -d` en la raíz; si la rama destino no es la del checkout de la raíz (p. ej. raíz en `main`, destino `plan/<slug>` en su worktree), falla con exit 1 tras un merge correcto. En demo-cliente se borraron T1, T2 y T3 con `-D` tras `merge-base --is-ancestor`.
+- P-demo-cliente-11 [menor] [demo] Cada corrida de `cargar_demo` recrea los puntos demo y sus `qr_codigo`: un QR impreso de una corrida anterior deja de valer. Está en el `help` del comando, no en `docs/demo-cliente.md`.
+- P-demo-cliente-12 [observación] [demo] No hay pantalla de historial propia (`/panel/informes/` vacío); la guía usa `/panel/visitas/` filtrado.
+- P-demo-cliente-13 [observación] [despliegue] `railway.json` usa `"builder": "RAILPACK"` y `restartPolicyType: ON_FAILURE` sin validar contra Railway; confirmarlo en el primer despliegue.
 
 ### Decisiones
 - 2026-10-12 — La demo es solo del sitio público y del panel; el escaneo de QR queda para cuando exista la app móvil — decisión del usuario — reemplaza a: (nada)
