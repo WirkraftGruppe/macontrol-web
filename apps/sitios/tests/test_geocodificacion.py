@@ -1,4 +1,8 @@
+import http.client
 import json
+import socket
+import threading
+import time
 import urllib.error
 from unittest import mock
 
@@ -136,7 +140,7 @@ class GeocodificacionTests(TestCase):
             def __exit__(self, *args):
                 return False
 
-            def read(self, cantidad):
+            def read1(self, cantidad):
                 return b" "
 
         # Cada llamada a monotonic() avanza un segundo: se pasa de los 5 s.
@@ -148,5 +152,52 @@ class GeocodificacionTests(TestCase):
                 geocodificacion.time, "monotonic", side_effect=lambda: next(reloj)
             ),
         ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+
+    def test_cuerpo_goteado_por_socket_real_corta_a_tiempo(self):
+        servidor = socket.socket()
+        servidor.bind(("127.0.0.1", 0))
+        servidor.listen(1)
+
+        def gotear():
+            conexion, _ = servidor.accept()
+            try:
+                conexion.recv(4096)
+                conexion.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n")
+                for _ in range(20):
+                    conexion.sendall(b" ")
+                    time.sleep(0.2)
+            except OSError:
+                pass
+            finally:
+                conexion.close()
+
+        threading.Thread(target=gotear, daemon=True).start()
+        self.addCleanup(servidor.close)
+        url = f"http://127.0.0.1:{servidor.getsockname()[1]}/search"
+        self.client.force_login(self.admin)
+        inicio = time.monotonic()
+        with (
+            mock.patch.object(geocodificacion, "URL_NOMINATIM", url),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 1),
+            mock.patch.object(geocodificacion, "TIMEOUT_SEGUNDOS", 1),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(time.monotonic() - inicio, 2.5)
+
+    def test_numero_enorme_no_da_500(self):
+        datos = json.dumps([{"display_name": "x", "lat": 10**400, "lon": 1}]).encode()
+        self.client.force_login(self.admin)
+        with mock.patch(ABRIR, return_value=datos):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["resultados"], [])
+
+    def test_error_de_protocolo_http_responde_503(self):
+        self.client.force_login(self.admin)
+        error = http.client.IncompleteRead(b"abc", 10)
+        with mock.patch(ABRIR, side_effect=error):
             r = self.client.post(self.url, {"q": "Castelli"})
         self.assertEqual(r.status_code, 503)

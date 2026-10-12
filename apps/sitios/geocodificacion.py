@@ -5,6 +5,7 @@ buscador; nunca nombres de clientes, de sitios ni de contactos.
 """
 
 import hashlib
+import http.client
 import json
 import logging
 import math
@@ -51,8 +52,10 @@ class _SinRedirecciones(urllib.request.HTTPRedirectHandler):
 def _abrir(solicitud):
     """Abre la solicitud sin seguir redirecciones y devuelve los bytes.
 
-    Además del timeout por socket hay una fecha límite total: se lee por bloques y,
-    si se pasa, falla (un servidor que gotea bytes no retiene la petición).
+    Además del timeout por socket hay una fecha límite total: el cuerpo se lee con
+    ``read1`` (una sola lectura de socket por vuelta) y la fecha se comprueba entre
+    lecturas. Peor caso real: ``LIMITE_TOTAL_SEGUNDOS + TIMEOUT_SEGUNDOS`` con el cuerpo
+    goteado; las cabeceras goteadas solo las acota el timeout por socket de ``open``.
     """
     limite = time.monotonic() + LIMITE_TOTAL_SEGUNDOS
     abridor = urllib.request.build_opener(_SinRedirecciones)
@@ -62,7 +65,7 @@ def _abrir(solicitud):
         while leidos < MAX_BYTES:
             if time.monotonic() > limite:
                 raise TimeoutError("se superó el tiempo total de la consulta")
-            bloque = respuesta.read(min(TAMANO_BLOQUE, MAX_BYTES - leidos))
+            bloque = respuesta.read1(min(TAMANO_BLOQUE, MAX_BYTES - leidos))
             if not bloque:
                 break
             partes.append(bloque)
@@ -98,7 +101,7 @@ def _candidatos(datos):
                     "lng": _coordenada(item["lon"], 180),
                 }
             )
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, TypeError, ValueError, OverflowError):
             continue
         if len(resultado) == MAX_CANDIDATOS:
             break
@@ -127,7 +130,14 @@ def buscar(texto):
     )
     try:
         candidatos = _candidatos(json.loads(_abrir(solicitud)))
-    except (urllib.error.URLError, OSError, ValueError, RecursionError) as error:
+    except (
+        urllib.error.URLError,
+        OSError,
+        ValueError,
+        RecursionError,
+        OverflowError,
+        http.client.HTTPException,
+    ) as error:
         logger.warning("Falló la consulta a Nominatim: %s", type(error).__name__)
         raise GeocodificacionError(str(error)) from error
     cache.set(clave, candidatos, DURACION_CACHE)
