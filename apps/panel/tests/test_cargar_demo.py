@@ -1,10 +1,11 @@
-"""Pruebas de ``cargar_demo``: datos genéricos, idempotente y solo con SQLite."""
+"""Pruebas de ``cargar_demo``: datos realistas, recreables y solo con SQLite."""
 
 import os
 import shutil
 import tempfile
 from datetime import timedelta
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 
 from django.core.management import call_command
@@ -15,14 +16,27 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.panel.demo import _es_sqlite
+from apps.panel.demo_datos import CLIENTES, MARCA_DEMO
+from apps.productos.models import Producto
+from apps.proyectos.models import Proyecto
+from apps.servicios.models import TipoServicio
 from apps.sitios.models import Plano, PuntoControl, Sitio
-from apps.visitas.models import Foto, Revision, Visita
+from apps.visitas.models import Foto, ProductoAplicado, Revision, Visita
+from apps.visitas.planillas import validar_datos
+from apps.web.models import PaginaServicio
 
 MEDIA_DEMO = tempfile.mkdtemp(prefix="macontrol-demo-test-")
+CARTA = Path(__file__).resolve().parents[3] / "docs" / "00-contenido-fuente.md"
+
+
+def _archivos(carpeta):
+    return sorted(f for _, _, fs in os.walk(carpeta) for f in fs)
 
 
 @override_settings(MEDIA_ROOT=MEDIA_DEMO)
 class CargarDemoTests(TestCase):
+    """Guardas de entorno, cuentas demo y limpieza ante una falla."""
+
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()
@@ -31,84 +45,18 @@ class CargarDemoTests(TestCase):
     def _cargar(self):
         call_command("cargar_demo", stdout=StringIO())
 
-    def _conteos(self):
-        return {
-            modelo.__name__: modelo.objects.count()
-            for modelo in (User, Cliente, Sitio, PuntoControl, Plano, Visita, Revision)
-        } | {"Foto": Foto.objects.count()}
-
-    @override_settings(DEBUG=True)
-    def test_crea_puntos_plano_y_revisiones_idempotente(self):
-        self._cargar()
-        primera = self._conteos()
-
-        # Todo es genérico: ningún nombre de cliente sale de la empresa real.
-        for cliente in Cliente.objects.all():
-            self.assertRegex(cliente.razon_social, r"^Cliente Demo \d+$")
-            self.assertEqual(cliente.cuit, "")
-
-        # Un plano por cada sitio de más de tres puntos, con marcadores en 0..1.
-        for sitio in Sitio.objects.all():
-            puntos = list(sitio.puntos.all())
-            self.assertEqual(sitio.planos.count(), 1 if len(puntos) > 3 else 0)
-            for punto in puntos:
-                if sitio.planos.exists():
-                    self.assertTrue(0 <= punto.x <= 1 and 0 <= punto.y <= 1)
-                self.assertIsNotNone(punto.latitud)
-        self.assertEqual(Plano.objects.count(), 1)
-        plano = Plano.objects.get()
-        self.assertGreater(plano.ancho_px, 0)
-
-        # Visitas realizadas con revisiones y fotos, y una abierta.
-        self.assertGreaterEqual(
-            Visita.objects.filter(estado=Visita.Estado.REALIZADA).count(), 2
-        )
-        self.assertEqual(Visita.objects.filter(estado=Visita.Estado.ABIERTA).count(), 1)
-        self.assertGreaterEqual(primera["Revision"], 4)
-        self.assertGreaterEqual(primera["Foto"], primera["Revision"])
-        self.assertEqual(User.objects.filter(rol=User.Rol.ADMINISTRADOR).count(), 1)
-        self.assertEqual(User.objects.filter(rol=User.Rol.EMPLEADO).count(), 1)
-
-        # Segunda corrida: no duplica nada.
-        self._cargar()
-        self.assertEqual(self._conteos(), primera)
-
     @override_settings(DEBUG=True)
     def test_falla_tardia_no_deja_planos_huerfanos(self):
         with (
             tempfile.TemporaryDirectory() as media,
             override_settings(MEDIA_ROOT=media),
         ):
-            ruta = "apps.panel.management.commands.cargar_demo.Command._proyecto"
+            ruta = "apps.panel.management.commands.cargar_demo.Command._crear_historia"
             with mock.patch(ruta, side_effect=RuntimeError("falla tardía")):
                 with self.assertRaisesMessage(RuntimeError, "falla tardía"):
                     self._cargar()
             self.assertEqual(Plano.objects.count(), 0)
-            archivos = [f for _, _, fs in os.walk(media) for f in fs]
-            self.assertEqual(archivos, [])
-
-    @override_settings(DEBUG=True, ATRASO_MAXIMO_HORAS=48)
-    def test_atraso_acotado_al_maximo(self):
-        antes = timezone.now()
-        self._cargar()
-        limite = antes - timedelta(hours=48)
-        self.assertEqual(
-            Visita.objects.filter(estado=Visita.Estado.REALIZADA).count(), 3
-        )
-        self.assertFalse(Revision.objects.filter(realizada_en__lt=limite).exists())
-
-    @override_settings(DEBUG=True)
-    def test_corrida_incompleta_se_completa_en_la_siguiente(self):
-        self._cargar()
-        # Una corrida fallida dejó la primera jornada abierta, sin cerrar.
-        primera = Visita.objects.filter(estado=Visita.Estado.REALIZADA).first()
-        Visita.objects.filter(proyecto=primera.proyecto).update(
-            estado=Visita.Estado.ABIERTA
-        )
-        self._cargar()
-        self.assertEqual(
-            Visita.objects.filter(estado=Visita.Estado.REALIZADA).count(), 3
-        )
+            self.assertEqual(_archivos(media), [])
 
     @override_settings(DEBUG=False)
     def test_rechaza_sin_debug_y_no_toca_la_base(self):
@@ -162,3 +110,159 @@ class CargarDemoTests(TestCase):
         self.assertIn("demo-admin", errores.getvalue())
         self.assertNotIn("demo-admin", salida.getvalue())
         self.assertIn("demo-empleado", salida.getvalue())
+
+
+@override_settings(MEDIA_ROOT=MEDIA_DEMO, DEBUG=True)
+class CargarDemoClienteTests(TestCase):
+    """Contenido, historia, marca y recreación de los datos de la demo."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_demo", stdout=StringIO())
+
+    def _cargar(self):
+        call_command("cargar_demo", stdout=StringIO())
+
+    def _conteos(self):
+        modelos = (
+            *(User, Cliente, Sitio, PuntoControl, Plano, Proyecto, Visita),
+            *(Revision, Foto, ProductoAplicado, Producto, TipoServicio),
+            PaginaServicio,
+        )
+        return {modelo.__name__: modelo.objects.count() for modelo in modelos}
+
+    def test_crea_los_conteos_esperados(self):
+        self.assertEqual(Cliente.objects.count(), 4)
+        self.assertEqual(Sitio.objects.count(), 6)
+        self.assertTrue(20 <= PuntoControl.objects.count() <= 30)
+        plano = Plano.objects.get()
+        ubicados = plano.puntos.exclude(x=None).exclude(y=None)
+        self.assertGreaterEqual(ubicados.count(), 4)
+        self.assertGreater(plano.ancho_px, 0)
+        self.assertTrue(ProductoAplicado.objects.exists())
+        incidencias = Revision.objects.filter(incidencia_ubicacion=True)
+        self.assertTrue(2 <= incidencias.count() <= 3)
+        self.assertTrue(Visita.objects.filter(incidencia_ubicacion=True).exists())
+        for rol in User.Rol.values:
+            self.assertEqual(User.objects.filter(rol=rol).count(), 1)
+        for revision in Revision.objects.all():
+            self.assertGreaterEqual(revision.fotos.count(), 1)
+        for sitio in Sitio.objects.all():
+            self.assertTrue(sitio.notas.startswith(MARCA_DEMO))
+            self.assertEqual(sitio.telefono_en_sitio, "0000-000000")
+            self.assertRegex(sitio.direccion, r"^(Ruta 2 km \d+|Calle \d+ s/n)$")
+        for cliente in Cliente.objects.all():
+            self.assertTrue(cliente.notas.startswith(MARCA_DEMO))
+            self.assertEqual((cliente.cuit, cliente.contacto_email), ("", ""))
+        nombres = Producto.objects.values_list("nombre_comercial", flat=True)
+        self.assertTrue(nombres)
+        self.assertTrue(all(nombre.endswith(" (demo)") for nombre in nombres))
+
+    def test_planillas_validas_contra_su_esquema(self):
+        for revision in Revision.objects.all():
+            errores = validar_datos(revision.esquema_planilla, revision.datos)
+            self.assertEqual(errores, {})
+
+    def test_visita_pendiente_coherente_con_el_proyecto(self):
+        pendiente = Visita.objects.get(estado=Visita.Estado.PENDIENTE)
+        self.assertEqual(pendiente.programada_para, pendiente.proyecto.proxima_visita)
+        self.assertGreater(pendiente.programada_para, timezone.localdate())
+        for proyecto in Proyecto.objects.all():
+            ultima = proyecto.visitas.filter(estado=Visita.Estado.REALIZADA).first()
+            esperada = timezone.localdate(ultima.cerrada_en) + timedelta(days=14)
+            self.assertEqual(proyecto.proxima_visita, esperada)
+            self.assertEqual(ultima.cierre, Visita.Cierre.EMPLEADO)
+            self.assertEqual(ultima.origen, Visita.Origen.APP)
+
+    def test_clientes_salen_de_la_carta(self):
+        carta = CARTA.read_text(encoding="utf-8")
+        linea = carta.split("## Quienes confían en nosotros")[1].splitlines()[1]
+        lista = {nombre.strip() for nombre in linea.split("·")}
+        razones = set(Cliente.objects.values_list("razon_social", flat=True))
+        self.assertEqual(razones, set(CLIENTES))
+        self.assertLessEqual(razones, lista)
+
+    def test_historial_de_tres_meses(self):
+        ahora = timezone.now()
+        edades = [
+            (ahora - visita.cerrada_en).days
+            for visita in Visita.objects.filter(estado=Visita.Estado.REALIZADA)
+        ]
+        self.assertGreaterEqual(max(edades), 85)
+        for mes in range(3):
+            self.assertTrue(any(mes * 30 <= edad < (mes + 1) * 30 for edad in edades))
+
+    def test_carga_contenido_inicial_solo_si_faltan_paginas(self):
+        self.assertTrue(PaginaServicio.objects.exists())
+        pagina = PaginaServicio.objects.first()
+        PaginaServicio.objects.filter(pk=pagina.pk).update(titulo_seo="Del cliente")
+        self._cargar()
+        self.assertTrue(
+            PaginaServicio.objects.filter(titulo_seo="Del cliente").exists()
+        )
+
+    def test_segunda_corrida_no_duplica(self):
+        with (
+            tempfile.TemporaryDirectory() as media,
+            override_settings(MEDIA_ROOT=media),
+        ):
+            self._cargar()
+            primera = self._conteos()
+            archivos = _archivos(media)
+            with self.captureOnCommitCallbacks(execute=True):
+                self._cargar()
+            self.assertEqual(self._conteos(), primera)
+            # Los archivos de la corrida anterior se borraron al confirmar.
+            restantes = _archivos(media)
+            self.assertEqual(len(restantes), len(archivos))
+            self.assertFalse(set(restantes) & set(archivos))
+        self.assertEqual(Sitio.history.filter(nombre="Planta Castelli").count(), 1)
+
+    def test_conserva_datos_que_no_son_demo(self):
+        cliente = Cliente.objects.create(razon_social="Cliente Propio", notas="mío")
+        sitio = Sitio.objects.create(cliente=cliente, nombre="Sitio propio")
+        ajeno = Cliente.objects.create(razon_social="Danone")
+        producto = Producto.objects.create(nombre_comercial="Producto propio")
+        tipo = TipoServicio.objects.create(nombre="Propio", slug="servicio-propio")
+        empleado = User.objects.create_user("propio", password="x", rol="empleado")
+        proyecto = Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=tipo,
+            titulo="Propio",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+        # Un sitio sin marca colgado de un cliente demo tampoco se toca.
+        demo = Cliente.objects.get(razon_social="Nutrisur")
+        cuelga = Sitio.objects.create(cliente=demo, nombre="Sitio mío")
+        self._cargar()
+        self._cargar()
+        for objeto in (cliente, sitio, ajeno, producto, tipo, empleado, proyecto):
+            self.assertTrue(type(objeto).objects.filter(pk=objeto.pk).exists())
+        self.assertTrue(Sitio.objects.filter(pk=cuelga.pk).exists())
+        self.assertTrue(Cliente.objects.filter(pk=cuelga.cliente_id).exists())
+        self.assertEqual(sitio.puntos.count(), 1)
+
+    def test_limpia_el_formato_viejo(self):
+        viejo = Cliente.objects.create(razon_social="Cliente Demo 1")
+        sitio = Sitio.objects.create(cliente=viejo, nombre="Planta Demo Norte")
+        tipo = TipoServicio.objects.create(
+            nombre="Control de plagas (demo)", slug="demo-control-de-plagas"
+        )
+        empleado = User.objects.get(username="demo-empleado")
+        Proyecto.objects.create(
+            sitio=sitio,
+            tipo_servicio=tipo,
+            titulo="Control mensual",
+            encargado_inicial=empleado,
+            encargado_actual=empleado,
+        )
+        self._cargar()
+        self.assertFalse(
+            Cliente.objects.filter(razon_social__startswith="Cliente Demo")
+        )
+        self.assertFalse(Sitio.objects.filter(nombre="Planta Demo Norte").exists())
+        self.assertFalse(TipoServicio.objects.filter(slug=tipo.slug).exists())
+        self.assertFalse(Sitio.history.filter(nombre="Planta Demo Norte").exists())
+        self.assertFalse(Proyecto.history.filter(titulo="Control mensual").exists())
+        self.assertEqual(Cliente.objects.count(), 4)
