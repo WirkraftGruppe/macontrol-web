@@ -9,7 +9,14 @@ from pathlib import Path
 from django.conf import settings
 from django.test import SimpleTestCase
 
-_HEREDADAS = ("DJANGO_ENV", "ALLOWED_HOSTS", "SECRET_KEY", "DATABASE_URL")
+_HEREDADAS = (
+    "DJANGO_ENV",
+    "ALLOWED_HOSTS",
+    "SECRET_KEY",
+    "DATABASE_URL",
+    "CSRF_TRUSTED_ORIGINS",
+    "RAILWAY_ENVIRONMENT",
+)
 
 
 def _correr(args, **entorno):
@@ -116,6 +123,67 @@ class CheckDeployTests(SimpleTestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         ids = set(re.findall(r"security\.W\d+", r.stdout + r.stderr))
         self.assertEqual(ids, {"security.W005", "security.W021"})
+
+
+class DespliegueTests(SimpleTestCase):
+    """Configuración para alojar: orígenes CSRF, hosts obligatorios y WhiteNoise."""
+
+    _PROD = {
+        "DJANGO_ENV": "production",
+        "SECRET_KEY": "x" * 60,
+        "DATABASE_URL": "sqlite:///prod-test.sqlite3",
+        "ALLOWED_HOSTS": "demo.up.railway.app",
+    }
+
+    def _leer_prod(self, expresion, **extra):
+        return _correr(
+            [
+                "shell",
+                "-c",
+                f"from django.conf import settings as s; print({expresion})",
+            ],
+            **{**self._PROD, **extra},
+        )
+
+    def test_prod_lee_csrf_trusted_origins(self):
+        r = self._leer_prod(
+            "s.CSRF_TRUSTED_ORIGINS",
+            CSRF_TRUSTED_ORIGINS=" https://a.up.railway.app , ,https://b.com.ar ",
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(
+            r.stdout.strip().splitlines()[-1],
+            "['https://a.up.railway.app', 'https://b.com.ar']",
+        )
+
+    def test_prod_sin_allowed_hosts_falla(self):
+        for valor in ("", " , "):
+            with self.subTest(valor=valor):
+                r = self._leer_prod("s.ALLOWED_HOSTS", ALLOWED_HOSTS=valor)
+                self.assertNotEqual(r.returncode, 0)
+                self.assertIn("ALLOWED_HOSTS", r.stdout + r.stderr)
+
+    def test_dev_aborta_en_railway(self):
+        r = _correr(
+            ["check"], DJANGO_ENV="development", RAILWAY_ENVIRONMENT="production"
+        )
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("RAILWAY_ENVIRONMENT", r.stdout + r.stderr)
+
+    def test_prod_whitenoise_despues_de_security_y_storages(self):
+        r = self._leer_prod(
+            "s.MIDDLEWARE[:2], s.STORAGES['staticfiles']['BACKEND'],"
+            " s.STORAGES['default']['BACKEND']"
+        )
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        salida = r.stdout.strip().splitlines()[-1]
+        self.assertIn(
+            "['django.middleware.security.SecurityMiddleware', "
+            "'whitenoise.middleware.WhiteNoiseMiddleware']",
+            salida,
+        )
+        self.assertIn("CompressedManifestStaticFilesStorage", salida)
+        self.assertIn("FileSystemStorage", salida)
 
 
 class SiteUrlTests(SimpleTestCase):

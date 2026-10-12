@@ -1,7 +1,9 @@
 """Settings de producción: SECRET_KEY y DATABASE_URL son obligatorias, sin defaults."""
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403
-from .base import env
+from .base import MIDDLEWARE, env
 
 DEBUG = False
 
@@ -9,6 +11,31 @@ SECRET_KEY = env("SECRET_KEY")
 
 # Recortados y sin vacíos: un host con espacios nunca coincide con el Host pedido.
 ALLOWED_HOSTS = [h.strip() for h in env.list("ALLOWED_HOSTS", default=[]) if h.strip()]
+
+if not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS está vacío con DJANGO_ENV=production: definí al menos un "
+        "host (separados por comas) o toda petición daría 400."
+    )
+
+# Orígenes https que Django acepta en los POST (el dominio público del hosting).
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in env.list("CSRF_TRUSTED_ORIGINS", default=[]) if o.strip()
+]
+
+# WhiteNoise sirve los estáticos de collectstatic, justo después de SecurityMiddleware.
+MIDDLEWARE = list(MIDDLEWARE)
+MIDDLEWARE.insert(
+    MIDDLEWARE.index("django.middleware.security.SecurityMiddleware") + 1,
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+)
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
 
 DATABASES = {"default": env.db("DATABASE_URL")}
 
