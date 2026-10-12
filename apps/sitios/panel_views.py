@@ -49,7 +49,7 @@ class SitioListado(AdministradorRequeridoMixin, ListadoPanelMixin):
     def get_queryset(self):
         queryset = super().get_queryset().select_related("cliente")
         cliente = self.request.GET.get("cliente", "")
-        if cliente.isdigit():
+        if cliente.isascii() and cliente.isdigit():
             queryset = queryset.filter(cliente_id=cliente)
         activo = self.request.GET.get("activo", "")
         if activo in ("1", "0"):

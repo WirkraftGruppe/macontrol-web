@@ -1,7 +1,12 @@
+import http.client
 import json
+import socket
+import threading
+import time
 import urllib.error
 from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -111,3 +116,88 @@ class GeocodificacionTests(TestCase):
         r = self.client.get(reverse("panel:sitios:alta"))
         self.assertIn("tile.openstreetmap.org", r["Content-Security-Policy"])
         self.assertContains(r, reverse("panel:sitios:geocodificar"))
+
+    def test_json_muy_anidado_responde_503(self):
+        self.client.force_login(self.admin)
+        anidado = b"[" * 100_000
+        with mock.patch(ABRIR, return_value=anidado):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
+
+    def test_user_agent_lleva_contacto(self):
+        self.assertIn(settings.SITE_URL, geocodificacion.USER_AGENT)
+        self.assertIn("administracion@macontrol.com.ar", geocodificacion.USER_AGENT)
+        self.assertTrue(geocodificacion.USER_AGENT.startswith("MAControl/1.0 (+"))
+
+    def test_respuesta_lenta_corta_por_tiempo_total(self):
+        class Lenta:
+            """Entrega un byte por lectura, sin cortar nunca por sí misma."""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read1(self, cantidad):
+                return b" "
+
+        # Cada llamada a monotonic() avanza un segundo: se pasa de los 5 s.
+        reloj = iter(range(0, 1000))
+        self.client.force_login(self.admin)
+        with (
+            mock.patch("urllib.request.OpenerDirector.open", return_value=Lenta()),
+            mock.patch.object(
+                geocodificacion.time, "monotonic", side_effect=lambda: next(reloj)
+            ),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+
+    def test_cuerpo_goteado_por_socket_real_corta_a_tiempo(self):
+        servidor = socket.socket()
+        servidor.bind(("127.0.0.1", 0))
+        servidor.listen(1)
+
+        def gotear():
+            conexion, _ = servidor.accept()
+            try:
+                conexion.recv(4096)
+                conexion.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n")
+                for _ in range(20):
+                    conexion.sendall(b" ")
+                    time.sleep(0.2)
+            except OSError:
+                pass
+            finally:
+                conexion.close()
+
+        threading.Thread(target=gotear, daemon=True).start()
+        self.addCleanup(servidor.close)
+        url = f"http://127.0.0.1:{servidor.getsockname()[1]}/search"
+        self.client.force_login(self.admin)
+        inicio = time.monotonic()
+        with (
+            mock.patch.object(geocodificacion, "URL_NOMINATIM", url),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 1),
+            mock.patch.object(geocodificacion, "TIMEOUT_SEGUNDOS", 1),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(time.monotonic() - inicio, 2.5)
+
+    def test_numero_enorme_no_da_500(self):
+        datos = json.dumps([{"display_name": "x", "lat": 10**400, "lon": 1}]).encode()
+        self.client.force_login(self.admin)
+        with mock.patch(ABRIR, return_value=datos):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["resultados"], [])
+
+    def test_error_de_protocolo_http_responde_503(self):
+        self.client.force_login(self.admin)
+        error = http.client.IncompleteRead(b"abc", 10)
+        with mock.patch(ABRIR, side_effect=error):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)

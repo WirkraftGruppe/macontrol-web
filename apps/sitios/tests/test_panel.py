@@ -55,6 +55,16 @@ class SitioPanelTests(TestCase):
         datos.update(extra)
         return datos
 
+    def test_filtro_cliente_no_ascii_no_da_500(self):
+        # "²" y los dígitos árabes pasan isdigit() pero no son enteros para la base.
+        for valor in ("²", "٣", "1²"):
+            r = self.client.get(reverse("panel:sitios:listado"), {"cliente": valor})
+            self.assertEqual(r.status_code, 200, valor)
+        r = self.client.get(
+            reverse("panel:sitios:listado"), {"cliente": str(self.cliente.pk)}
+        )
+        self.assertContains(r, "Planta Ñandú 1")
+
     def test_ficha_muestra_atribucion_osm(self):
         url = reverse("panel:sitios:ficha", args=[self.sitio.pk])
         r = self.client.get(url, {"pestana": "mapa"})
