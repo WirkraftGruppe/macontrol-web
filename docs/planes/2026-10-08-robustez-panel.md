@@ -253,9 +253,9 @@ commit_base: 21b20be
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | en curso |
+| T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
+| T5 | hecha |
 | T6 | pendiente |
 | T7 | pendiente |
 | T8 | pendiente |
@@ -270,10 +270,10 @@ commit_base: 21b20be
 | 2026-10-08 | T1 (ronda 1) | 5beddf5 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: 1 importante (alta en admin rechazada, regresión de T1), 2 menores, 2 observaciones; el usuario decide corregir en T1 antes de integrar |
 | 2026-10-08 | T1 (ronda 2) | c516ab7 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: hallazgos 1-3 y la observación de precision_m cerrados; queda 1 Baja ya existente antes de T1 (P-robustez-panel-2) y el historial doble (P-robustez-panel-1) |
 | 2026-10-08 | T2 | a5c66bc | criterio `T1: integra robustez-panel-T1` PASA (principal) | worktree-integrar.sh: merge, makemigrations --check y 624 tests OK; falló solo el `git branch -d` final (P-robustez-panel-3); rama borrada a mano tras comprobar que estaba contenida |
-| | T3 | | | |
 | 2026-10-12 | T3 (ronda 1) | 3ee6a27 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 [Baja] la fecha límite total no corta lecturas goteadas; T3-2 [Baja] OverflowError y HTTPException escapan (anterior a T3); se corrigen en T3 ronda 2 |
 | 2026-10-12 | T4 | 3608ef0 | verificador PASA 4/4; verificador-b PASA 4/4 | auditor-seguridad: sin hallazgos; nota latente: el admin de `Configuracion` no pasa por `clean_redes` (P-robustez-panel-5). Integrada en e5d01d0 (626 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
-| | T5 | | | |
+| 2026-10-12 | T3 (ronda 2) | 613d341 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 cerrado para el cuerpo, T3-2 cerrado; nuevo T3-3 [Baja] (líneas de control del chunked y cabeceras goteadas sin cota total, docstring inexacto) queda abierto como P-robustez-panel-7; test con socket real estable 3/3 |
+| 2026-10-12 | T5 | 87e96af | criterios `T3: integra` y `T4: integra` PASA (principal) | T3 integrada en 87e96af: merge, makemigrations --check y 633 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T6 | | | |
 | | T7 | | | |
 | | T8 | | | |
@@ -354,6 +354,7 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - P-robustez-panel-4 [observación] La 404 bajo `/panel/` o `/admin/` enlaza a su inicio, pero el botón sigue diciendo "Volver al inicio"; cambiar el texto es decisión de contenido (implementador de T4).
 - P-robustez-panel-5 [observación] `ConfiguracionAdmin` (`apps/web/admin.py:6-8`) usa el ModelForm por defecto y no pasa por `clean_redes`: desde `/admin/` se puede guardar cualquier URL en `redes`. Hoy ninguna plantilla pública muestra `redes`; pasa a hallazgo el día que se publique. Corrección: `form = ConfiguracionForm` o un validador en el campo del modelo (auditor-seguridad, T4).
 - P-robustez-panel-6 [observación] `test_404_bajo_panel_enlaza_al_panel` arma `404.html` con `render_to_string` y no hace un GET real; hoy no hay `handler404` propio y Django pasa `request_path` (`django/views/defaults.py:59`), así que cubre el caso real (verificador, T4).
+- P-robustez-panel-7 [menor] La geocodificación no tiene cota total de tiempo para las cabeceras ni para las líneas de control del chunked (tamaño de trozo, trailer): un servidor que las gotee retiene el worker mucho más de 5 s. El docstring de `_abrir` (`apps/sitios/geocodificacion.py:55-58`) dice que el cuerpo goteado se acota a `LIMITE_TOTAL_SEGUNDOS + TIMEOUT_SEGUNDOS`, lo que no vale para chunked, y la línea 122 del plan declara "fecha límite total de 5 s". Corrección: documentar el límite real o usar `http.client.HTTPSConnection` con un `threading.Timer` que corte el socket al vencer el plazo, con un test que gotee la línea de tamaño de trozo (auditor-seguridad, T3 ronda 2; T3-3).
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
