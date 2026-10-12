@@ -309,8 +309,8 @@ commit_base: 21b20be
 | T5 | hecha |
 | T6 | hecha |
 | T7 | hecha |
-| T8 | en curso |
-| T9 | pendiente |
+| T8 | hecha |
+| T9 | hecha |
 | T10 | pendiente |
 | T11 | pendiente |
 | T12 | hecha |
@@ -332,10 +332,10 @@ commit_base: 21b20be
 | 2026-10-12 | T12 (ronda 1) | dca443e | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T12-1 [Baja] con `Connection: close` el vigilante no corta la línea de trozo ni el trailer goteados; T12-2 [Baja, PLAUSIBLE] `SSLSocket.shutdown` desde el vigilante puede dar 500 o mandar el pedido en claro (regresión de T12); se corrigen en T12 ronda 2. Sin indicios de proxy de salida |
 | 2026-10-12 | T12 (ronda 2) | bf482b5 | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA; test_geocodificacion estable 3/3); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T3-3, T12-1 y T12-2 cerrados (9 casos de goteo en HTTP y 8 en TLS cortan a 1 s; intercalado forzado da 503), sin hallazgos nuevos |
 | 2026-10-12 | T7 | 82df1a9 | criterios `T6: integra` y `T12: integra` PASA (principal) | T12 integrada en 82df1a9: merge, makemigrations --check y 641 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
-| | T8 | | | |
+| 2026-10-12 | T8 | b177786 | verificador 9/9 PASA, verificador-b 9/9 PASA; veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af); bloque de T8 cambió solo en el ítem y el criterio de P-robustez-panel-8 | auditor-seguridad: T8 sin hallazgos; dos Baja anteriores en `apps/panel/listados.py` (P-robustez-panel-9 y -10) |
 | 2026-10-12 | T13 | 897f42d | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterios de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en sitios, sin hallazgos nuevos. Integrada en 9370e78 (643 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T14 | 26e5843 | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterio de T6 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en los cuatro parámetros de proyectos, sin hallazgos nuevos. Integrada en 6aead1b (642 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
-| | T9 | | | |
+| 2026-10-12 | T9 | dc68cd1 | criterios `T8: integra`, `T13: integra` y `T14: integra` PASA (principal) | T8 integrada en dc68cd1: merge, makemigrations --check y 650 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T10 | | | |
 | | T11 | | | |
 | | TODO | | | |
@@ -414,6 +414,9 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - P-robustez-panel-6 [observación] `test_404_bajo_panel_enlaza_al_panel` arma `404.html` con `render_to_string` y no hace un GET real; hoy no hay `handler404` propio y Django pasa `request_path` (`django/views/defaults.py:59`), así que cubre el caso real (verificador, T4).
 - P-robustez-panel-7 [menor] La geocodificación no tiene cota total de tiempo para las cabeceras ni para las líneas de control del chunked (tamaño de trozo, trailer): un servidor que las gotee retiene el worker mucho más de 5 s. El docstring de `_abrir` (`apps/sitios/geocodificacion.py:55-58`) dice que el cuerpo goteado se acota a `LIMITE_TOTAL_SEGUNDOS + TIMEOUT_SEGUNDOS`, lo que no vale para chunked, y la línea 122 del plan declara "fecha límite total de 5 s". Corrección: documentar el límite real o usar `http.client.HTTPSConnection` con un `threading.Timer` que corte el socket al vencer el plazo, con un test que gotee la línea de tamaño de trozo (auditor-seguridad, T3 ronda 2; T3-3).
 - P-robustez-panel-8 [menor] Los filtros numéricos del panel convierten con `int(valor)` sin acotar la magnitud: más de 4300 dígitos dan `ValueError` (límite de `sys.int_max_str_digits`) y un id mayor que 2^63-1 da `OverflowError` en SQLite (en Postgres es probable que devuelva vacío). Ambos dan 500, solo para un administrador. Verificado en `apps/proyectos/panel_views.py:52-53`; el mismo patrón está en `apps/sitios/panel_views.py:52`, `apps/panel/views.py:63` y `apps/visitas/panel_views.py:73`. Corrección: `len(valor) <= 19` y `int(valor) <= 2**63 - 1` antes de filtrar, con un test por caso (auditor-seguridad, T6).
+- P-robustez-panel-9 [menor] `ListadoPanelMixin.get_orden` (`apps/panel/listados.py:26`) valida con `orden.lstrip("-")`, así que `?orden=--creado` pasa la lista blanca y `order_by` lanza `FieldError`: 500 en los 9 listados del panel, solo para un administrador. Ya existía. Corrección: quitar un solo guion (`orden[1:] if orden.startswith("-") else orden`) antes de comparar, con un test (auditor-seguridad, T8).
+- P-robustez-panel-10 [menor] `ListadoPanelMixin.get_busqueda` (`apps/panel/listados.py:29`) no filtra NUL: `?q=%00` da `DataError` en Postgres (psycopg 3 rechaza NUL en texto) y 500 en los listados del panel; en SQLite responde 200, así que los tests no lo ven. Ya existía. Corrección: descartar ` ` de `q`, con un test que simule el rechazo (auditor-seguridad, T8).
+- P-robustez-panel-11 [observación] `_historial` de la ficha de visita trae 51 registros y muestra 50, para que el más antiguo mostrado tenga con qué compararse (implementador, T8).
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
