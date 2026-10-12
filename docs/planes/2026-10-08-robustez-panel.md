@@ -295,7 +295,7 @@ commit_base: 21b20be
 | 2026-10-12 | T3 (ronda 2) | 613d341 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 cerrado para el cuerpo, T3-2 cerrado; nuevo T3-3 [Baja] (líneas de control del chunked y cabeceras goteadas sin cota total, docstring inexacto) queda abierto como P-robustez-panel-7; test con socket real estable 3/3 |
 | 2026-10-12 | T5 | 87e96af | criterios `T3: integra` y `T4: integra` PASA (principal) | T3 integrada en 87e96af: merge, makemigrations --check y 633 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | 2026-10-12 | T6 | e44f20b | verificador 3/3 PASA, verificador-b 3/3 PASA; veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f, T12 por decisión del usuario), bloque de T6 idéntico en 21b20be y fa3397f | auditor-seguridad: sin regresiones; dos Baja anteriores a T6 (P-robustez-panel-8). Integrada en 9060ba3 (634 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
-| | T12 | | | |
+| 2026-10-12 | T12 (ronda 1) | dca443e | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T12-1 [Baja] con `Connection: close` el vigilante no corta la línea de trozo ni el trailer goteados; T12-2 [Baja, PLAUSIBLE] `SSLSocket.shutdown` desde el vigilante puede dar 500 o mandar el pedido en claro (regresión de T12); se corrigen en T12 ronda 2. Sin indicios de proxy de salida |
 | | T7 | | | |
 | | T8 | | | |
 | | T9 | | | |
@@ -402,6 +402,8 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-08 — en el panel, `desactivar_punto(form.instance)` corre antes del guardado completo del formulario, dentro del mismo `atomic` — toma los bloqueos antes de escribir y evita el deadlock de la ronda 1 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-12 — los hallazgos T3-1 (fecha límite que no corta lecturas goteadas) y T3-2 (OverflowError y HTTPException que dan 500) se corrigen en T3 antes de integrar — T3-1 es un control que T3 declara y no cumple, mismo criterio que el usuario aplicó a T1; T3-2 es el mismo `except` y el mismo objetivo (503 en vez de 500) — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-12 — T3-3 (P-robustez-panel-7) se resuelve en una subtarea nueva, T12, en la ola 3 junto a T6, con su integración en T7; contrato modificado en fa3397f, así que `congelado.sh` sale con 1 (CONTRATO MODIFICADO) hasta el cierre — el hallazgo quedó abierto tras las dos rondas de T3 — decisión del usuario — reemplaza a: (nada)
+- 2026-10-12 — los hallazgos T12-1 (`Connection: close` sin corte) y T12-2 (carrera con `SSLSocket.shutdown`) se corrigen en T12 antes de integrar — T12-1 es una variante del objetivo de T12 y T12-2 una regresión introducida por T12, mismo criterio que el usuario aplicó a T1 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — la geocodificación deja de respetar `HTTPS_PROXY`/`no_proxy` del entorno al pasar a `HTTPSConnection` — no hay proxy de salida en el repo (auditor-seguridad, T12); si el hosting lo exige, falla visible con 503 y se repone con `set_tunnel` — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 
