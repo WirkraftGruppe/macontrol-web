@@ -253,8 +253,8 @@ commit_base: 21b20be
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | pendiente |
-| T4 | pendiente |
+| T3 | en curso |
+| T4 | en curso |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
