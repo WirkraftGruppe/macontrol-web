@@ -242,7 +242,7 @@ commit_base: d8caed8
 | 2026-10-12 | T3 (verificador) | 4188e67 | FALLA formal: 10/10 PASA; único motivo CONTRATO MODIFICADO | check --deploy: solo W005 y W021 (HSTS reversible) |
 | 2026-10-12 | T3 (auditor-seguridad) | 4188e67 | sin bloqueantes | I-1, I-2 importantes; M-1 menor; O-1 a O-3 observaciones → P-demo-cliente-4 a -9 |
 | 2026-10-12 | T5 (principal) | 60fc3a8 | 1/1 PASA | worktree-integrar: 623 tests OK; mismo fallo de `branch -d` (P-demo-cliente-10) |
-| 2026-10-12 | TODO (verificador) | 4098d88 | FALLA formal: 41/42 PASA; único FALLA congelado.sh, CONTRATO MODIFICADO (055dd91, dffcb24) | suite 623 OK, ruff OK, makemigrations sin cambios; pendiente: aceptación del usuario y decisión de fusión |
+| 2026-10-12 | TODO (verificador) | 4098d88 | FALLA formal: 41/42 PASA; único FALLA congelado.sh, CONTRATO MODIFICADO (055dd91, dffcb24) | suite 623 OK, ruff OK, makemigrations sin cambios; FALLA formal aceptada por el usuario el 2026-10-12; fusión en main autorizada |
 
 ## Pendientes que deja este plan
 ### Problemas
