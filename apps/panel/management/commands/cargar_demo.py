@@ -1,97 +1,89 @@
-"""Carga datos de demostración genéricos: clientes, sitios, puntos, planos y visitas."""
+"""Carga datos de demostración: clientes, sitios, plano, puntos y 90 días de visitas."""
 
 import logging
-import uuid
 from datetime import timedelta
 from decimal import Decimal
-from io import BytesIO
 
-from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
-from PIL import Image, ImageDraw
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
-from apps.panel.demo import exigir_entorno_demo
+from apps.panel.demo import exigir_entorno_demo, limpiar_datos_demo
+from apps.panel.demo_datos import (
+    CASTELLI,
+    CHASCOMUS,
+    CLAVE_DEMO,
+    CLIENTES,
+    DESFASES,
+    DIAS_DE_HISTORIA,
+    FRECUENCIA_DIAS,
+    INCIDENCIAS_UBICACION,
+    MARCA_DEMO,
+    PRODUCTOS,
+    PROYECTO_CON_PENDIENTE,
+    SITIOS,
+    SUFIJO_PRODUCTO,
+    TELEFONO_FICTICIO,
+    TIPOS,
+)
+from apps.panel.demo_historia import GeneradorHistoria
+from apps.panel.demo_imagenes import plano_esquematico, posicion_en_plano
+from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
 from apps.servicios.models import TipoServicio
 from apps.sitios import services as servicios_sitio
-from apps.sitios.models import Plano, PuntoControl, Sitio
-from apps.visitas import services as servicios_visita
-from apps.visitas.models import Visita
+from apps.sitios.models import Plano, Sitio
+from apps.web.models import PaginaServicio
 
 logger = logging.getLogger(__name__)
 
-CLAVE_DEMO = "demo1234"
-LATITUD_BASE = Decimal("-36.090000")
-LONGITUD_BASE = Decimal("-57.800000")
-
-# (cliente, sitio, nombres de los puntos además de "General")
-SITIOS = [
-    (
-        "Cliente Demo 1",
-        "Planta Demo Norte",
-        ["Entrada", "Depósito", "Cocina", "Muelle de carga"],
-    ),
-    ("Cliente Demo 1", "Depósito Demo Sur", ["Pasillo", "Patio"]),
-    ("Cliente Demo 2", "Oficina Demo Centro", ["Recepción"]),
-]
-
-
-def _imagen(ancho, alto, color, formato, nombre):
-    """Archivo subido con una imagen lisa generada con Pillow."""
-    salida = BytesIO()
-    imagen = Image.new("RGB", (ancho, alto), color)
-    dibujo = ImageDraw.Draw(imagen)
-    dibujo.rectangle([10, 10, ancho - 10, alto - 10], outline="white", width=3)
-    imagen.save(salida, format=formato)
-    return SimpleUploadedFile(nombre, salida.getvalue())
+# Los sitios se corren unos cientos de metros dentro de su localidad.
+PASO_SITIO = Decimal("0.004")
+PASO_PUNTO = Decimal("0.0003")
 
 
 class Command(BaseCommand):
     help = (
-        "Carga datos de demostración genéricos (clientes, sitios, puntos, planos, "
-        "proyectos, visitas con revisiones y fotos). Es idempotente y solo corre "
-        "con DEBUG, DJANGO_ENV=development y SQLite (sin DATABASE_URL), "
-        "para no tocar nunca una base remota. Crea los usuarios demo-admin "
-        "(administrador) y demo-empleado "
-        f"(empleado) con la contraseña {CLAVE_DEMO}: existen solo en desarrollo."
+        "Carga datos de demostración (4 clientes, 6 sitios con sus puntos, un plano, "
+        "proyectos y unos 90 días de visitas con revisiones, fotos y productos). "
+        "Borra y recrea solo los datos marcados como demo (notas que empiezan con "
+        "'[demo]', productos con sufijo ' (demo)' y el formato viejo 'Cliente Demo "
+        "N'); no toca nada sin marca. Regenera los QR de los puntos demo. Solo corre "
+        "con DEBUG, DJANGO_ENV=development y SQLite (sin DATABASE_URL). Crea "
+        "demo-admin (administrador) y demo-empleado (empleado) con la contraseña "
+        f"{CLAVE_DEMO}: existen solo en desarrollo."
     )
 
     def handle(self, *args, **opciones):
         exigir_entorno_demo("cargar_demo")
-        # La transacción revierte la base, no los archivos de plano ya escritos.
-        self._planos_creados = []
+        # La transacción revierte la base, no los archivos ya escritos.
+        self._archivos = []
         try:
             with transaction.atomic():
-                empleado = self._usuarios()
-                tipo, _ = TipoServicio.objects.get_or_create(
-                    slug="demo-control-de-plagas",
-                    defaults={"nombre": "Control de plagas (demo)"},
-                )
-                sitios = [self._sitio(*datos) for datos in SITIOS]
-                proyectos = [self._proyecto(sitio, tipo, empleado) for sitio in sitios]
+                administrador, empleado = self._usuarios()
+                borrados = limpiar_datos_demo()
+                if not PaginaServicio.objects.exists():
+                    call_command("loaddata", "contenido_inicial", verbosity=0)
+                sitios = self._crear_sitios()
+                self._crear_historia(sitios, administrador, empleado)
         except Exception:
-            self._borrar_planos()
+            self._borrar_archivos()
             raise
-        # Los servicios de visitas abren su propia transacción: van fuera.
-        for orden, proyecto in enumerate(proyectos):
-            self._visitas(proyecto, empleado, orden)
-        self.stdout.write("Demo lista.")
+        self.stdout.write(f"Demo lista ({borrados} sitios anteriores reemplazados).")
 
-    def _borrar_planos(self):
-        """Borra del almacenamiento los planos creados por una corrida fallida."""
-        for plano in self._planos_creados:
+    def _borrar_archivos(self):
+        """Borra del almacenamiento los archivos de una corrida fallida."""
+        for almacenamiento, nombre in self._archivos:
             try:
-                plano.imagen.storage.delete(plano.imagen.name)
+                almacenamiento.delete(nombre)
             except Exception:  # noqa: BLE001
-                logger.exception("No se pudo borrar un plano de la demo.")
+                logger.exception("No se pudo borrar un archivo de la demo.")
 
     def _usuarios(self):
-        """Crea los usuarios demo y devuelve el empleado.
+        """Crea los usuarios demo y devuelve (administrador, empleado).
 
         Uno que ya existía con otro rol u otra contraseña no se modifica: se avisa
         por stderr y la contraseña solo se informa de los recién creados.
@@ -114,110 +106,112 @@ class Command(BaseCommand):
                     "contraseña: no se modificó."
                 )
             usuarios.append(usuario)
-        return usuarios[1]
+        return tuple(usuarios)
 
-    def _sitio(self, razon_social, nombre, nombres_puntos):
-        cliente, _ = Cliente.objects.get_or_create(razon_social=razon_social)
-        sitio, _ = Sitio.objects.get_or_create(
-            cliente=cliente,
-            nombre=nombre,
-            defaults={"latitud": LATITUD_BASE, "longitud": LONGITUD_BASE},
-        )
-        puntos = [sitio.puntos.get(nombre="General")]
-        for orden, nombre_punto in enumerate(nombres_puntos, start=1):
-            punto, _ = PuntoControl.objects.get_or_create(
-                sitio=sitio, nombre=nombre_punto, defaults={"orden": orden}
+    def _crear_sitios(self):
+        """Clientes de la Carta, sus sitios y puntos; el primer sitio lleva plano."""
+        clientes = {
+            razon: Cliente.objects.create(razon_social=razon, notas=MARCA_DEMO)
+            for razon in CLIENTES
+        }
+        sitios = []
+        for numero, datos in enumerate(SITIOS):
+            razon, nombre, direccion, localidad, sector, puntos = datos
+            lat, lng = CASTELLI if localidad == "Castelli" else CHASCOMUS
+            desvio = PASO_SITIO * (numero // 2)
+            sitio = Sitio.objects.create(
+                cliente=clientes[razon],
+                nombre=nombre,
+                direccion=direccion,
+                localidad=localidad,
+                sector=sector,
+                latitud=lat + desvio,
+                longitud=lng - desvio,
+                contacto_en_sitio="Encargado (demostración)",
+                telefono_en_sitio=TELEFONO_FICTICIO,
+                horario_acceso="Lunes a viernes de 8 a 17",
+                notas=MARCA_DEMO,
             )
-            puntos.append(punto)
-        # Cada punto, apenas corrido del anterior para que el mapa los distinga.
-        for numero, punto in enumerate(puntos):
-            if punto.latitud is None:
-                servicios_sitio.fijar_ubicacion(
-                    punto,
-                    LATITUD_BASE + Decimal(numero) / 10000,
-                    LONGITUD_BASE + Decimal(numero) / 10000,
-                )
-        if len(puntos) > 3:
-            self._plano(sitio, puntos)
-        return sitio
+            self._crear_puntos(sitio, puntos, con_plano=numero == 0)
+            sitios.append(sitio)
+        return sitios
 
-    def _plano(self, sitio, puntos):
-        """Plano generado con los marcadores repartidos en una grilla de 0 a 1."""
-        plano = sitio.planos.first()
-        if plano is None:
+    def _crear_puntos(self, sitio, nombres, con_plano):
+        """Puntos del sitio, con su ubicación y, si lleva plano, sus marcadores."""
+        puntos = [sitio.puntos.get(nombre="General")]
+        for orden, nombre in enumerate(nombres, start=1):
+            puntos.append(sitio.puntos.create(nombre=nombre, orden=orden))
+        plano = None
+        if con_plano:
             plano = Plano(
                 sitio=sitio,
                 nombre="Planta general",
-                imagen=_imagen(800, 500, "#d9e2ec", "PNG", "plano.png"),
+                imagen=plano_esquematico([punto.nombre for punto in puntos]),
             )
             plano.save()
-            self._planos_creados.append(plano)
+            self._archivos.append((plano.imagen.storage, plano.imagen.name))
         for numero, punto in enumerate(puntos):
-            if punto.plano_id is None:
-                punto.plano = plano
-                punto.save(update_fields=["plano"])
-                servicios_sitio.mover_en_plano(
-                    punto,
-                    Decimal(numero % 3 + 1) / 4,
-                    Decimal(numero // 3 + 1) / 3,
+            # Cada punto, apenas corrido del anterior para que el mapa los distinga.
+            servicios_sitio.fijar_ubicacion(
+                punto,
+                sitio.latitud + PASO_PUNTO * (numero % 3),
+                sitio.longitud + PASO_PUNTO * (numero // 3),
+            )
+            if plano is not None:
+                x, y = posicion_en_plano(numero, len(puntos))
+                servicios_sitio.ubicar_en_plano(punto, plano, x, y)
+
+    def _crear_productos(self):
+        return [
+            Producto.objects.create(
+                nombre_comercial=f"{nombre}{SUFIJO_PRODUCTO}",
+                principio_activo=principio,
+                presentacion=presentacion,
+                unidad_dosis_por_defecto=unidad,
+                registro=registro,
+            )
+            for nombre, principio, presentacion, unidad, registro in PRODUCTOS
+        ]
+
+    def _tipos(self):
+        """Tipos de servicio reales por slug; los que faltan se crean sin pisar."""
+        return [
+            TipoServicio.objects.get_or_create(slug=slug, defaults={"nombre": nombre})[
+                0
+            ]
+            for slug, nombre in TIPOS.items()
+        ]
+
+    def _crear_historia(self, sitios, administrador, empleado):
+        """Un proyecto por sitio y sus jornadas quincenales de unos 90 días."""
+        tipos = self._tipos()
+        generador = GeneradorHistoria(
+            empleado, administrador, self._crear_productos(), self._archivos
+        )
+        hoy = timezone.localdate()
+        antiguo = timezone.now() - timedelta(days=DIAS_DE_HISTORIA + 3)
+        for numero, sitio in enumerate(sitios):
+            proyecto = Proyecto.objects.create(
+                sitio=sitio,
+                tipo_servicio=tipos[0 if numero < 4 else 1],
+                titulo=f"Control quincenal de {sitio.nombre}",
+                encargado_inicial=empleado,
+                encargado_actual=empleado,
+                frecuencia_dias=FRECUENCIA_DIAS,
+            )
+            puntos = list(sitio.puntos.filter(activo=True))
+            dias = range(DESFASES[numero], DIAS_DE_HISTORIA, FRECUENCIA_DIAS)
+            for jornada, atras in enumerate(dias):
+                lejanos = INCIDENCIAS_UBICACION.get((numero, jornada), set())
+                generador.jornada(
+                    proyecto, puntos, hoy - timedelta(days=atras), lejanos
                 )
-
-    def _proyecto(self, sitio, tipo, empleado):
-        proyecto, _ = Proyecto.objects.get_or_create(
-            sitio=sitio,
-            tipo_servicio=tipo,
-            titulo=f"Control mensual de {sitio.nombre}",
-            defaults={
-                "encargado_inicial": empleado,
-                "encargado_actual": empleado,
-                "frecuencia_dias": 30,
-            },
-        )
-        return proyecto
-
-    def _visitas(self, proyecto, empleado, orden):
-        """Visitas por los servicios del dominio, solo si el proyecto no las tiene.
-
-        Se mira lo que esa corrida deja: jornadas realizadas, o la abierta del
-        último proyecto. Así una corrida fallida se completa en la siguiente.
-        """
-        esperada = Visita.Estado.ABIERTA if orden == 2 else Visita.Estado.REALIZADA
-        if proyecto.visitas.filter(estado=esperada).exists():
-            return
-        puntos = list(proyecto.sitio.puntos.filter(activo=True))
-        ahora = timezone.now()
-        # El primer proyecto tiene dos jornadas realizadas, el segundo una y el
-        # último queda con una visita abierta.
-        jornadas = {0: [timedelta(days=3), timedelta(days=1)], 1: [timedelta(hours=5)]}
-        # Una revisión más atrasada que el máximo configurado sería rechazada.
-        tope = timedelta(hours=settings.ATRASO_MAXIMO_HORAS - 1)
-        for atraso in jornadas.get(orden, []):
-            atraso = min(atraso, tope)
-            visita = self._jornada(proyecto, empleado, puntos, ahora - atraso)
-            servicios_visita.cerrar_visita(
-                visita, quien=empleado, cierre=Visita.Cierre.EMPLEADO
+            # La más reciente es la primera: la próxima visita sale de ella.
+            proxima = hoy - timedelta(days=DESFASES[numero] - FRECUENCIA_DIAS)
+            if numero == PROYECTO_CON_PENDIENTE:
+                generador.pendiente(proyecto, proxima)
+            Proyecto.objects.filter(pk=proyecto.pk).update(
+                proxima_visita=proxima, creado=antiguo
             )
-        if orden == 2:
-            self._jornada(proyecto, empleado, puntos[:1], ahora)
-
-    def _jornada(self, proyecto, empleado, puntos, realizada_en):
-        """Abre una visita y registra una revisión por punto, cada una con foto."""
-        visita, _ = servicios_visita.abrir_visita(
-            empleado=empleado, proyecto=proyecto, qr_codigo=puntos[0].qr_codigo
-        )
-        for numero, punto in enumerate(puntos):
-            servicios_visita.registrar_revision(
-                visita=visita,
-                empleado=empleado,
-                qr_codigo=punto.qr_codigo,
-                cliente_uuid=uuid.uuid4(),
-                realizada_en=realizada_en + timedelta(minutes=numero),
-                latitud=punto.latitud,
-                longitud=punto.longitud,
-                precision_m=Decimal("8.0"),
-                datos={},
-                productos_aplicados=[],
-                fotos=[_imagen(320, 240, "#7a9e7e", "JPEG", f"foto-{numero}.jpg")],
-                observaciones="Revisión de demostración.",
-            )
-        return visita
+        Cliente.objects.filter(notas=MARCA_DEMO).update(creado=antiguo)
+        Sitio.objects.filter(notas=MARCA_DEMO).update(creado=antiguo)
