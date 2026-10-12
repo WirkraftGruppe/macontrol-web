@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.views.defaults import server_error
 
@@ -162,6 +163,17 @@ class ErroresTests(ConContenido):
         self.assertEqual(error.status_code, 500)
         self.assertIn("Error del servidor", error.content.decode())
         self.assertIn("css/web.css", error.content.decode())
+
+    def test_404_bajo_panel_enlaza_al_panel(self):
+        casos = {
+            "/panel/no-existe/": 'href="/panel/"',
+            "/admin/no-existe/": 'href="/admin/"',
+            "/no-existe/": 'href="/"',
+        }
+        for ruta, enlace in casos.items():
+            html = render_to_string("404.html", {"request_path": ruta})
+            self.assertIn(enlace, html, ruta)
+            self.assertIn("noindex", html, ruta)
 
 
 class PlantillasTests(TestCase):
