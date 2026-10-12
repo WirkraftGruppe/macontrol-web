@@ -63,7 +63,7 @@ Se pidió poner primero los importantes y después ordenar por app según el gra
 | 1 | T1, T2 (integración) | sitios (ninguna) — importantes -8, -9, -1 |
 | 2 | T3, T4, T5 (integración) | sitios, web (ninguna) |
 | 3 | T6, T12, T7 (integración) | proyectos, sitios (ninguna) — T12 agregada por contrato modificado (T3-3) |
-| 4 | T8, T9 (integración) | visitas (ninguna) |
+| 4 | T8, T13, T14, T9 (integración) | visitas, sitios, proyectos (ninguna) — T13 y T14 agregadas por contrato modificado (P-robustez-panel-8) |
 | 5 | T10, T11 (integración y cierre) | panel transversal y diseño (ninguna) |
 
 ## Subtareas
@@ -196,6 +196,7 @@ Agregada por contrato modificado (decisión del usuario, 2026-10-12): el hallazg
   - **P-panel-21**: `_historial` trae los últimos 50 registros en una sola consulta (`select_related("history_user")`), compara cada uno con el siguiente de la lista y no usa `prev_record`.
   - **-11**: el listado `ubicacion` filtra `cuenta_como_servicio=True` y `estado=REALIZADA`, igual que el tablero de T10.
   - **P-panel-10**: `isascii()` en `:73`.
+  - **P-robustez-panel-8** (contrato modificado): un valor del filtro numérico vale solo si es ASCII, son dígitos, tiene a lo sumo 19 caracteres y es menor o igual que `2**63 - 1` (máximo de `BigAutoField`); si no, el filtro se ignora, igual que hoy con un valor no numérico.
   - **P-panel-22**: la ficha muestra `incidencia_asignacion`.
   - **P-panel-27**: un test nuevo comprueba el código de respuesta y el mensaje del rechazo de un POST forjado sobre una pendiente. El mensaje actual de `Visita.clean` es "Una visita pendiente no tiene revisiones.".
 - **Criterios**:
@@ -203,18 +204,47 @@ Agregada por contrato modificado (decisión del usuario, 2026-10-12): el hallazg
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_panel.FichaVisitaTests.test_historial_con_consultas_acotadas --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_panel.ListadoVisitasTests.test_filtro_ubicacion_excluye_administradores_y_abiertas --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_panel.ListadoVisitasTests.test_filtro_numerico_no_ascii_no_da_500 --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_panel.ListadoVisitasTests.test_filtro_numerico_fuera_de_rango_no_da_500 --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_panel.FichaVisitaTests.test_muestra_incidencia_de_asignacion --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas.tests.test_admin.AdminPendienteTests.test_post_forjado_sobre_pendiente_muestra_el_rechazo --keepdb` — (cobertura)
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.visitas --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 400 --subtarea T8`
 
+### T13 — Filtro numérico de sitios fuera de rango (P-robustez-panel-8)
+
+Agregada por contrato modificado (decisión del usuario, 2026-10-12): hallazgo de auditor-seguridad sobre T6.
+
+- **Ola**: 4 · **Depende de**: T7
+- **Puede tocar**: `apps/sitios/panel_views.py`, `apps/sitios/tests/test_panel.py`
+- **Qué hacer**: en `apps/sitios/panel_views.py:52`, un valor del filtro numérico vale solo si es ASCII, son dígitos, tiene a lo sumo 19 caracteres y es menor o igual que `2**63 - 1` (máximo de `BigAutoField`); si no, el filtro se ignora, igual que hoy con un valor no numérico. Un valor con más de 4300 dígitos y `9223372036854775808` responden 200.
+- **Presupuesto**: 150 líneas agregadas.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_panel.SitioPanelTests.test_filtro_cliente_fuera_de_rango_no_da_500 --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 150 --subtarea T13`
+
+### T14 — Filtro numérico de proyectos fuera de rango (P-robustez-panel-8)
+
+Agregada por contrato modificado (decisión del usuario, 2026-10-12): hallazgo de auditor-seguridad sobre T6.
+
+- **Ola**: 4 · **Depende de**: T7
+- **Puede tocar**: `apps/proyectos/panel_views.py`, `apps/proyectos/tests/test_panel.py`
+- **Qué hacer**: en `apps/proyectos/panel_views.py:52`, un valor del filtro numérico vale solo si es ASCII, son dígitos, tiene a lo sumo 19 caracteres y es menor o igual que `2**63 - 1` (máximo de `BigAutoField`); si no, el filtro se ignora, igual que hoy con un valor no numérico. Un valor con más de 4300 dígitos y `9223372036854775808` responden 200.
+- **Presupuesto**: 150 líneas agregadas.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.proyectos.tests.test_panel.ProyectoPanelTests.test_filtro_numerico_fuera_de_rango_no_da_500 --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.proyectos --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 150 --subtarea T14`
+
 ### T9 — Integración ola 4 (principal)
 
-- **Ola**: 4 · **Depende de**: T8
-- **Pasos**: los de T2, con T8 (`apps/visitas`). Al final se crea T10.
+- **Ola**: 4 · **Depende de**: T8, T13, T14
+- **Pasos**: los de T2, con T8 (`apps/visitas`), T13 (`apps/sitios`) y T14 (`apps/proyectos`). Al final se crea T10.
 - **Presupuesto**: no aplica.
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/robustez-panel | grep -q "T8: integra robustez-panel-T8"`
+  - `[cmd]` `git log --oneline plan/robustez-panel | grep -q "T13: integra robustez-panel-T13"`
+  - `[cmd]` `git log --oneline plan/robustez-panel | grep -q "T14: integra robustez-panel-T14"`
 
 ### T10 — Panel transversal y diseño (P-cierre-puntos-1, P-robustez-datos-11 tablero, P-panel-9, -10, -12, -19)
 
@@ -226,6 +256,7 @@ Agregada por contrato modificado (decisión del usuario, 2026-10-12): el hallazg
   - **-11**: los dos contadores de `tablero.py` cuentan solo visitas `REALIZADA`.
   - **P-panel-9**: el CSS de `tablero.html` y `mapa.html` pasa a `panel.css` y se quitan sus `<style nonce>`. También se agregan `.linea-tiempo`, `.miniaturas`, `.planilla` y `.fotos`.
   - **P-panel-10**: `_entero` usa `isascii()`.
+  - **P-robustez-panel-8** (contrato modificado): en `_entero`, un valor del filtro numérico vale solo si es ASCII, son dígitos, tiene a lo sumo 19 caracteres y es menor o igual que `2**63 - 1` (máximo de `BigAutoField`); si no, el filtro se ignora, igual que hoy con un valor no numérico.
   - **P-panel-12**: se quita `csp_update` de `MapaDatosView` y se ajusta `test_mapa_permite_teselas_osm_en_csp`.
   - **P-panel-19**: `AccesoTests` crea objetos reales y prueba el POST anónimo.
 - **Criterios**:
@@ -234,6 +265,7 @@ Agregada por contrato modificado (decisión del usuario, 2026-10-12): el hallazg
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_diseno.DisenoTests.test_tablero_y_mapa_sin_style_propio --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_diseno.DisenoTests.test_clases_de_fichas_tienen_estilo --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_mapa.MapaTests.test_filtro_numerico_no_ascii_no_da_500 --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_mapa.MapaTests.test_filtro_numerico_fuera_de_rango_no_da_500 --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_mapa.MapaTests.test_datos_del_mapa_sin_csp_de_teselas --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_acceso.AccesoTests.test_empleado_no_ve_rutas_con_objetos_reales --keepdb` — (cobertura)
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_acceso.AccesoTests.test_anonimo_post_va_al_login --keepdb` — (cobertura)
