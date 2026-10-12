@@ -267,6 +267,27 @@ class AdminPendienteTests(TestCase):
         self.assertEqual(pendiente.datos, {})
         self.assertFalse(pendiente.revisiones.exists())
 
+    def test_post_forjado_sobre_pendiente_muestra_el_rechazo(self):
+        pendiente = crear_visita()
+        crear_revision(pendiente)
+        administrador = User.objects.create_superuser(
+            username="root-rech", password="x", rol=User.Rol.ADMINISTRADOR
+        )
+        self.client.force_login(administrador)
+        url = reverse("admin:visitas_visita_change", args=[pendiente.pk])
+        respuesta = self.client.post(
+            url,
+            {
+                "proyecto": pendiente.proyecto_id,
+                "empleado": pendiente.empleado_id,
+                "origen": Visita.Origen.APP,
+            },
+        )
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "Una visita pendiente no tiene revisiones.")
+        pendiente.refresh_from_db()
+        self.assertEqual(pendiente.estado, Visita.Estado.PENDIENTE)
+
     def test_pendiente_no_asignable_a_administrador(self):
         administrador = User.objects.create_superuser(
             username="root-asig", password="x", rol=User.Rol.ADMINISTRADOR
