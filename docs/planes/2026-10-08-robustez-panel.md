@@ -314,8 +314,8 @@ commit_base: 21b20be
 | T10 | pendiente |
 | T11 | pendiente |
 | T12 | hecha |
-| T13 | en curso |
-| T14 | en curso |
+| T13 | hecha |
+| T14 | hecha |
 
 ### Corridas
 
@@ -333,8 +333,8 @@ commit_base: 21b20be
 | 2026-10-12 | T12 (ronda 2) | bf482b5 | verificador 5/5 PASA, verificador-b 5/5 PASA (más 4 tests de T3 en PASA; test_geocodificacion estable 3/3); veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f) | auditor-seguridad: T3-3, T12-1 y T12-2 cerrados (9 casos de goteo en HTTP y 8 en TLS cortan a 1 s; intercalado forzado da 503), sin hallazgos nuevos |
 | 2026-10-12 | T7 | 82df1a9 | criterios `T6: integra` y `T12: integra` PASA (principal) | T12 integrada en 82df1a9: merge, makemigrations --check y 641 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T8 | | | |
-| | T13 | | | |
-| | T14 | | | |
+| 2026-10-12 | T13 | 897f42d | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterios de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en sitios, sin hallazgos nuevos. Integrada en 9370e78 (643 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
+| 2026-10-12 | T14 | 26e5843 | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterio de T6 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en los cuatro parámetros de proyectos, sin hallazgos nuevos. Integrada en 6aead1b (642 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | | T9 | | | |
 | | T10 | | | |
 | | T11 | | | |
