@@ -2,6 +2,7 @@ import json
 import urllib.error
 from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -111,3 +112,41 @@ class GeocodificacionTests(TestCase):
         r = self.client.get(reverse("panel:sitios:alta"))
         self.assertIn("tile.openstreetmap.org", r["Content-Security-Policy"])
         self.assertContains(r, reverse("panel:sitios:geocodificar"))
+
+    def test_json_muy_anidado_responde_503(self):
+        self.client.force_login(self.admin)
+        anidado = b"[" * 100_000
+        with mock.patch(ABRIR, return_value=anidado):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
+
+    def test_user_agent_lleva_contacto(self):
+        self.assertIn(settings.SITE_URL, geocodificacion.USER_AGENT)
+        self.assertIn("administracion@macontrol.com.ar", geocodificacion.USER_AGENT)
+        self.assertTrue(geocodificacion.USER_AGENT.startswith("MAControl/1.0 (+"))
+
+    def test_respuesta_lenta_corta_por_tiempo_total(self):
+        class Lenta:
+            """Entrega un byte por lectura, sin cortar nunca por sí misma."""
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, cantidad):
+                return b" "
+
+        # Cada llamada a monotonic() avanza un segundo: se pasa de los 5 s.
+        reloj = iter(range(0, 1000))
+        self.client.force_login(self.admin)
+        with (
+            mock.patch("urllib.request.OpenerDirector.open", return_value=Lenta()),
+            mock.patch.object(
+                geocodificacion.time, "monotonic", side_effect=lambda: next(reloj)
+            ),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
