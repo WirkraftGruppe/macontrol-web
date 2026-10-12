@@ -132,6 +132,18 @@ T3 va sola en la ola 2 porque `config/` y `requirements.txt` son del principal y
   - `[grep-1]` `grep -nF "Ctrl+C" docs/demo-cliente.md`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T2`
 
+### T6 — Historia de 90 días de la demo (partición de T1 por presupuesto)
+- **Ola**: 1 · **Depende de**: T1 · **Worktree**: sí (misma rama `demo-cliente-T1`) · **Ruta**: delegada (`implementador`, ya escrito en T1); el principal parte el commit sin cambiar código
+- **Puede tocar**: `apps/panel/demo_historia.py`
+- **No puede tocar**: lo mismo que T1
+- **Presupuesto**: 250 líneas agregadas
+- **Qué hacer**: el generador de la historia de unos 90 días descripto en T1 ("Historia de unos 90 días"). T1 lo excedía (789 líneas contra 700); su commit se parte en `T1:` (todo menos `demo_historia.py`) y `T6:` (`demo_historia.py`). El commit intermedio `T1:` no es autónomo porque importa `demo_historia`.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_cargar_demo.CargarDemoClienteTests.test_planillas_validas_contra_su_esquema --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_cargar_demo.CargarDemoClienteTests.test_visita_pendiente_coherente_con_el_proyecto --keepdb`
+  - `[grep-0]` `grep -nE "urlopen|requests\." apps/panel/demo_historia.py`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T6`
+
 ### T4 — Integración ola 1 (principal)
 - **Ola**: 1 · **Depende de**: T1, T2
 - **Pasos**:
@@ -217,6 +229,7 @@ commit_base: d8caed8
 |---|---|
 | T1 | pendiente |
 | T2 | pendiente |
+| T6 | pendiente |
 | T4 | pendiente |
 | T3 | pendiente |
 | T5 | pendiente |
