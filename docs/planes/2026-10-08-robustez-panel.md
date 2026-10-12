@@ -275,7 +275,7 @@ commit_base: 21b20be
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | en curso |
+| T6 | hecha |
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
@@ -294,7 +294,7 @@ commit_base: 21b20be
 | 2026-10-12 | T4 | 3608ef0 | verificador PASA 4/4; verificador-b PASA 4/4 | auditor-seguridad: sin hallazgos; nota latente: el admin de `Configuracion` no pasa por `clean_redes` (P-robustez-panel-5). Integrada en e5d01d0 (626 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T3 (ronda 2) | 613d341 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 cerrado para el cuerpo, T3-2 cerrado; nuevo T3-3 [Baja] (líneas de control del chunked y cabeceras goteadas sin cota total, docstring inexacto) queda abierto como P-robustez-panel-7; test con socket real estable 3/3 |
 | 2026-10-12 | T5 | 87e96af | criterios `T3: integra` y `T4: integra` PASA (principal) | T3 integrada en 87e96af: merge, makemigrations --check y 633 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
-| | T6 | | | |
+| 2026-10-12 | T6 | e44f20b | verificador 3/3 PASA, verificador-b 3/3 PASA; veredicto formal FALLA solo por CONTRATO MODIFICADO (fa3397f, T12 por decisión del usuario), bloque de T6 idéntico en 21b20be y fa3397f | auditor-seguridad: sin regresiones; dos Baja anteriores a T6 (P-robustez-panel-8). Integrada en 9060ba3 (634 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | | T12 | | | |
 | | T7 | | | |
 | | T8 | | | |
@@ -376,6 +376,7 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - P-robustez-panel-5 [observación] `ConfiguracionAdmin` (`apps/web/admin.py:6-8`) usa el ModelForm por defecto y no pasa por `clean_redes`: desde `/admin/` se puede guardar cualquier URL en `redes`. Hoy ninguna plantilla pública muestra `redes`; pasa a hallazgo el día que se publique. Corrección: `form = ConfiguracionForm` o un validador en el campo del modelo (auditor-seguridad, T4).
 - P-robustez-panel-6 [observación] `test_404_bajo_panel_enlaza_al_panel` arma `404.html` con `render_to_string` y no hace un GET real; hoy no hay `handler404` propio y Django pasa `request_path` (`django/views/defaults.py:59`), así que cubre el caso real (verificador, T4).
 - P-robustez-panel-7 [menor] La geocodificación no tiene cota total de tiempo para las cabeceras ni para las líneas de control del chunked (tamaño de trozo, trailer): un servidor que las gotee retiene el worker mucho más de 5 s. El docstring de `_abrir` (`apps/sitios/geocodificacion.py:55-58`) dice que el cuerpo goteado se acota a `LIMITE_TOTAL_SEGUNDOS + TIMEOUT_SEGUNDOS`, lo que no vale para chunked, y la línea 122 del plan declara "fecha límite total de 5 s". Corrección: documentar el límite real o usar `http.client.HTTPSConnection` con un `threading.Timer` que corte el socket al vencer el plazo, con un test que gotee la línea de tamaño de trozo (auditor-seguridad, T3 ronda 2; T3-3).
+- P-robustez-panel-8 [menor] Los filtros numéricos del panel convierten con `int(valor)` sin acotar la magnitud: más de 4300 dígitos dan `ValueError` (límite de `sys.int_max_str_digits`) y un id mayor que 2^63-1 da `OverflowError` en SQLite (en Postgres es probable que devuelva vacío). Ambos dan 500, solo para un administrador. Verificado en `apps/proyectos/panel_views.py:52-53`; el mismo patrón está en `apps/sitios/panel_views.py:52`, `apps/panel/views.py:63` y `apps/visitas/panel_views.py:73`. Corrección: `len(valor) <= 19` y `int(valor) <= 2**63 - 1` antes de filtrar, con un test por caso (auditor-seguridad, T6).
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
