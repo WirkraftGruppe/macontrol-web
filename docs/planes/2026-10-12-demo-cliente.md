@@ -94,7 +94,7 @@ T3 va sola en la ola 2 porque `config/` y `requirements.txt` son del principal y
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_cargar_demo.CargarDemoClienteTests.test_historial_de_tres_meses --keepdb`. Comprueba que la visita realizada más vieja tiene ≥85 días y que hay visitas en cada uno de los 3 meses.
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_cargar_demo.CargarDemoClienteTests.test_limpia_el_formato_viejo --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.panel.tests.test_cargar_demo --keepdb`
-  - `[grep-0]` `contacto_email|urlopen|requests\.` en `apps/panel/management/commands/cargar_demo.py apps/panel/demo.py`
+  - `[grep-0]` `grep -nE "contacto_email|urlopen|requests\." apps/panel/management/commands/cargar_demo.py apps/panel/demo.py`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 700 --subtarea T1`
 
 ### T2 — `demo.bat` y guía de la demo
@@ -123,13 +123,13 @@ T3 va sola en la ola 2 porque `config/` y `requirements.txt` son del principal y
 - **Criterios**:
   - `[existe]` `demo.bat`
   - `[existe]` `docs/demo-cliente.md`
-  - `[grep-1]` `0.0.0.0:8000` en `demo.bat`
-  - `[grep-1]` `cargar_demo` en `demo.bat`
-  - `[grep-1]` `demo.sqlite3` en `demo.bat`
-  - `[grep-0]` `DJANGO_ENV=production` en `demo.bat`
+  - `[grep-1]` `grep -nF "0.0.0.0:8000" demo.bat`
+  - `[grep-1]` `grep -n "cargar_demo" demo.bat`
+  - `[grep-1]` `grep -nF "demo.sqlite3" demo.bat`
+  - `[grep-0]` `grep -n "DJANGO_ENV=production" demo.bat`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development DATABASE_URL=sqlite:///demo.sqlite3 ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.50 ./venv/Scripts/python.exe manage.py check`
-  - `[grep-1]` `demo-empleado` en `docs/demo-cliente.md`
-  - `[grep-1]` `Ctrl\+C` en `docs/demo-cliente.md`
+  - `[grep-1]` `grep -n "demo-empleado" docs/demo-cliente.md`
+  - `[grep-1]` `grep -nF "Ctrl+C" docs/demo-cliente.md`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 250 --subtarea T2`
 
 ### T4 — Integración ola 1 (principal)
@@ -177,10 +177,10 @@ T3 va sola en la ola 2 porque `config/` y `requirements.txt` son del principal y
     - Pendientes de `despliegue` que siguen abiertos.
   - En el venv compartido se instalan gunicorn y whitenoise. Es aditivo; gunicorn no arranca en Windows, pero se instala.
 - **Criterios**:
-  - `[grep-1]` `^gunicorn` en `requirements.txt`
-  - `[grep-1]` `^whitenoise` en `requirements.txt`
-  - `[grep-1]` `whitenoise.middleware.WhiteNoiseMiddleware` en `config/settings/prod.py`
-  - `[grep-1]` `collectstatic` en `railway.json`
+  - `[grep-1]` `grep -n "^gunicorn" requirements.txt`
+  - `[grep-1]` `grep -n "^whitenoise" requirements.txt`
+  - `[grep-1]` `grep -nF "whitenoise.middleware.WhiteNoiseMiddleware" config/settings/prod.py`
+  - `[grep-1]` `grep -n "collectstatic" railway.json`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_settings.DespliegueTests.test_prod_lee_csrf_trusted_origins --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_settings.DespliegueTests.test_prod_sin_allowed_hosts_falla --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_settings.DespliegueTests.test_dev_aborta_en_railway --keepdb`
