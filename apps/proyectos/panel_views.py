@@ -49,7 +49,7 @@ class ListadoProyectos(AdministradorRequeridoMixin, ListadoPanelMixin):
             ("encargado", "encargado_actual_id"),
         ):
             valor = filtros.get(parametro)
-            if valor and valor.isdigit():
+            if valor and valor.isascii() and valor.isdigit():
                 queryset = queryset.filter(**{campo: int(valor)})
         if filtros.get("estado") in Proyecto.Estado.values:
             queryset = queryset.filter(estado=filtros["estado"])
