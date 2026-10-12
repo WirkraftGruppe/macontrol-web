@@ -7,13 +7,26 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | arrancar robustez-panel | sesión 2026-10-08 cerrada (merge de ajustes visuales de sitio-publico) |
+| robustez-panel | plan/robustez-panel | (lo lleva su sesión) | ver su plan | sesión paralela |
+| — | main | — | demo del cliente 2026-10-13 con `demo.bat`; robustez-panel debe rebasear sobre `main` (P-demo-cliente-2) | sesión 2026-10-12 cerrada (demo-cliente fusionado) |
 
-Siguiente: 79 abiertos: `despliegue` 24, `robustez-panel` 14, `expo` 8, `empresa` 6, `sitio-cierre` 5, `informes` 2, `saneamiento` 1, y 21 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12; P-sitio-publico-3, -5, -8 a -11 y -13 a -17), a etiquetar en el próximo triage. Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
+Siguiente: 91 abiertos (con los 13 de `demo-cliente`; desglose por etiqueta del 2026-10-08: `despliegue` 24, `robustez-panel` 14, `expo` 8, `empresa` 6, `sitio-cierre` 5, `informes` 2, `saneamiento` 1, y 21 sin etiqueta (P-robustez-datos-1 a -7 y -10 a -12; P-sitio-publico-3, -5, -8 a -11 y -13 a -17), a etiquetar en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-12 — Plan `demo-cliente`: datos de demostración, `demo.bat` y preparación para alojar, fusión en `main`
+Hecho:
+- Plan Chico `demo-cliente` (T3 con `auditor-seguridad`) en dos olas, desde `main` aba788e (commit_base d8caed8):
+  - T1 y T6: `cargar_demo` reescrito en `apps/panel` (4 clientes de la Carta, 6 sitios, plano con Pillow, 90 días de historia por ORM, datos marcados y recreables; carga `contenido_inicial` si falta, cierra P-sitio-publico-3). T1 excedió su presupuesto (789/700) y se partió en T1 + T6 (`demo_historia.py`).
+  - T2: `demo.bat` (base `demo.sqlite3` aparte, IP privada detectada, `runserver 0.0.0.0:8000`) y `docs/demo-cliente.md`.
+  - T3: whitenoise y gunicorn, `railway.json`, `.python-version`, `CSRF_TRUSTED_ORIGINS`, abortos por `ALLOWED_HOSTS` vacío y por Railway en dev, `docs/despliegue.md`. Sin desplegar.
+- Dos contratos modificados aprobados por el usuario: criterios grep como comando completo (055dd91) y T6 (dffcb24).
+- Verificación TODO en 4098d88: 41/42 PASA; único FALLA `congelado.sh` (CONTRATO MODIFICADO), aceptado por el usuario. Suite 623 OK, ruff OK. `auditor-seguridad` sobre T3: sin bloqueantes; hallazgos en P-demo-cliente-4 a -9.
+- Fusionado en `main` en fb14739 con `--no-ff`. Sin push.
+- `worktree-integrar.sh` falla en `git branch -d` cuando la raíz no está en la rama destino (P-demo-cliente-10); las ramas se borraron con `-D` tras comprobar `merge-base --is-ancestor`.
+Sigue: demo del cliente con `demo.bat` desde la raíz; antes de alojar en público, P-demo-cliente-4, -5 y -8.
 
 ### 2026-10-08 — merge de robustez-datos y sitio-publico en main
 Hecho:
