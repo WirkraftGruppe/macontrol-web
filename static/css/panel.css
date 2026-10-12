@@ -168,6 +168,56 @@
 .ingreso-logo { display: block; height: 48px; width: auto; margin-bottom: 16px; }
 .ingreso .formulario { max-width: none; }
 
+/* Botón con aspecto de enlace (acciones por POST dentro de una tabla) */
+.enlace {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.enlace:hover { color: var(--brand-hover); }
+
+/* Tablero */
+.contadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.contador { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.contador-cifra { display: block; font-family: "Barlow Condensed", system-ui, sans-serif; font-weight: 700; font-size: 34px; line-height: 1.05; color: var(--brand); }
+.contador-etiqueta { color: var(--text-muted); font-size: 14px; }
+.contador-danger .contador-cifra { color: var(--danger); }
+
+/* Mapa */
+.mapa-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.mapa-filtros .campo { margin-bottom: 0; }
+#mapa { height: 70vh; min-height: 360px; border: 1px solid var(--border); border-radius: 8px; }
+.mapa-atribucion { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
+.mapa-popup h3 { margin: 0 0 4px; font-size: 18px; }
+.mapa-popup ul { margin: 4px 0; padding-left: 18px; }
+
+/* Fichas de proyecto y de visita */
+.linea-tiempo { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--border-strong); }
+.linea-tiempo > li { position: relative; margin-bottom: 20px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.linea-tiempo > li::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 18px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.linea-tiempo h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 4px; font-size: 18px; }
+.linea-tiempo details { margin-top: 8px; }
+.linea-tiempo summary { cursor: pointer; font-weight: 600; }
+.planilla { margin: 8px 0; }
+.planilla th { width: 40%; font-weight: 600; text-transform: none; }
+.planilla td { height: auto; padding: 8px 12px; }
+.miniaturas, .fotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.miniaturas img { display: block; width: 96px; height: 96px; object-fit: cover; border: 1px solid var(--border); border-radius: 4px; }
+.fotos img { display: block; max-width: 240px; height: auto; border: 1px solid var(--border); border-radius: 4px; }
+
 /* Pantallas angostas: la barra lateral pasa arriba */
 @media (max-width: 900px) {
   .panel { flex-direction: column; }

@@ -7,7 +7,11 @@ from django.test import TestCase
 from django.urls import URLResolver, get_resolver
 
 from apps.accounts.models import User
+from apps.clientes.models import Cliente
 from apps.panel import urls
+from apps.proyectos.models import Proyecto
+from apps.servicios.models import TipoServicio
+from apps.sitios.models import Sitio
 
 CLAVE = "clave-segura-123"
 
@@ -102,8 +106,22 @@ def _rutas_protegidas(pk="1"):
 
 
 class AccesoTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """Objetos reales: las rutas con pk llegan a una vista que sí los encuentra."""
+        cls.cliente = Cliente.objects.create(razon_social="Cliente SA")
+        cls.sitio = Sitio.objects.create(cliente=cls.cliente, nombre="Planta")
+        cls.servicio = TipoServicio.objects.create(nombre="Desinsectación", slug="d")
+        cls.empleado = User.objects.create_user("emp", password=CLAVE)
+        cls.proyecto = Proyecto.objects.create(
+            sitio=cls.sitio,
+            tipo_servicio=cls.servicio,
+            titulo="Proyecto",
+            encargado_inicial=cls.empleado,
+            encargado_actual=cls.empleado,
+        )
+
     def test_empleado_no_ve_ninguna_ruta_del_panel(self):
-        User.objects.create_user("emp", password=CLAVE)
         self.client.login(username="emp", password=CLAVE)
         rutas = _rutas_protegidas()
 
@@ -119,6 +137,24 @@ class AccesoTests(TestCase):
             with self.subTest(ruta=ruta):
                 self.assertEqual(self.client.get(ruta).status_code, 403)
                 self.assertEqual(self.client.post(ruta).status_code, 403)
+
+    def test_empleado_no_ve_rutas_con_objetos_reales(self):
+        self.client.login(username="emp", password=CLAVE)
+        pk = str(self.cliente.pk)
+        # El id de ejemplo existe en las tablas a las que apuntan las rutas con pk.
+        self.assertTrue(Proyecto.objects.filter(pk=pk).exists())
+        self.assertTrue(Sitio.objects.filter(pk=pk).exists())
+        for ruta in _rutas_protegidas(pk=pk):
+            with self.subTest(ruta=ruta):
+                self.assertEqual(self.client.get(ruta).status_code, 403)
+                self.assertEqual(self.client.post(ruta).status_code, 403)
+
+    def test_anonimo_post_va_al_login(self):
+        for ruta in _rutas_protegidas(pk=str(self.cliente.pk)):
+            with self.subTest(ruta=ruta):
+                respuesta = self.client.post(ruta)
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertTrue(respuesta["Location"].startswith("/panel/ingresar/"))
 
     def test_anonimo_va_al_login_en_todas_las_rutas(self):
         for ruta in _rutas_protegidas() + _rutas_protegidas(pk="999999"):

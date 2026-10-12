@@ -1,5 +1,8 @@
 """Diseño del panel: layout, filtro de tonos y listado base con HTMX."""
 
+import re
+from pathlib import Path
+
 from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
@@ -8,6 +11,10 @@ from apps.panel.listados import ListadoPanelMixin
 from apps.panel.templatetags.panel_ui import tono_estado
 
 User = get_user_model()
+
+RAIZ = Path(__file__).resolve().parents[3]
+PLANTILLAS = RAIZ / "apps" / "panel" / "templates" / "panel"
+CSS = (RAIZ / "static" / "css" / "panel.css").read_text(encoding="utf-8")
 
 
 class ListadoPrueba(ListadoPanelMixin):
@@ -75,3 +82,23 @@ class DisenoTests(TestCase):
         self.assertEqual(
             list(vista.get_queryset().values_list("username", flat=True)), ["a"]
         )
+
+    def test_panel_css_define_enlace(self):
+        bloque = re.search(r"(?m)^\.enlace\s*\{([^}]*)\}", CSS)
+        self.assertIsNotNone(bloque, "panel.css no define .enlace")
+        self.assertIn("text-decoration: underline", bloque.group(1))
+        self.assertIn("cursor: pointer", bloque.group(1))
+        self.assertIn("background: none", bloque.group(1))
+
+    def test_tablero_y_mapa_sin_style_propio(self):
+        for nombre in ("tablero.html", "mapa.html"):
+            with self.subTest(plantilla=nombre):
+                texto = (PLANTILLAS / nombre).read_text(encoding="utf-8")
+                self.assertNotIn("<style", texto)
+        for clase in (".contadores", ".contador-cifra", ".mapa-filtros", "#mapa"):
+            self.assertIn(clase, CSS)
+
+    def test_clases_de_fichas_tienen_estilo(self):
+        for clase in ("linea-tiempo", "miniaturas", "planilla", "fotos"):
+            with self.subTest(clase=clase):
+                self.assertRegex(CSS, rf"(?m)^\.{clase}\b")
