@@ -275,12 +275,13 @@ commit_base: 21b20be
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | pendiente |
+| T6 | en curso |
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
 | T10 | pendiente |
 | T11 | pendiente |
+| T12 | en curso |
 
 ### Corridas
 
@@ -294,6 +295,7 @@ commit_base: 21b20be
 | 2026-10-12 | T3 (ronda 2) | 613d341 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 cerrado para el cuerpo, T3-2 cerrado; nuevo T3-3 [Baja] (líneas de control del chunked y cabeceras goteadas sin cota total, docstring inexacto) queda abierto como P-robustez-panel-7; test con socket real estable 3/3 |
 | 2026-10-12 | T5 | 87e96af | criterios `T3: integra` y `T4: integra` PASA (principal) | T3 integrada en 87e96af: merge, makemigrations --check y 633 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
 | | T6 | | | |
+| | T12 | | | |
 | | T7 | | | |
 | | T8 | | | |
 | | T9 | | | |
@@ -398,6 +400,7 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-08 — la regla del último punto activo en el admin se valida en `PuntoControlAdminForm.clean()` (solo en edición, con `select_for_update`) y `save_model` llama a `services.desactivar_punto` — el error aparece en el formulario y el servicio sigue siendo la regla que decide — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-08 — en el panel, `desactivar_punto(form.instance)` corre antes del guardado completo del formulario, dentro del mismo `atomic` — toma los bloqueos antes de escribir y evita el deadlock de la ronda 1 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-12 — los hallazgos T3-1 (fecha límite que no corta lecturas goteadas) y T3-2 (OverflowError y HTTPException que dan 500) se corrigen en T3 antes de integrar — T3-1 es un control que T3 declara y no cumple, mismo criterio que el usuario aplicó a T1; T3-2 es el mismo `except` y el mismo objetivo (503 en vez de 500) — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — T3-3 (P-robustez-panel-7) se resuelve en una subtarea nueva, T12, en la ola 3 junto a T6, con su integración en T7; contrato modificado en fa3397f, así que `congelado.sh` sale con 1 (CONTRATO MODIFICADO) hasta el cierre — el hallazgo quedó abierto tras las dos rondas de T3 — decisión del usuario — reemplaza a: (nada)
 
 ### Cierra
 
