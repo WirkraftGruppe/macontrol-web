@@ -62,7 +62,7 @@ Se pidió poner primero los importantes y después ordenar por app según el gra
 |---|---|---|
 | 1 | T1, T2 (integración) | sitios (ninguna) — importantes -8, -9, -1 |
 | 2 | T3, T4, T5 (integración) | sitios, web (ninguna) |
-| 3 | T6, T7 (integración) | proyectos (ninguna) |
+| 3 | T6, T12, T7 (integración) | proyectos, sitios (ninguna) — T12 agregada por contrato modificado (T3-3) |
 | 4 | T8, T9 (integración) | visitas (ninguna) |
 | 5 | T10, T11 (integración y cierre) | panel transversal y diseño (ninguna) |
 
@@ -160,13 +160,32 @@ Toda subtarea que corrige un defecto lleva al menos un `[test]` que lo reproduce
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.proyectos --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 400 --subtarea T6`
 
+### T12 — Cota total de tiempo en la geocodificación (T3-3, P-robustez-panel-7)
+
+Agregada por contrato modificado (decisión del usuario, 2026-10-12): el hallazgo T3-3 de auditor-seguridad en la ronda 2 de T3 quedó abierto tras las dos rondas.
+
+- **Ola**: 3 · **Depende de**: T5
+- **Puede tocar**: `apps/sitios/geocodificacion.py`, `apps/sitios/tests/test_geocodificacion.py`
+- **Qué hacer**:
+  - La consulta a Nominatim usa `http.client.HTTPSConnection` (sin seguir redirecciones; todo estado distinto de 200 responde 503) y un vigilante (`threading.Timer`) que corta el socket al vencer `LIMITE_TOTAL_SEGUNDOS`. Así la cota total de 5 s cubre las cabeceras, las líneas de control del chunked (tamaño de trozo, trailer) y el cuerpo.
+  - Se mantienen el User-Agent con contacto, el tope de 1 MB, la lectura con `read1` y las excepciones que hoy responden 503. El docstring de `_abrir` describe el límite real, incluida la resolución DNS si queda fuera de la cota.
+  - Los tests de T3 que son criterios conservan su nombre y siguen en verde; se puede adaptar su mock a la nueva forma de abrir la conexión.
+- **Presupuesto**: 300 líneas agregadas.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_geocodificacion.GeocodificacionTests.test_cabeceras_goteadas_cortan_por_tiempo_total --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_geocodificacion.GeocodificacionTests.test_linea_de_trozo_goteada_corta_por_tiempo_total --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_geocodificacion.GeocodificacionTests.test_redireccion_responde_503 --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 300 --subtarea T12`
+
 ### T7 — Integración ola 3 (principal)
 
-- **Ola**: 3 · **Depende de**: T6
-- **Pasos**: los de T2, con T6 (`apps/proyectos`). Al final se crea T8.
+- **Ola**: 3 · **Depende de**: T6, T12
+- **Pasos**: los de T2, con T6 (`apps/proyectos`) y T12 (`apps/sitios`). Al final se crea T8.
 - **Presupuesto**: no aplica.
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/robustez-panel | grep -q "T6: integra robustez-panel-T6"`
+  - `[cmd]` `git log --oneline plan/robustez-panel | grep -q "T12: integra robustez-panel-T12"`
 
 ### T8 — Incidencias, historial y ficha de visitas (P-robustez-datos-3, P-panel-21, P-robustez-datos-11 listado, P-panel-10, -22, -27)
 
