@@ -311,8 +311,8 @@ commit_base: 21b20be
 | T7 | hecha |
 | T8 | hecha |
 | T9 | hecha |
-| T10 | pendiente |
-| T11 | pendiente |
+| T10 | hecha |
+| T11 | hecha |
 | T12 | hecha |
 | T13 | hecha |
 | T14 | hecha |
@@ -336,8 +336,10 @@ commit_base: 21b20be
 | 2026-10-12 | T13 | 897f42d | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterios de T3 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en sitios, sin hallazgos nuevos. Integrada en 9370e78 (643 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T14 | 26e5843 | verificador 3/3 PASA, verificador-b 3/3 PASA (más criterio de T6 en PASA); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: T6-1 y T6-2 cerrados en los cuatro parámetros de proyectos, sin hallazgos nuevos. Integrada en 6aead1b (642 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T9 | dc68cd1 | criterios `T8: integra`, `T13: integra` y `T14: integra` PASA (principal) | T8 integrada en dc68cd1: merge, makemigrations --check y 650 tests OK; otra vez falló solo el `branch -d` (P-robustez-panel-3), rama borrada tras comprobar que estaba contenida |
-| | T10 | | | |
-| | T11 | | | |
+| 2026-10-12 | T10 (ronda 1) | ad83f61 | verificador 12/12 PASA, verificador-b 12/12 PASA (suite completa 659 OK); veredicto formal FALLA solo por CONTRATO MODIFICADO (43cc3af) | auditor-seguridad: sin hallazgos de seguridad; dos Baja en el propio test `AccesoTests.test_empleado_no_ve_rutas_con_objetos_reales` (cobertura parcial de objetos reales; pks coincidentes, frágil fuera de SQLite); se corrigen en T10 |
+| 2026-10-12 | T10 (ronda 2) | 4153da9 | verificador 12/12 PASA, verificador-b 12/12 PASA (suite 659 OK); FALLA formal solo por CONTRATO MODIFICADO | auditor-seguridad: los dos Baja cerrados; nuevo Baja: una ruta nueva con `<uuid:...>` pasaba sin objeto real; observación: `mkdtemp` a nivel de módulo; se corrigen en T10 (última ronda) |
+| 2026-10-12 | T10 (ronda 3) | 1be2581 | verificador 12/12 PASA, verificador-b 12/12 PASA (suite 659 OK); FALLA formal solo por CONTRATO MODIFICADO | auditor-seguridad: todo cerrado, sin hallazgos nuevos. Integrada en c9f84c3 (659 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
+| 2026-10-12 | T11 | c9f84c3 | criterio `T10: integra robustez-panel-T10` PASA (principal) | `### Cierra` completado; queda la verificación TODO |
 | | TODO | | | |
 
 ### Veredicto de juez-plan
@@ -417,6 +419,9 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - P-robustez-panel-9 [menor] `ListadoPanelMixin.get_orden` (`apps/panel/listados.py:26`) valida con `orden.lstrip("-")`, así que `?orden=--creado` pasa la lista blanca y `order_by` lanza `FieldError`: 500 en los 9 listados del panel, solo para un administrador. Ya existía. Corrección: quitar un solo guion (`orden[1:] if orden.startswith("-") else orden`) antes de comparar, con un test (auditor-seguridad, T8).
 - P-robustez-panel-10 [menor] `ListadoPanelMixin.get_busqueda` (`apps/panel/listados.py:29`) no filtra NUL: `?q=%00` da `DataError` en Postgres (psycopg 3 rechaza NUL en texto) y 500 en los listados del panel; en SQLite responde 200, así que los tests no lo ven. Ya existía. Corrección: descartar ` ` de `q`, con un test que simule el rechazo (auditor-seguridad, T8).
 - P-robustez-panel-11 [observación] `_historial` de la ficha de visita trae 51 registros y muestra 50, para que el más antiguo mostrado tenga con qué compararse (implementador, T8).
+- P-robustez-panel-12 [observación] El contador "Incidencias sin revisar" del tablero cuenta solo visitas `REALIZADA` (T10), pero el filtro `?incidencia=sin_revisar` del listado de visitas (`apps/visitas/panel_views.py:92-95`) no filtra por estado. En la práctica casi no difiere, porque `incidencia` se marca al cerrar la visita (auditor-seguridad, T10).
+- P-robustez-panel-13 [observación] `style="display:inline"` en `apps/accounts/templates/accounts/panel/listado_parcial.html:27` y `apps/servicios/templates/servicios/panel/campos.html:30`: la CSP lo bloquea y el estilo no se aplica (visual, no de seguridad). Se puede reemplazar por `.enlace` u otra clase de `panel.css` (auditor-seguridad, T10).
+- P-robustez-panel-14 [observación] `AccesoTests` asigna el objeto real por prefijo de ruta: una ruta futura con un segundo parámetro, o con el pk de otro modelo en una posición ya mapeada, recibiría un id ajeno sin fallar; y una ruta mixta uuid + pk falla con `404 != 403` en vez de un mensaje claro (auditor-seguridad, T10).
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
@@ -447,6 +452,8 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-12 — P-robustez-panel-8 se resuelve en este plan: T8 (visitas) y T10 (panel) suman la cota a sus filtros, y T13 (sitios) y T14 (proyectos) son subtareas nuevas de la ola 4, integradas en T9; contrato modificado de nuevo — decisión del usuario — reemplaza a: (nada)
 - 2026-10-12 — un filtro numérico fuera de rango (más de 19 dígitos o mayor que `2**63 - 1`) se ignora, igual que un valor no numérico, en vez de devolver un listado vacío — coherente con el tratamiento de `isascii()` de T3/T6 — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-12 — P-robustez-panel-8 se reparte en una subtarea por app (T13 sitios, T14 proyectos) y no en una sola — cada app tiene un único dueño y así corren en paralelo con T8 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — los defectos que el auditor encontró en el propio `AccesoTests` de T10 (cobertura parcial, pks coincidentes, rutas uuid sin objeto real, `mkdtemp` de módulo) se corrigen en T10 en dos rondas antes de integrar — son defectos de la subtarea, mismo criterio que el usuario aplicó a T1 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — P-robustez-panel-9 y -10 (`apps/panel/listados.py`) no se suman a T10 y quedan abiertos — sumarlos exigía otra modificación del contrato y el usuario lanzó la ola 5 sin pedirla — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 
@@ -455,7 +462,25 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - cierra: P-puntos-control-26 — comportamiento coherente y cubierto por `test_mapa` (ver Decisiones)
 - cierra: P-robustez-datos-4 — se acepta la resolución con prefetch (ver Decisiones)
 
-<!-- Los pendientes que resuelven T1–T10 se agregan acá en T11, al verlos en PASA. -->
+- cierra: P-robustez-datos-8 — T1: el panel y el admin limpian `ubicacion_fijada_por/en` y `precision_m` al cambiar coordenadas
+- cierra: P-robustez-datos-9 — T1: `estado_revision` y `estados_de_puntos` filtran `cuenta_como_servicio=True`
+- cierra: P-robustez-datos-1 — T1: destildar "activo" pasa por `desactivar_punto` en el panel y el admin
+- cierra: P-panel-10 — T3 (sitios), T6 (proyectos), T8 (visitas) y T10 (panel): filtros numéricos con `isascii()`
+- cierra: P-panel-18 — T3: `RecursionError` de un JSON muy anidado da 503
+- cierra: P-panel-20 — T3 y T12: User-Agent con contacto y cota total de tiempo
+- cierra: P-sitio-publico-13 — T4: `clean_redes` rechaza URLs con usuario o contraseña
+- cierra: P-sitio-publico-9 — T4: la 404 bajo `/panel/` y `/admin/` enlaza a su propio inicio
+- cierra: P-robustez-panel-7 — T12: `HTTPSConnection` con vigilante que corta el socket al vencer el plazo total
+- cierra: P-robustez-datos-3 — T8: filtro `?incidencia=ubicacion_revisadas`
+- cierra: P-panel-21 — T8: historial en una sola consulta, últimos 50 cambios
+- cierra: P-panel-22 — T8 (ficha muestra `incidencia_asignacion`) y T10 (`.fotos` en `panel.css`)
+- cierra: P-panel-27 — T8: `test_post_forjado_sobre_pendiente_muestra_el_rechazo`
+- cierra: P-robustez-datos-11 — T8 (listado) y T10 (tablero): solo visitas realizadas que cuentan como servicio
+- cierra: P-robustez-panel-8 — T8, T10, T13 y T14: filtros numéricos con a lo sumo 19 dígitos y `<= 2**63 - 1`
+- cierra: P-cierre-puntos-1 — T10: `.enlace` en `panel.css`
+- cierra: P-panel-9 — T10: CSS de tablero y mapa en `panel.css`, más `.linea-tiempo`, `.miniaturas`, `.planilla` y `.fotos`
+- cierra: P-panel-12 — T10: sin `csp_update` en `MapaDatosView`
+- cierra: P-panel-19 — T10: `AccesoTests` con objetos reales por modelo y POST anónimo
 
 ### Etiquetas
 
