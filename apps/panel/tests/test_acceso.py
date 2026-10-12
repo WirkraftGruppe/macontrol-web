@@ -1,19 +1,48 @@
 """Acceso al panel: login, roles y salida."""
 
 import re
+import shutil
+import tempfile
+from io import BytesIO
 
 from django.core.cache import cache
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import URLResolver, get_resolver
+from PIL import Image
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
 from apps.panel import urls
+from apps.productos.models import Producto
 from apps.proyectos.models import Proyecto
-from apps.servicios.models import TipoServicio
-from apps.sitios.models import Sitio
+from apps.servicios.models import CampoPlanilla, TipoServicio
+from apps.sitios.models import Plano, PuntoControl, Sitio
+from apps.visitas.models import Foto, Revision, Visita
+from apps.web.models import ClienteDestacado, PaginaServicio
 
 CLAVE = "clave-segura-123"
+MEDIA_TEMPORAL = tempfile.mkdtemp(prefix="acceso-panel-test-")
+SENTINELA = "@PK@"
+UUID_FOTO = "00000000-0000-0000-0000-000000000001"
+
+# Prefijo de ruta (con `@PK@` donde va el id) -> clave del objeto real. El orden
+# importa: gana la primera coincidencia, por eso van antes las más específicas.
+MODELO_POR_RUTA = (
+    (r"^/panel/sitios/planos/@PK@/", "plano"),
+    (r"^/panel/sitios/puntos/@PK@/", "punto"),
+    (r"^/panel/sitios/@PK@/", "sitio"),
+    (r"^/panel/clientes/@PK@/", "cliente"),
+    (r"^/panel/servicios/campos/@PK@/", "campo"),
+    (r"^/panel/servicios/@PK@/", "servicio"),
+    (r"^/panel/proyectos/@PK@/", "proyecto"),
+    (r"^/panel/productos/@PK@/", "producto"),
+    (r"^/panel/visitas/proyectos/@PK@/", "proyecto"),
+    (r"^/panel/visitas/@PK@/", "visita"),
+    (r"^/panel/web/paginas/@PK@/", "pagina"),
+    (r"^/panel/web/clientes/@PK@/", "cliente_web"),
+    (r"^/panel/usuarios/@PK@/", "usuario"),
+)
 
 
 class AccesoPanelTests(TestCase):
@@ -105,10 +134,23 @@ def _rutas_protegidas(pk="1"):
     ]
 
 
+def _imagen(nombre):
+    """Imagen PNG mínima y válida, lista para guardar en un campo de imagen."""
+    buffer = BytesIO()
+    Image.new("RGB", (20, 20), "white").save(buffer, "PNG")
+    return SimpleUploadedFile(nombre, buffer.getvalue(), content_type="image/png")
+
+
+@override_settings(MEDIA_ROOT=MEDIA_TEMPORAL)
 class AccesoTests(TestCase):
     @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(MEDIA_TEMPORAL, ignore_errors=True)
+
+    @classmethod
     def setUpTestData(cls):
-        """Objetos reales: las rutas con pk llegan a una vista que sí los encuentra."""
+        """Un objeto real de cada modelo al que apuntan las rutas con id."""
         cls.cliente = Cliente.objects.create(razon_social="Cliente SA")
         cls.sitio = Sitio.objects.create(cliente=cls.cliente, nombre="Planta")
         cls.servicio = TipoServicio.objects.create(nombre="Desinsectación", slug="d")
@@ -120,6 +162,44 @@ class AccesoTests(TestCase):
             encargado_inicial=cls.empleado,
             encargado_actual=cls.empleado,
         )
+        visita = Visita.objects.create(
+            proyecto=cls.proyecto, empleado=cls.empleado, origen=Visita.Origen.APP
+        )
+        punto = PuntoControl.objects.get(sitio=cls.sitio, orden=0)
+        revision = Revision.objects.create(
+            visita=visita,
+            punto=punto,
+            orden=1,
+            realizada_en=visita.creado,
+            recibida_en=visita.creado,
+        )
+        foto = Foto.objects.create(revision=revision, imagen=_imagen("foto.png"))
+        cls.ids = {
+            "cliente": cls.cliente.pk,
+            "sitio": cls.sitio.pk,
+            "servicio": cls.servicio.pk,
+            "proyecto": cls.proyecto.pk,
+            "usuario": cls.empleado.pk,
+            "visita": visita.pk,
+            "punto": punto.pk,
+            "plano": Plano.objects.create(
+                sitio=cls.sitio, nombre="Plano", imagen=_imagen("plano.png")
+            ).pk,
+            "campo": CampoPlanilla.objects.create(
+                tipo_servicio=cls.servicio,
+                orden=1,
+                etiqueta="Dato",
+                clave="dato",
+                tipo=CampoPlanilla.Tipo.TEXTO,
+            ).pk,
+            "producto": Producto.objects.create(nombre_comercial="Producto").pk,
+            "pagina": PaginaServicio.objects.get_or_create(
+                tipo=cls.servicio,
+                defaults={"titulo_seo": "t", "resumen": "r", "problema": "p"},
+            )[0].pk,
+            "cliente_web": ClienteDestacado.objects.create(nombre="Cliente web").pk,
+        }
+        cls.codigo_foto = str(foto.codigo)
 
     def test_empleado_no_ve_ninguna_ruta_del_panel(self):
         self.client.login(username="emp", password=CLAVE)
@@ -138,19 +218,41 @@ class AccesoTests(TestCase):
                 self.assertEqual(self.client.get(ruta).status_code, 403)
                 self.assertEqual(self.client.post(ruta).status_code, 403)
 
+    def _rutas_con_objetos_reales(self):
+        """Cada ruta con el id (o uuid) de un objeto real de su propio modelo.
+
+        Falla si aparece una ruta con parámetros que `MODELO_POR_RUTA` no cubre:
+        una ruta nueva no puede quedar sin probar en silencio.
+        """
+        rutas = []
+        for ruta in _rutas_protegidas(pk=SENTINELA):
+            if ruta == f"/panel/visitas/fotos/{UUID_FOTO}/":
+                rutas.append(ruta.replace(UUID_FOTO, self.codigo_foto))
+            elif SENTINELA in ruta:
+                clave = next(
+                    (c for patron, c in MODELO_POR_RUTA if re.match(patron, ruta)),
+                    None,
+                )
+                if clave is None:
+                    self.fail(f"Ruta con parámetros sin objeto real en el test: {ruta}")
+                rutas.append(ruta.replace(SENTINELA, str(self.ids[clave])))
+            elif "<" in ruta or "{" in ruta:
+                self.fail(f"Ruta con parámetro sin resolver: {ruta}")
+            else:
+                rutas.append(ruta)
+        return rutas
+
     def test_empleado_no_ve_rutas_con_objetos_reales(self):
         self.client.login(username="emp", password=CLAVE)
-        pk = str(self.cliente.pk)
-        # El id de ejemplo existe en las tablas a las que apuntan las rutas con pk.
-        self.assertTrue(Proyecto.objects.filter(pk=pk).exists())
-        self.assertTrue(Sitio.objects.filter(pk=pk).exists())
-        for ruta in _rutas_protegidas(pk=pk):
+        rutas = self._rutas_con_objetos_reales()
+        self.assertGreater(len(rutas), 30)
+        for ruta in rutas:
             with self.subTest(ruta=ruta):
                 self.assertEqual(self.client.get(ruta).status_code, 403)
                 self.assertEqual(self.client.post(ruta).status_code, 403)
 
     def test_anonimo_post_va_al_login(self):
-        for ruta in _rutas_protegidas(pk=str(self.cliente.pk)):
+        for ruta in self._rutas_con_objetos_reales():
             with self.subTest(ruta=ruta):
                 respuesta = self.client.post(ruta)
                 self.assertEqual(respuesta.status_code, 302)
