@@ -138,3 +138,19 @@ class RedesTests(BaseSubidas):
         buena = json.dumps([{"nombre": "Red", "url": "https://sitio.com/perfil"}])
         self.client.post(url, {**base, "redes": buena})
         self.assertEqual(Configuracion.obtener().redes[0]["nombre"], "Red")
+
+    def test_redes_rechaza_url_con_usuario_o_contrasena(self):
+        url = reverse("panel:web:configuracion")
+        base = {
+            "razon_social": "MAControl S.A.",
+            "telefono": "02241 49 6047",
+            "direcciones": "[]",
+        }
+        for mala in (
+            "https://usuario:clave@sitio.com/perfil",
+            "https://usuario@sitio.com/perfil",
+            "https://:clave@sitio.com/perfil",
+        ):
+            redes = json.dumps([{"nombre": "Red", "url": mala}])
+            respuesta = self.client.post(url, {**base, "redes": redes})
+            self.assertIn("redes", respuesta.context["form"].errors, mala)
