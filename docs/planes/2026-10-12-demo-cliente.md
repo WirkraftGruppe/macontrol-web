@@ -210,7 +210,7 @@ T3 va sola en la ola 2 porque `config/` y `requirements.txt` son del principal y
 ```
 
 ## Registro de verificación
-commit_base: (hash de `docs(plan): demo-cliente`)
+commit_base: d8caed8
 
 ### Estado de subtareas
 | Tarea | Estado |
