@@ -138,6 +138,9 @@ class GeocodificacionTests(TestCase):
                 time.sleep(0.05)
                 return b" "
 
+            def close(self):
+                pass
+
         class Conexion:
             sock = None
 
@@ -236,6 +239,68 @@ class GeocodificacionTests(TestCase):
         r, duracion = self._consultar_con(guion)
         self.assertEqual(r.status_code, 503)
         self.assertLess(duracion, 2.5)
+
+    def test_linea_de_trozo_goteada_con_connection_close_corta_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\n"
+                b"Transfer-Encoding: chunked\r\n\r\n"
+            )
+            self._gotear(conexion, b"0")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_trailer_goteado_con_connection_close_corta_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\n"
+                b"Transfer-Encoding: chunked\r\n\r\n0\r\nX-Lento: "
+            )
+            self._gotear(conexion, b"a")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_vigilante_corta_con_socket_socket_shutdown(self):
+        class Lenta:
+            status = 200
+
+            def read1(self, cantidad):
+                time.sleep(0.05)
+                return b" "
+
+            def close(self):
+                pass
+
+        sock = mock.Mock()
+
+        class Conexion:
+            def __init__(self, *args, **kwargs):
+                self.sock = sock
+
+            def request(self, *args, **kwargs):
+                pass
+
+            def getresponse(self):
+                self.sock = None  # como con ``Connection: close``
+                return Lenta()
+
+            def close(self):
+                pass
+
+        self.client.force_login(self.admin)
+        with (
+            mock.patch.object(geocodificacion, "_conexion", Conexion),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 0.2),
+            mock.patch.object(socket.socket, "shutdown") as apagar,
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        apagar.assert_called_once_with(sock, socket.SHUT_RDWR)
+        sock.shutdown.assert_not_called()
 
     def test_redireccion_responde_503(self):
         recibidas = []

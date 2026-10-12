@@ -63,13 +63,17 @@ def _abrir(solicitud):
     ruta = f"{destino.path}?{destino.query}"
     conexion = _conexion(destino.hostname, destino.port)
     vencido = threading.Event()
+    activo = []
 
     def cortar():
         vencido.set()
-        sock = conexion.sock
+        # Referencia propia: con ``Connection: close`` getresponse() deja
+        # ``conexion.sock`` en None. El shutdown va al fd sin pasar por
+        # ``SSLSocket.shutdown``, que anula ``_sslobj`` mientras otro hilo lee.
+        sock = activo[0] if activo else conexion.sock
         if sock is not None:
             try:
-                sock.shutdown(socket.SHUT_RDWR)
+                socket.socket.shutdown(sock, socket.SHUT_RDWR)
             except OSError:
                 pass
 
@@ -82,8 +86,10 @@ def _abrir(solicitud):
     vigilante.start()
     partes = []
     leidos = 0
+    respuesta = None
     try:
         conexion.request("GET", ruta, headers=dict(solicitud.header_items()))
+        activo.append(conexion.sock)
         comprobar()
         respuesta = conexion.getresponse()
         comprobar()
@@ -101,6 +107,8 @@ def _abrir(solicitud):
         raise
     finally:
         vigilante.cancel()
+        if respuesta is not None:
+            respuesta.close()
         conexion.close()
     return b"".join(partes)
 
