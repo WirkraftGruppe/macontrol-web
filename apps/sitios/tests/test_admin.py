@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import Permission
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.models import User
 from apps.clientes.models import Cliente
@@ -126,6 +127,67 @@ class PuntoControlAdminTests(TestCase):
         self.client.force_login(self.administrador)
         url = reverse("admin:sitios_puntocontrol_change", args=[self.punto.pk])
         self.assertEqual(self.client.get(url).status_code, 200)
+
+    def _datos_cambio(self, **extra):
+        return {
+            "nombre": "General",
+            "sector": "",
+            "orden": 0,
+            "activo": "on",
+            "_save": "Guardar",
+            **extra,
+        }
+
+    def test_corregir_coordenadas_limpia_fijada_por_escaneo(self):
+        self.client.force_login(self.administrador)
+        PuntoControl.objects.filter(pk=self.punto.pk).update(
+            latitud="-35.100000",
+            longitud="-58.100000",
+            ubicacion_fijada_en=timezone.now(),
+            ubicacion_fijada_por=self.administrador,
+        )
+        url = reverse("admin:sitios_puntocontrol_change", args=[self.punto.pk])
+        respuesta = self.client.post(
+            url, self._datos_cambio(latitud="-35.2", longitud="-58.100000")
+        )
+        self.assertEqual(respuesta.status_code, 302)
+        self.punto.refresh_from_db()
+        self.assertEqual(str(self.punto.latitud), "-35.200000")
+        self.assertIsNone(self.punto.ubicacion_fijada_por)
+        self.assertIsNone(self.punto.ubicacion_fijada_en)
+
+    def test_no_desactiva_el_ultimo_punto(self):
+        self.client.force_login(self.administrador)
+        url = reverse("admin:sitios_puntocontrol_change", args=[self.punto.pk])
+        datos = self._datos_cambio()
+        del datos["activo"]
+        respuesta = self.client.post(url, datos)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertContains(respuesta, "último punto activo")
+        self.punto.refresh_from_db()
+        self.assertTrue(self.punto.activo)
+        PuntoControl.objects.create(sitio=self.sitio, nombre="Cocina", orden=1)
+        respuesta = self.client.post(url, datos)
+        self.assertEqual(respuesta.status_code, 302)
+        self.punto.refresh_from_db()
+        self.assertFalse(self.punto.activo)
+
+    def test_alta_inactiva_con_otro_punto_activo(self):
+        self.client.force_login(self.administrador)
+        url = reverse("admin:sitios_puntocontrol_add")
+        datos = {"sitio": self.sitio.pk, "nombre": "Cocina", "orden": 1}
+        respuesta = self.client.post(url, {**datos, "_save": "Guardar"})
+        self.assertEqual(respuesta.status_code, 302)
+        creado = PuntoControl.objects.get(nombre="Cocina")
+        self.assertFalse(creado.activo)
+
+    def test_alta_en_sitio_inactivo(self):
+        self.client.force_login(self.administrador)
+        Sitio.objects.filter(pk=self.sitio.pk).update(activo=False)
+        url = reverse("admin:sitios_puntocontrol_add")
+        datos = {"sitio": self.sitio.pk, "nombre": "Cocina", "orden": 1}
+        respuesta = self.client.post(url, {**datos, "_save": "Guardar"})
+        self.assertEqual(respuesta.status_code, 302)
 
     def test_regenerar_qr_pide_confirmacion(self):
         self.client.force_login(self.administrador)

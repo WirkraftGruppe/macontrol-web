@@ -1,6 +1,7 @@
 """Formularios del panel para el contenido del sitio público."""
 
 import json
+from urllib.parse import urlsplit
 
 from django import forms
 from django.core.files.uploadedfile import UploadedFile
@@ -85,6 +86,9 @@ class ConfiguracionForm(forms.ModelForm):
         for red in redes:
             try:
                 validar_https(red["url"])
+                partes = urlsplit(red["url"])
+                if partes.username or partes.password:
+                    raise forms.ValidationError("credenciales en la URL")
             except forms.ValidationError:
                 raise forms.ValidationError(
                     f"La URL de «{red['nombre']}» debe ser una dirección https válida."

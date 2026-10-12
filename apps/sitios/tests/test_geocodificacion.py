@@ -1,7 +1,12 @@
+import http.client
 import json
+import socket
+import threading
+import time
 import urllib.error
 from unittest import mock
 
+from django.conf import settings
 from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
@@ -111,3 +116,225 @@ class GeocodificacionTests(TestCase):
         r = self.client.get(reverse("panel:sitios:alta"))
         self.assertIn("tile.openstreetmap.org", r["Content-Security-Policy"])
         self.assertContains(r, reverse("panel:sitios:geocodificar"))
+
+    def test_json_muy_anidado_responde_503(self):
+        self.client.force_login(self.admin)
+        anidado = b"[" * 100_000
+        with mock.patch(ABRIR, return_value=anidado):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
+
+    def test_user_agent_lleva_contacto(self):
+        self.assertIn(settings.SITE_URL, geocodificacion.USER_AGENT)
+        self.assertIn("administracion@macontrol.com.ar", geocodificacion.USER_AGENT)
+        self.assertTrue(geocodificacion.USER_AGENT.startswith("MAControl/1.0 (+"))
+
+    def test_respuesta_lenta_corta_por_tiempo_total(self):
+        class Lenta:
+            status = 200
+
+            def read1(self, cantidad):
+                time.sleep(0.05)
+                return b" "
+
+            def close(self):
+                pass
+
+        class Conexion:
+            sock = None
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def request(self, *args, **kwargs):
+                pass
+
+            def getresponse(self):
+                return Lenta()
+
+            def close(self):
+                pass
+
+        self.client.force_login(self.admin)
+        inicio = time.monotonic()
+        with (
+            mock.patch.object(geocodificacion, "_conexion", Conexion),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 0.3),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(time.monotonic() - inicio, 2)
+
+    def _consultar_con(self, guion):
+        """Consulta a un servidor local de un solo uso; ``guion`` hace de Nominatim.
+
+        La consulta va por HTTP plano al servidor local (127.0.0.1, puerto efímero);
+        el código de producción sigue construyendo una conexión HTTPS.
+        """
+        servidor = socket.socket()
+        servidor.bind(("127.0.0.1", 0))
+        servidor.listen(1)
+        self.addCleanup(servidor.close)
+
+        def atender():
+            try:
+                conexion, _ = servidor.accept()
+            except OSError:
+                return
+            try:
+                conexion.recv(4096)
+                guion(conexion)
+            except OSError:
+                pass
+            finally:
+                conexion.close()
+
+        threading.Thread(target=atender, daemon=True).start()
+        url = f"http://127.0.0.1:{servidor.getsockname()[1]}/search"
+
+        def conexion_plana(host, puerto):
+            return http.client.HTTPConnection(host, puerto, timeout=1)
+
+        self.client.force_login(self.admin)
+        inicio = time.monotonic()
+        with (
+            mock.patch.object(geocodificacion, "URL_NOMINATIM", url),
+            mock.patch.object(geocodificacion, "_conexion", conexion_plana),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 1),
+            mock.patch.object(geocodificacion, "TIMEOUT_SEGUNDOS", 1),
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        return r, time.monotonic() - inicio
+
+    @staticmethod
+    def _gotear(conexion, texto, veces=20):
+        for _ in range(veces):
+            conexion.sendall(texto)
+            time.sleep(0.2)
+
+    def test_cuerpo_goteado_por_socket_real_corta_a_tiempo(self):
+        def guion(conexion):
+            conexion.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n")
+            self._gotear(conexion, b" ")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_cabeceras_goteadas_cortan_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(b"HTTP/1.1 200 OK\r\nX-Lento: ")
+            self._gotear(conexion, b"a")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_linea_de_trozo_goteada_corta_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")
+            self._gotear(conexion, b"0")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_linea_de_trozo_goteada_con_connection_close_corta_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\n"
+                b"Transfer-Encoding: chunked\r\n\r\n"
+            )
+            self._gotear(conexion, b"0")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_trailer_goteado_con_connection_close_corta_por_tiempo_total(self):
+        def guion(conexion):
+            conexion.sendall(
+                b"HTTP/1.1 200 OK\r\nConnection: close\r\n"
+                b"Transfer-Encoding: chunked\r\n\r\n0\r\nX-Lento: "
+            )
+            self._gotear(conexion, b"a")
+
+        r, duracion = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertLess(duracion, 2.5)
+
+    def test_vigilante_corta_con_socket_socket_shutdown(self):
+        class Lenta:
+            status = 200
+
+            def read1(self, cantidad):
+                time.sleep(0.05)
+                return b" "
+
+            def close(self):
+                pass
+
+        sock = mock.Mock()
+
+        class Conexion:
+            def __init__(self, *args, **kwargs):
+                self.sock = sock
+
+            def request(self, *args, **kwargs):
+                pass
+
+            def getresponse(self):
+                self.sock = None  # como con ``Connection: close``
+                return Lenta()
+
+            def close(self):
+                pass
+
+        self.client.force_login(self.admin)
+        with (
+            mock.patch.object(geocodificacion, "_conexion", Conexion),
+            mock.patch.object(geocodificacion, "LIMITE_TOTAL_SEGUNDOS", 0.2),
+            mock.patch.object(socket.socket, "shutdown") as apagar,
+        ):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)
+        apagar.assert_called_once_with(sock, socket.SHUT_RDWR)
+        sock.shutdown.assert_not_called()
+
+    def test_redireccion_responde_503(self):
+        recibidas = []
+
+        def guion(conexion):
+            recibidas.append(1)
+            conexion.sendall(
+                b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/otro\r\n"
+                b"Content-Length: 0\r\n\r\n"
+            )
+
+        r, _ = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.json()["error"], geocodificacion.MENSAJE_CARGA_MANUAL)
+        self.assertEqual(len(recibidas), 1)
+
+    def test_estado_distinto_de_200_responde_503(self):
+        def guion(conexion):
+            conexion.sendall(b"HTTP/1.1 500 Error\r\nContent-Length: 2\r\n\r\n[]")
+
+        r, _ = self._consultar_con(guion)
+        self.assertEqual(r.status_code, 503)
+
+    def test_numero_enorme_no_da_500(self):
+        datos = json.dumps([{"display_name": "x", "lat": 10**400, "lon": 1}]).encode()
+        self.client.force_login(self.admin)
+        with mock.patch(ABRIR, return_value=datos):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["resultados"], [])
+
+    def test_error_de_protocolo_http_responde_503(self):
+        self.client.force_login(self.admin)
+        error = http.client.IncompleteRead(b"abc", 10)
+        with mock.patch(ABRIR, side_effect=error):
+            r = self.client.post(self.url, {"q": "Castelli"})
+        self.assertEqual(r.status_code, 503)

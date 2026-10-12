@@ -3,6 +3,7 @@
 from csp.decorators import csp_update
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -48,7 +49,13 @@ class SitioListado(AdministradorRequeridoMixin, ListadoPanelMixin):
     def get_queryset(self):
         queryset = super().get_queryset().select_related("cliente")
         cliente = self.request.GET.get("cliente", "")
-        if cliente.isdigit():
+        # Solo un id válido de BigAutoField; otro valor se ignora, sin dar 500.
+        if (
+            cliente.isascii()
+            and cliente.isdigit()
+            and len(cliente) <= 19
+            and int(cliente) <= 2**63 - 1
+        ):
             queryset = queryset.filter(cliente_id=cliente)
         activo = self.request.GET.get("activo", "")
         if activo in ("1", "0"):
@@ -228,6 +235,24 @@ class PuntoEdicion(_PuntoMixin, UpdateView):
 
     def get_form_kwargs(self):
         return {**super().get_form_kwargs(), "sitio": self.object.sitio}
+
+    def form_valid(self, form):
+        """Coordenadas corregidas limpian la marca de escaneo; baja por el servicio."""
+        if {"latitud", "longitud"} & set(form.changed_data):
+            form.instance.ubicacion_fijada_por = None
+            form.instance.ubicacion_fijada_en = None
+            form.instance.precision_m = None
+        if "activo" not in form.changed_data or form.cleaned_data["activo"]:
+            return super().form_valid(form)
+        # El servicio bloquea las filas de los puntos activos y rechaza el último;
+        # si lo rechaza, no se guarda nada.
+        with transaction.atomic():
+            try:
+                services.desactivar_punto(form.instance)
+            except ValidationError as error:
+                form.add_error("activo", error)
+                return self.form_invalid(form)
+            return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)

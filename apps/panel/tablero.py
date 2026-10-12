@@ -27,7 +27,12 @@ def contadores(hoy=None):
             filter=Q(estado=Visita.Estado.PENDIENTE, programada_para=hoy),
         ),
         incidencias=Count(
-            "pk", filter=Q(incidencia=True, incidencia_revisada_en__isnull=True)
+            "pk",
+            filter=Q(
+                incidencia=True,
+                incidencia_revisada_en__isnull=True,
+                estado=Visita.Estado.REALIZADA,
+            ),
         ),
     )
     # Subconsulta: un join con las revisiones multiplicaría las visitas.
@@ -36,7 +41,9 @@ def contadores(hoy=None):
     )
     ubicacion = (
         Visita.objects.filter(
-            incidencia_revisada_en__isnull=True, cuenta_como_servicio=True
+            incidencia_revisada_en__isnull=True,
+            cuenta_como_servicio=True,
+            estado=Visita.Estado.REALIZADA,
         )
         .filter(Q(incidencia_ubicacion=True) | Exists(con_incidencia_en_revision))
         .count()

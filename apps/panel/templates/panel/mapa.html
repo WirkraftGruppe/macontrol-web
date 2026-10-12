@@ -6,14 +6,6 @@
   <link rel="stylesheet" href="{% static 'vendor/leaflet/leaflet.css' %}">
 {% endblock %}
 {% block panel_contenido %}
-<style nonce="{{ request.csp_nonce }}">
-  .mapa-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
-  .mapa-filtros .campo { margin-bottom: 0; }
-  #mapa { height: 70vh; min-height: 360px; border: 1px solid var(--border); border-radius: 8px; }
-  .mapa-atribucion { margin: 8px 0 0; font-size: 12px; color: var(--text-muted); }
-  .mapa-popup h3 { margin: 0 0 4px; font-size: 18px; }
-  .mapa-popup ul { margin: 4px 0; padding-left: 18px; }
-</style>
 <h1>Mapa de sitios</h1>
 <form class="mapa-filtros" id="mapa-filtros">
   <div class="campo">

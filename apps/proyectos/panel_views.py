@@ -19,6 +19,7 @@ from .models import FILTRO_ENCARGADO, EstadoVisita, Proyecto
 from .panel_forms import FormularioProyectoAlta, FormularioProyectoEdicion
 
 FILTRO_MAXIMO_OPCIONES = 200
+ID_MAXIMO = 2**63 - 1  # máximo de BigAutoField
 FILTROS = ("cliente", "sitio", "servicio", "estado", "encargado", "estado_visita")
 
 
@@ -49,7 +50,14 @@ class ListadoProyectos(AdministradorRequeridoMixin, ListadoPanelMixin):
             ("encargado", "encargado_actual_id"),
         ):
             valor = filtros.get(parametro)
-            if valor and valor.isdigit():
+            # Solo ASCII, a lo sumo 19 dígitos y dentro del BigAutoField.
+            if (
+                valor
+                and valor.isascii()
+                and valor.isdigit()
+                and len(valor) <= 19
+                and int(valor) <= ID_MAXIMO
+            ):
                 queryset = queryset.filter(**{campo: int(valor)})
         if filtros.get("estado") in Proyecto.Estado.values:
             queryset = queryset.filter(estado=filtros["estado"])

@@ -16,6 +16,9 @@ from .forms import FormularioIngreso
 from .mapa import ORIGEN_TESELAS, sitios_para_mapa
 from .tablero import contadores, proyectos_urgentes
 
+ID_MAXIMO = 2**63 - 1  # máximo de BigAutoField
+LARGO_MAXIMO = len(str(ID_MAXIMO))
+
 
 class InicioView(AdministradorRequeridoMixin, TemplateView):
     """Tablero: contadores y los proyectos activos más urgentes."""
@@ -42,7 +45,6 @@ class MapaView(AdministradorRequeridoMixin, TemplateView):
         return contexto
 
 
-@method_decorator(csp_update({"img-src": ORIGEN_TESELAS}), name="dispatch")
 class MapaDatosView(AdministradorRequeridoMixin, View):
     """JSON con los sitios activos; filtros `cliente`, `servicio` y `estado`."""
 
@@ -59,8 +61,17 @@ class MapaDatosView(AdministradorRequeridoMixin, View):
 
 
 def _entero(valor):
-    """Devuelve el entero o None si el parámetro falta o no es numérico."""
-    return int(valor) if valor and valor.isdigit() else None
+    """Devuelve el entero o None si el parámetro falta o no es un id válido.
+
+    El largo se mira antes de `int()` para no convertir cadenas enormes; el máximo
+    es el de `BigAutoField`.
+    """
+    if not (
+        valor and valor.isascii() and valor.isdigit() and len(valor) <= LARGO_MAXIMO
+    ):
+        return None
+    numero = int(valor)
+    return numero if numero <= ID_MAXIMO else None
 
 
 class IngresarView(LimiteIngresoMixin, LoginView):

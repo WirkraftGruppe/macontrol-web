@@ -88,6 +88,20 @@ class ProyectoPanelTests(TestCase):
             self._titulos(estado_visita="sin_programar"), ["sin programar"]
         )
 
+    def test_filtro_numerico_no_ascii_no_da_500(self):
+        self._proyecto("Uno")
+        for valor in ("²", "٣", "1٣"):
+            for parametro in ("cliente", "sitio", "servicio", "encargado"):
+                with self.subTest(parametro=parametro, valor=valor):
+                    self.assertEqual(self._titulos(**{parametro: valor}), ["Uno"])
+
+    def test_filtro_numerico_fuera_de_rango_no_da_500(self):
+        self._proyecto("Uno")
+        for valor in ("9" * 4301, "9223372036854775808", "9" * 20):
+            for parametro in ("cliente", "sitio", "servicio", "encargado"):
+                with self.subTest(parametro=parametro, valor=valor[:25]):
+                    self.assertEqual(self._titulos(**{parametro: valor}), ["Uno"])
+
     def test_filtro_coincide_con_la_propiedad_del_modelo(self):
         for dias in (-1, 0, 7, 8, None):
             self._proyecto(f"p{dias}", dias)

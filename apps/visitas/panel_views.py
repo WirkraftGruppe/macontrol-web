@@ -30,10 +30,25 @@ INCIDENCIAS = (
     ("sin_revisar", "Sin revisar"),
     ("todas", "Todas las incidencias"),
     ("ubicacion", "Ubicación sin revisar"),
+    ("ubicacion_revisadas", "Ubicación revisadas"),
 )
+MAXIMO_ID = 2**63 - 1  # máximo de BigAutoField
+MAXIMO_DIGITOS_ID = len(str(MAXIMO_ID))
+HISTORIAL_MAXIMO = 50
 TIPOS_IMAGEN = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 CAMPOS_OCULTOS = {"datos"}
 TIPOS_CAMBIO = {"+": "Creación", "~": "Modificación", "-": "Eliminación"}
+
+
+def _es_id_valido(valor):
+    """Un valor del filtro numérico: dígitos ASCII y dentro del rango de un id."""
+    return (
+        bool(valor)
+        and valor.isascii()
+        and valor.isdigit()
+        and len(valor) <= MAXIMO_DIGITOS_ID
+        and int(valor) <= MAXIMO_ID
+    )
 
 
 class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
@@ -70,7 +85,7 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
             ("proyecto", "proyecto_id"),
         ):
             valor = filtros.get(parametro)
-            if valor and valor.isdigit():
+            if _es_id_valido(valor):
                 queryset = queryset.filter(**{campo: int(valor)})
         if filtros.get("estado") in Visita.Estado.values:
             queryset = queryset.filter(estado=filtros["estado"])
@@ -78,9 +93,13 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
             queryset = queryset.filter(incidencia=True)
             if filtros["incidencia"] == "sin_revisar":
                 queryset = queryset.filter(incidencia_revisada_en__isnull=True)
-        elif filtros.get("incidencia") == "ubicacion":
+        elif filtros.get("incidencia") in ("ubicacion", "ubicacion_revisadas"):
+            # Igual que el tablero: solo visitas realizadas que cuentan como servicio.
             queryset = queryset.filter(
-                con_ubicacion=True, incidencia_revisada_en__isnull=True
+                con_ubicacion=True,
+                cuenta_como_servicio=True,
+                estado=Visita.Estado.REALIZADA,
+                incidencia_revisada_en__isnull=filtros["incidencia"] == "ubicacion",
             )
         return queryset
 
@@ -100,10 +119,15 @@ class ListadoVisitas(AdministradorRequeridoMixin, ListadoPanelMixin):
 
 
 def _historial(visita):
-    """Cambios de la visita: quién, cuándo, tipo y nombres de campos modificados."""
+    """Últimos cambios de la visita: quién, cuándo, tipo y campos modificados.
+
+    Una sola consulta: se trae uno más del máximo para comparar el último mostrado.
+    """
+    registros = list(
+        visita.history.select_related("history_user")[: HISTORIAL_MAXIMO + 1]
+    )
     filas = []
-    for registro in visita.history.select_related("history_user"):
-        anterior = registro.prev_record
+    for registro, anterior in zip(registros[:HISTORIAL_MAXIMO], registros[1:] + [None]):
         campos = []
         if anterior:
             for cambio in registro.diff_against(anterior).changes:

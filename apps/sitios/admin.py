@@ -1,5 +1,7 @@
+from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from simple_history.admin import SimpleHistoryAdmin
@@ -81,8 +83,35 @@ class SitioAdmin(_AdministradorMixin, SimpleHistoryAdmin):
             )
 
 
+class PuntoControlAdminForm(forms.ModelForm):
+    """Avisa en el formulario si se desactiva el último punto activo del sitio."""
+
+    class Meta:
+        model = PuntoControl
+        fields = "__all__"
+
+    def clean(self):
+        datos = super().clean()
+        if (
+            self.instance.pk
+            and "activo" in self.changed_data
+            and not datos.get("activo")
+        ):
+            activos = list(
+                PuntoControl.objects.select_for_update()
+                .filter(sitio_id=self.instance.sitio_id, activo=True)
+                .values_list("pk", flat=True)
+            )
+            if activos == [self.instance.pk]:
+                self.add_error(
+                    "activo", "No se puede desactivar el último punto activo."
+                )
+        return datos
+
+
 @admin.register(PuntoControl)
 class PuntoControlAdmin(_AdministradorMixin, SimpleHistoryAdmin):
+    form = PuntoControlAdminForm
     list_display = ("nombre", "sitio", "sector", "orden", "activo")
     search_fields = ("nombre", "sector", "sitio__nombre")
     list_filter = ("activo",)
@@ -98,6 +127,21 @@ class PuntoControlAdmin(_AdministradorMixin, SimpleHistoryAdmin):
         """Al editar, el sitio y la foto no se cambian desde el admin."""
         campos = super().get_readonly_fields(request, obj)
         return (*campos, "sitio", "foto") if obj else campos
+
+    def save_model(self, request, obj, form, change):
+        """Coordenadas corregidas limpian la marca de escaneo; baja por el servicio."""
+        if {"latitud", "longitud"} & set(form.changed_data):
+            obj.ubicacion_fijada_por = None
+            obj.ubicacion_fijada_en = None
+            obj.precision_m = None
+        if not change or "activo" not in form.changed_data or obj.activo:
+            return super().save_model(request, obj, form, change)
+        # El formulario ya rechazó el último punto activo; si el servicio lo
+        # rechaza igual, la excepción hace fallar la petición.
+        obj.activo = True
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            services.desactivar_punto(obj)
 
     def has_regenerar_qr_permission(self, request):
         return self._es_administrador_activo(request) and self.has_change_permission(
