@@ -9,7 +9,8 @@ import http.client
 import json
 import logging
 import math
-import time
+import socket
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -42,34 +43,73 @@ class TextoInvalido(ValueError):
     """El texto de búsqueda está vacío o es demasiado largo."""
 
 
-class _SinRedirecciones(urllib.request.HTTPRedirectHandler):
-    """No sigue redirecciones: el host de la consulta es siempre el fijo."""
-
-    def redirect_request(self, *args, **kwargs):
-        return None
+def _conexion(host, puerto):
+    """Conexión HTTPS con el contexto SSL por defecto (verifica el certificado)."""
+    return http.client.HTTPSConnection(host, puerto, timeout=TIMEOUT_SEGUNDOS)
 
 
 def _abrir(solicitud):
-    """Abre la solicitud sin seguir redirecciones y devuelve los bytes.
+    """Consulta la solicitud sin seguir redirecciones y devuelve los bytes.
 
-    Además del timeout por socket hay una fecha límite total: el cuerpo se lee con
-    ``read1`` (una sola lectura de socket por vuelta) y la fecha se comprueba entre
-    lecturas. Peor caso real: ``LIMITE_TOTAL_SEGUNDOS + TIMEOUT_SEGUNDOS`` con el cuerpo
-    goteado; las cabeceras goteadas solo las acota el timeout por socket de ``open``.
+    Un vigilante (``threading.Timer``) corta el socket al vencer
+    ``LIMITE_TOTAL_SEGUNDOS``: la cota total cubre las cabeceras, las líneas de
+    control del chunked (tamaño de trozo y trailer) y el cuerpo, que se lee con
+    ``read1``. Fuera de la cota queda la resolución DNS (``getaddrinfo`` no admite
+    timeout) y el connect, que acota solo ``TIMEOUT_SEGUNDOS``; si el vigilante
+    vence antes de que exista el socket, se detecta apenas la conexión avanza.
+    Todo estado distinto de 200 (incluidas las redirecciones) es un error.
     """
-    limite = time.monotonic() + LIMITE_TOTAL_SEGUNDOS
-    abridor = urllib.request.build_opener(_SinRedirecciones)
+    destino = urllib.parse.urlsplit(solicitud.full_url)
+    ruta = f"{destino.path}?{destino.query}"
+    conexion = _conexion(destino.hostname, destino.port)
+    vencido = threading.Event()
+    activo = []
+
+    def cortar():
+        vencido.set()
+        # Referencia propia: con ``Connection: close`` getresponse() deja
+        # ``conexion.sock`` en None. El shutdown va al fd sin pasar por
+        # ``SSLSocket.shutdown``, que anula ``_sslobj`` mientras otro hilo lee.
+        sock = activo[0] if activo else conexion.sock
+        if sock is not None:
+            try:
+                socket.socket.shutdown(sock, socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    def comprobar():
+        if vencido.is_set():
+            raise TimeoutError("se superó el tiempo total de la consulta")
+
+    vigilante = threading.Timer(LIMITE_TOTAL_SEGUNDOS, cortar)
+    vigilante.daemon = True
+    vigilante.start()
     partes = []
     leidos = 0
-    with abridor.open(solicitud, timeout=TIMEOUT_SEGUNDOS) as respuesta:
+    respuesta = None
+    try:
+        conexion.request("GET", ruta, headers=dict(solicitud.header_items()))
+        activo.append(conexion.sock)
+        comprobar()
+        respuesta = conexion.getresponse()
+        comprobar()
+        if respuesta.status != 200:
+            raise GeocodificacionError(f"estado {respuesta.status}")
         while leidos < MAX_BYTES:
-            if time.monotonic() > limite:
-                raise TimeoutError("se superó el tiempo total de la consulta")
             bloque = respuesta.read1(min(TAMANO_BLOQUE, MAX_BYTES - leidos))
+            comprobar()
             if not bloque:
                 break
             partes.append(bloque)
             leidos += len(bloque)
+    except (OSError, http.client.HTTPException):
+        comprobar()
+        raise
+    finally:
+        vigilante.cancel()
+        if respuesta is not None:
+            respuesta.close()
+        conexion.close()
     return b"".join(partes)
 
 
