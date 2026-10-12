@@ -254,7 +254,7 @@ commit_base: 21b20be
 | T1 | hecha |
 | T2 | hecha |
 | T3 | en curso |
-| T4 | en curso |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -271,7 +271,8 @@ commit_base: 21b20be
 | 2026-10-08 | T1 (ronda 2) | c516ab7 | verificador PASA 11/11; verificador-b PASA 11/11 | auditor-seguridad: hallazgos 1-3 y la observación de precision_m cerrados; queda 1 Baja ya existente antes de T1 (P-robustez-panel-2) y el historial doble (P-robustez-panel-1) |
 | 2026-10-08 | T2 | a5c66bc | criterio `T1: integra robustez-panel-T1` PASA (principal) | worktree-integrar.sh: merge, makemigrations --check y 624 tests OK; falló solo el `git branch -d` final (P-robustez-panel-3); rama borrada a mano tras comprobar que estaba contenida |
 | | T3 | | | |
-| | T4 | | | |
+| 2026-10-12 | T3 (ronda 1) | 3ee6a27 | verificador PASA 6/6; verificador-b PASA 6/6 | auditor-seguridad: T3-1 [Baja] la fecha límite total no corta lecturas goteadas; T3-2 [Baja] OverflowError y HTTPException escapan (anterior a T3); se corrigen en T3 ronda 2 |
+| 2026-10-12 | T4 | 3608ef0 | verificador PASA 4/4; verificador-b PASA 4/4 | auditor-seguridad: sin hallazgos; nota latente: el admin de `Configuracion` no pasa por `clean_redes` (P-robustez-panel-5). Integrada en e5d01d0 (626 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | | T5 | | | |
 | | T6 | | | |
 | | T7 | | | |
@@ -350,6 +351,9 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - P-robustez-panel-1 [observación] Una baja desde la edición del panel o del admin deja dos filas de historial, ambas con el motivo "Punto desactivado": `desactivar_punto` guarda con `update_fields=["activo"]` (`apps/sitios/services.py:143-145`) y después el formulario hace el guardado completo con `_change_reason` todavía puesto. Se resuelve con un `desactivar_punto` que acepte los campos extra en un solo `save`, o borrando `_change_reason` antes del guardado completo (auditor-seguridad, T1 ronda 2).
 - P-robustez-panel-2 [menor] La edición de un punto en el panel o el admin no tiene bloqueo optimista: si un escaneo fija la ubicación entre el GET y el POST, el guardado borra coordenadas y marca de escaneo y el historial lo atribuye al administrador (`apps/sitios/panel_views.py:235-240`, `apps/sitios/admin.py:133-138`, `apps/visitas/services.py:310-325`). Ya existía antes de T1. Corrección propuesta: campo oculto con `ubicacion_fijada_en` o un contador de versión, validado en `clean()`.
 - P-robustez-panel-3 [menor] `worktree-integrar.sh` borra la rama de la subtarea con `git -C "$raiz" branch -d`, que compara contra el HEAD de la raíz (`main`) y no contra la rama destino: cuando el destino es `plan/<slug>` en otro worktree, el script sale con exit 1 después de un merge correcto (pasó al integrar T1). Corrección: `git branch -d` desde el worktree destino, o comprobar `merge-base --is-ancestor` contra el destino y usar `-D`.
+- P-robustez-panel-4 [observación] La 404 bajo `/panel/` o `/admin/` enlaza a su inicio, pero el botón sigue diciendo "Volver al inicio"; cambiar el texto es decisión de contenido (implementador de T4).
+- P-robustez-panel-5 [observación] `ConfiguracionAdmin` (`apps/web/admin.py:6-8`) usa el ModelForm por defecto y no pasa por `clean_redes`: desde `/admin/` se puede guardar cualquier URL en `redes`. Hoy ninguna plantilla pública muestra `redes`; pasa a hallazgo el día que se publique. Corrección: `form = ConfiguracionForm` o un validador en el campo del modelo (auditor-seguridad, T4).
+- P-robustez-panel-6 [observación] `test_404_bajo_panel_enlaza_al_panel` arma `404.html` con `render_to_string` y no hace un GET real; hoy no hay `handler404` propio y Django pasa `request_path` (`django/views/defaults.py:59`), así que cubre el caso real (verificador, T4).
 ### Decisiones
 
 - 2026-10-08 — al corregir coordenadas a mano (panel, admin y `services.fijar_ubicacion`) también se limpia `precision_m`, junto con `ubicacion_fijada_por/en` — la precisión de la fijación anterior no corresponde a la ubicación nueva (observación de auditor-seguridad sobre T1) — decisión del usuario — reemplaza a: (nada)
@@ -373,6 +377,7 @@ Todas son observaciones: ninguna es importante ni bloqueante. Las dos referencia
 - 2026-10-08 — -8 en el panel y el admin limpia `ubicacion_fijada_por/en` y `precision_m` en el formulario, sin llamar a `services.fijar_ubicacion` — el formulario guarda los demás campos en un solo `save` — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-08 — la regla del último punto activo en el admin se valida en `PuntoControlAdminForm.clean()` (solo en edición, con `select_for_update`) y `save_model` llama a `services.desactivar_punto` — el error aparece en el formulario y el servicio sigue siendo la regla que decide — reemplaza a: (nada) — decidida por Claude, revisable
 - 2026-10-08 — en el panel, `desactivar_punto(form.instance)` corre antes del guardado completo del formulario, dentro del mismo `atomic` — toma los bloqueos antes de escribir y evita el deadlock de la ronda 1 — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-12 — los hallazgos T3-1 (fecha límite que no corta lecturas goteadas) y T3-2 (OverflowError y HTTPException que dan 500) se corrigen en T3 antes de integrar — T3-1 es un control que T3 declara y no cumple, mismo criterio que el usuario aplicó a T1; T3-2 es el mismo `except` y el mismo objetivo (503 en vez de 500) — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
 
