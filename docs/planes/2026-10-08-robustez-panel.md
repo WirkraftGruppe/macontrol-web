@@ -341,6 +341,7 @@ commit_base: 21b20be
 | 2026-10-12 | T10 (ronda 3) | 1be2581 | verificador 12/12 PASA, verificador-b 12/12 PASA (suite 659 OK); FALLA formal solo por CONTRATO MODIFICADO | auditor-seguridad: todo cerrado, sin hallazgos nuevos. Integrada en c9f84c3 (659 tests OK); otra vez falló solo el `branch -d` (P-robustez-panel-3) |
 | 2026-10-12 | T11 | c9f84c3 | criterio `T10: integra robustez-panel-T10` PASA (principal) | `### Cierra` completado; queda la verificación TODO |
 | 2026-10-12 | TODO | a2ed607 | verificador 70/71 PASA, verificador-b 70/71 PASA; único FALLA `congelado.sh` (CONTRATO MODIFICADO: fa3397f y 43cc3af, ambos coinciden con lo declarado; sin cambios arriba del corte desde 43cc3af); suite 659 OK | auditor-seguridad: 0 hallazgos introducidos por el plan, 0 nuevos anteriores; P-robustez-panel-1 a -14 sin cambio de severidad. Fusión en `main`: decisión del usuario |
+| 2026-10-12 | merge de `main` | 0798ca8 | check, makemigrations --check, ruff y suite completa (669 tests) OK tras traer `main` (797652d, demo-cliente) sin conflictos | fusión en `main` autorizada por el usuario (FALLA formal solo por CONTRATO MODIFICADO, aceptada como en robustez-datos) |
 
 ### Veredicto de juez-plan
 
