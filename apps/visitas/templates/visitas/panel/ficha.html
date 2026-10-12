@@ -6,6 +6,7 @@
     {% include "panel/partials/etiqueta_estado.html" with tono=visita.estado|tono_estado texto=visita.get_estado_display %}
     {% if visita.incidencia %}{% include "panel/partials/etiqueta_estado.html" with tono="danger" texto="Incidencia" %}{% endif %}
     {% if con_ubicacion %}{% include "panel/partials/etiqueta_estado.html" with tono="danger" texto="Incidencia de ubicación" %}{% endif %}
+    {% if visita.incidencia_asignacion %}{% include "panel/partials/etiqueta_estado.html" with tono="danger" texto="Incidencia de asignación" %}{% endif %}
   </p>
   <dl>
     <dt>Proyecto</dt><dd><a href="{% url 'panel:proyectos:ficha' visita.proyecto.pk %}">{{ visita.proyecto.titulo }}</a> ({{ visita.proyecto.sitio.nombre }})</dd>

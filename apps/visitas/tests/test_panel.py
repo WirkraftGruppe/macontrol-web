@@ -90,6 +90,47 @@ class ListadoVisitasTests(BaseTests):
         self.assertEqual(self._pks(incidencia="todas"), {sin_revisar.pk, revisada.pk})
         self.assertIn(self.visita.pk, self._pks())
 
+    def test_filtro_ubicacion_revisadas_lista_solo_revisadas(self):
+        sin_revisar = self.otra_visita(incidencia_ubicacion=True)
+        revisada = self.otra_visita(
+            incidencia_ubicacion=True,
+            incidencia_revisada_por=self.admin,
+            incidencia_revisada_en=timezone.now(),
+        )
+        en_revision = self.otra_visita(
+            incidencia_revisada_por=self.admin,
+            incidencia_revisada_en=timezone.now(),
+        )
+        crear_revision(en_revision, incidencia_ubicacion=True)
+        self.assertEqual(
+            self._pks(incidencia="ubicacion_revisadas"),
+            {revisada.pk, en_revision.pk},
+        )
+        self.assertEqual(self._pks(incidencia="ubicacion"), {sin_revisar.pk})
+        respuesta = self.client.get(reverse("panel:visitas:listado"))
+        self.assertIn(
+            "ubicacion_revisadas", [v for v, _ in respuesta.context["incidencias"]]
+        )
+
+    def test_filtro_ubicacion_excluye_administradores_y_abiertas(self):
+        cuenta = self.otra_visita(incidencia_ubicacion=True)
+        de_administrador = self.otra_visita(incidencia_ubicacion=True)
+        Visita.objects.filter(pk=de_administrador.pk).update(cuenta_como_servicio=False)
+        abierta = self.otra_visita(
+            incidencia_ubicacion=True, estado=Visita.Estado.ABIERTA, cerrada_en=None
+        )
+        self.assertEqual(self._pks(incidencia="ubicacion"), {cuenta.pk})
+        self.assertNotIn(abierta.pk, self._pks(incidencia="ubicacion"))
+
+    def test_filtro_numerico_no_ascii_no_da_500(self):
+        self.assertIn(self.visita.pk, self._pks(empleado="١٢٣", proyecto="²"))
+
+    def test_filtro_numerico_fuera_de_rango_no_da_500(self):
+        for valor in ("9223372036854775808", "9" * 5000, "0" * 25):
+            with self.subTest(valor=valor[:25]):
+                self.assertIn(self.visita.pk, self._pks(empleado=valor, proyecto=valor))
+        self.assertEqual(self._pks(empleado=str(2**63 - 1)), set())
+
     def test_filtra_por_empleado_proyecto_y_estado(self):
         pendiente = self.otra_visita(
             estado=Visita.Estado.PENDIENTE,
@@ -171,6 +212,26 @@ class FichaVisitaTests(BaseTests):
             self.assertNotIn(prohibido, contenido)
         for campo in ("latitud", "longitud", "precisión"):
             self.assertNotIn(campo, contenido.lower())
+
+    def test_historial_con_consultas_acotadas(self):
+        for i in range(60):
+            self.visita.observaciones = f"Cambio {i}"
+            self.visita.save()
+        url = reverse("panel:visitas:ficha", args=[self.visita.pk])
+        with CaptureQueriesContext(connection) as consultas:
+            respuesta = self.client.get(url)
+        self.assertEqual(len(respuesta.context["historial"]), 50)
+        historial = [
+            q["sql"] for q in consultas if "historicalvisita" in q["sql"].lower()
+        ]
+        self.assertEqual(len(historial), 1, historial)
+
+    def test_muestra_incidencia_de_asignacion(self):
+        visita = self.otra_visita(incidencia_asignacion=True)
+        respuesta = self.client.get(reverse("panel:visitas:ficha", args=[visita.pk]))
+        self.assertContains(respuesta, "Incidencia de asignación")
+        normal = self.client.get(reverse("panel:visitas:ficha", args=[self.visita.pk]))
+        self.assertNotContains(normal, "Incidencia de asignación")
 
     def test_muestra_planilla_del_esquema_copiado(self):
         self.visita.esquema_planilla = [
