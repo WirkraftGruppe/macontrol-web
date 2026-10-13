@@ -139,8 +139,8 @@ commit_base: 74f544d
 | Tarea | Estado |
 |---|---|
 | T1 | hecha |
-| T2 | pendiente |
-| T3 | pendiente |
+| T2 | hecha |
+| T3 | en curso |
 | T4 | pendiente |
 
 ### Corridas
