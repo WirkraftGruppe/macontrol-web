@@ -140,7 +140,7 @@ commit_base: 74f544d
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | en curso |
+| T3 | hecha |
 | T4 | pendiente |
 
 ### Corridas
@@ -148,6 +148,7 @@ commit_base: 74f544d
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | 2026-10-12 | T1 | 7e10703 | PASA (14/14) | verificador |
+| 2026-10-12 | T3 | b3e22eb | PASA (4/4) | verificador |
 
 ## Pendientes que deja este plan
 
