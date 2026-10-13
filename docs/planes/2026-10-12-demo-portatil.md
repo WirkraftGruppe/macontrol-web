@@ -132,13 +132,13 @@
 <!-- Corte del congelado: desde este encabezado hacia abajo, el principal lo actualiza durante la
 ejecución. Lo de arriba no se toca sin un commit `docs(plan): demo-portatil — modificado: <motivo>`. -->
 
-commit_base: (pendiente)
+commit_base: 74f544d
 
 ### Estado de subtareas
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | en curso |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
