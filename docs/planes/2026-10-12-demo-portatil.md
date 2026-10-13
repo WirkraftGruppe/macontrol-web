@@ -138,7 +138,7 @@ commit_base: 74f544d
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
+| T1 | hecha |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
@@ -147,6 +147,7 @@ commit_base: 74f544d
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-12 | T1 | 7e10703 | PASA (14/14) | verificador |
 
 ## Pendientes que deja este plan
 
