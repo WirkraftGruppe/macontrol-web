@@ -141,7 +141,7 @@ commit_base: 74f544d
 | T1 | hecha |
 | T2 | hecha |
 | T3 | hecha |
-| T4 | pendiente |
+| T4 | hecha |
 
 ### Corridas
 
@@ -153,3 +153,9 @@ commit_base: 74f544d
 ## Pendientes que deja este plan
 
 ### Cierra
+- P-demo-portatil-1 [menor] `requirements.txt` instala `ruff` y `WeasyPrint` en el paquete portátil sin usarse ahí (zip de 65,4 MB); separar un `requirements-demo.txt` o de producción lo achicaría.
+- P-demo-portatil-2 [menor] El mensaje de falla de `empaquetar_demo.py --sin-descarga` con la caché vacía no se ejercitó en ninguna corrida.
+- P-demo-portatil-3 [observación] Al cambiar la versión del embebido hay que actualizar tres constantes del script (versión, tamaño, SHA-256); el SHA-256 se toma del `.sigstore` publicado junto al zip en python.org, porque la página de la release no lo lista.
+- P-demo-portatil-4 [observación] La consola cp1252 muestra mal los acentos en la salida de `empaquetar_demo.py` y `humo_demo.py` (solo cosmético).
+- 2026-10-12 — El `demo.bat` portátil detecta la IP privada en lugar de `ALLOWED_HOSTS=*` — `dev.py` rechaza `*` — reemplaza a: (nada)
+- 2026-10-12 — Las dependencias del paquete portátil se instalan con el pip del venv (`--target`, `--only-binary :all:`, wheels en caché) en lugar de `get-pip.py` — sin pip dentro del paquete y `--sin-descarga` sin red — reemplaza a: (nada)
