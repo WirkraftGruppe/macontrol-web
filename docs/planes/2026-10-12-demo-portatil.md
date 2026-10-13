@@ -149,6 +149,8 @@ commit_base: 74f544d
 |---|---|---|---|---|
 | 2026-10-12 | T1 | 7e10703 | PASA (14/14) | verificador |
 | 2026-10-12 | T3 | b3e22eb | PASA (4/4) | verificador |
+| 2026-10-13 | TODO | e8d79fa | FALLA (25/26) | verificador; migrate+cargar_demo de T1 chocó con el hook de cierre rearmando dist/prueba/ en paralelo |
+| 2026-10-13 | TODO | e8d79fa | PASA (26/26) | verificador, sin corridas concurrentes |
 
 ## Pendientes que deja este plan
 
@@ -156,6 +158,7 @@ commit_base: 74f544d
 - P-demo-portatil-2 [menor] El mensaje de falla de `empaquetar_demo.py --sin-descarga` con la caché vacía no se ejercitó en ninguna corrida.
 - P-demo-portatil-3 [observación] Al cambiar la versión del embebido hay que actualizar tres constantes del script (versión, tamaño, SHA-256); el SHA-256 se toma del `.sigstore` publicado junto al zip en python.org, porque la página de la release no lo lista.
 - P-demo-portatil-4 [observación] La consola cp1252 muestra mal los acentos en la salida de `empaquetar_demo.py` y `humo_demo.py` (solo cosmético).
+- P-demo-portatil-5 [menor] Los criterios usan un `dist/prueba/` y un puerto 8000 compartidos: dos corridas en paralelo (verificador y hook de cierre) se pisan; usar una carpeta por corrida.
 - 2026-10-12 — El `demo.bat` portátil detecta la IP privada en lugar de `ALLOWED_HOSTS=*` — `dev.py` rechaza `*` — reemplaza a: (nada)
 - 2026-10-12 — Las dependencias del paquete portátil se instalan con el pip del venv (`--target`, `--only-binary :all:`, wheels en caché) en lugar de `get-pip.py` — sin pip dentro del paquete y `--sin-descarga` sin red — reemplaza a: (nada)
 
