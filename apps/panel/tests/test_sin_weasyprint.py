@@ -1,4 +1,4 @@
-"""WeasyPrint no se importa al arrancar: el paquete portátil de la demo no lo trae funcional."""
+"""El arranque de Django no depende de WeasyPrint (el paquete portátil no lo trae)."""
 
 import subprocess
 import sys

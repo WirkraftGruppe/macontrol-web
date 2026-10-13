@@ -2,7 +2,8 @@
 
 Uso, desde la raíz del proyecto y con el Python del venv:
 
-    ./venv/Scripts/python.exe herramientas/empaquetar_demo.py [--destino dist] [--sin-descarga]
+    ./venv/Scripts/python.exe herramientas/empaquetar_demo.py
+        [--destino dist] [--sin-descarga]
 
 El resultado queda en `<destino>/macontrol-demo/` y `<destino>/macontrol-demo.zip`.
 La carpeta lleva Python embebido, las dependencias de `requirements.txt`, el código
@@ -66,7 +67,7 @@ for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "(Get-NetIPCon
 if "%IP%"=="" (
     set "ALLOWED_HOSTS=localhost,127.0.0.1"
     echo AVISO: no se detecto la IP de la red local. La demo solo abrira en esta PC.
-    echo Conecte la PC a la red Wi-Fi y vuelva a abrir demo.bat para usarla desde el telefono.
+    echo Conecte la PC a la red Wi-Fi y abra demo.bat de nuevo para usar el telefono.
 ) else (
     set "ALLOWED_HOSTS=localhost,127.0.0.1,%IP%"
 )
@@ -98,7 +99,7 @@ echo.
 if not "%DEMO_SIN_NAVEGADOR%"=="1" start "" http://localhost:8000/
 python\python.exe manage.py runserver 0.0.0.0:8000 --noreload
 endlocal
-"""
+"""  # noqa: E501 (la línea de PowerShell es larga)
 
 LEEME = """MAControl - demo portátil
 
@@ -106,8 +107,8 @@ Esta carpeta corre la demo sin instalar nada: trae su propio Python.
 1. Copie la carpeta completa a la PC (Windows 10 u 11, 64 bits).
 2. Haga doble clic en demo.bat. La primera vez prepara la base y tarda unos segundos.
 3. En la notebook se abre http://localhost:8000/ en el navegador.
-4. Desde el teléfono, con la misma red Wi-Fi, abra la dirección "Teléfono" que muestra la ventana.
-5. Windows pregunta por el firewall: acepte el acceso en redes privadas para usar el teléfono.
+4. Desde el teléfono, en la misma red Wi-Fi, abra la dirección "Teléfono" de la ventana.
+5. Si Windows pregunta por el firewall, acepte el acceso en redes privadas.
 6. Usuarios de prueba: demo-admin y demo-empleado, clave demo1234.
 7. Para apagar, cierre la ventana negra o presione Ctrl+C.
 La demo guarda sus datos en demo.sqlite3 dentro de esta carpeta; borrarlo la reinicia.
@@ -126,7 +127,14 @@ def raiz_proyecto() -> Path:
 def dir_cache(raiz: Path) -> Path:
     """Caché `dist/cache/` del checkout principal (los worktrees la comparten)."""
     resultado = subprocess.run(
-        ["git", "-C", str(raiz), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        [
+            "git",
+            "-C",
+            str(raiz),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -165,7 +173,8 @@ def obtener_embebido(cache: Path, sin_descarga: bool) -> Path:
         if not embebido_valido(ruta):
             ruta.unlink(missing_ok=True)
             raise ErrorEmpaquetado(
-                f"{NOMBRE_EMBEBIDO} descargado no coincide con el tamaño o el SHA-256 esperados."
+                f"{NOMBRE_EMBEBIDO} descargado no coincide con el tamaño o el SHA-256 "
+                "esperados."
             )
     return ruta
 
@@ -191,7 +200,7 @@ def preparar_python(embebido: Path, paquete: Path) -> Path:
 
 
 def pip(args: list[str]) -> str:
-    """Corre el pip del Python que ejecuta el script; falla con su salida si no termina en 0."""
+    """Corre el pip de este Python; si no termina en 0 falla con su salida."""
     resultado = subprocess.run(
         [sys.executable, "-m", "pip", *args, "--disable-pip-version-check"],
         capture_output=True,
@@ -221,7 +230,9 @@ OPCIONES_PLATAFORMA = [
 ]
 
 
-def instalar_dependencias(raiz: Path, cache: Path, python: Path, sin_descarga: bool) -> None:
+def instalar_dependencias(
+    raiz: Path, cache: Path, python: Path, sin_descarga: bool
+) -> None:
     wheels = cache / "wheels"
     requisitos = str(raiz / "requirements.txt")
     if sin_descarga:
@@ -260,7 +271,11 @@ def archivos_codigo(raiz: Path) -> list[str]:
     for relativa in filter(None, salida.split("\0")):
         partes = Path(relativa).parts
         nombre = partes[-1]
-        if PARTES_EXCLUIDAS & set(partes) or nombre.endswith(".sqlite3") or nombre.startswith(".env"):
+        if (
+            PARTES_EXCLUIDAS & set(partes)
+            or nombre.endswith(".sqlite3")
+            or nombre.startswith(".env")
+        ):
             continue
         archivos.append(relativa)
     return archivos
@@ -276,13 +291,13 @@ def copiar_codigo(raiz: Path, paquete: Path) -> int:
 
 
 def escribir_textos(paquete: Path) -> None:
-    """`demo.bat` con CRLF (cmd lo exige) y `LEEME.txt` con CRLF para el Bloc de notas."""
+    """`demo.bat` y `LEEME.txt` con CRLF (cmd y el Bloc de notas lo esperan)."""
     for nombre, texto in (("demo.bat", DEMO_BAT), ("LEEME.txt", LEEME)):
         (paquete / nombre).write_bytes(texto.replace("\n", "\r\n").encode("utf-8"))
 
 
 def verificar_config(paquete: Path) -> None:
-    """Comprueba que el embebido importa `config` y Django desde la carpeta del paquete."""
+    """Comprueba que el embebido importa `config` y Django desde el paquete."""
     resultado = subprocess.run(
         [str(paquete / "python" / "python.exe"), "-B", "-c", "import config, django"],
         cwd=paquete,
@@ -305,8 +320,12 @@ def comprimir(paquete: Path) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Empaqueta la demo portátil de MAControl.")
-    parser.add_argument("--destino", default="dist", help="carpeta de salida (por defecto dist)")
+    parser = argparse.ArgumentParser(
+        description="Empaqueta la demo portátil de MAControl."
+    )
+    parser.add_argument(
+        "--destino", default="dist", help="carpeta de salida (por defecto dist)"
+    )
     parser.add_argument(
         "--sin-descarga",
         action="store_true",
