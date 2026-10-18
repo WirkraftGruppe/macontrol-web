@@ -439,6 +439,8 @@ commit_base: a5d491f
 | T10 | hecha |
 | T7 | hecha |
 | T8 | hecha |
+| T11 | pendiente |
+| T12 | pendiente |
 
 ### Corridas
 
@@ -453,6 +455,7 @@ commit_base: a5d491f
 | 2026-10-18 | T1–T6 + cierre global (verificador, verificador-b) | 704116d | PASA 72/72 | auditor-seguridad integrado: 0 bloqueantes para desplegar, 1 observación (P-13) |
 | 2026-10-18 | T9 (verificador, verificador-b) | 213dee4 | 7/7 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO (f0328b8, opción a del usuario) | auditor-seguridad: 0 bloqueantes, 1 menor (P-14); integrada edcb4cf, 139 tests |
 | 2026-10-18 | T9 + T10 (verificador, verificador-b) | 28e2ffb | 15/15 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad T10: 0 bloqueantes, 1 importante (P-15), 2 menores (P-14, P-16), 2 observaciones (P-17) |
+| 2026-10-18 | TODO T1–T10 + cierre global (verificador, verificador-b) | 5353b19 | FALLA 2/105: CSP de T7 (orden de directivas de django-csp) y congelado.sh (CONTRATO MODIFICADO) | auditor-seguridad final: 0 bloqueantes, 2 menores (P-22, P-23), 1 observación; → T11/T12 (contrato modificado) |
 
 ## Pendientes que deja este plan
 
@@ -478,6 +481,8 @@ commit_base: a5d491f
 - P-puesta-en-produccion-19 [menor] Sigue lo restante de P-web-independiente-9: `srcset` del hero y CSS crítico para el LCP móvil.
 - P-puesta-en-produccion-20 [observación] El dominio propio `macontrol.com.ar` no está conectado; el sitio sale por `web-production-0c499.up.railway.app` (plan posterior).
 - P-puesta-en-produccion-21 [observación] `Strict-Transport-Security` sale con `max-age=3600` en producción: subirlo (y evaluar `includeSubDomains`/`preload`) cuando se conecte el dominio propio.
+- P-puesta-en-produccion-22 [menor] `GET /media/servicios/a%00.png` da 500 en vez de 404: `media_publica` (`apps/web/views.py:155-165`) deja pasar ` ` y `resolve()`/`is_file()` lanzan `ValueError: embedded null byte`. Sin traceback ni filtrado, pero cualquiera genera 500 y trazas a voluntad. Rechazar ` ` junto con `..`, `\` y `:`, con un caso en `test_rechaza_rutas_fuera_de_carpetas_publicas` (auditor-seguridad final).
+- P-puesta-en-produccion-23 [observación] `docs/despliegue.md` (líneas 57 y 76) cita P-puesta-en-produccion-9, que se cerró y siguió como P-18; `docs/decisiones.md` dice que `cache_sitio` se crea en el `preDeployCommand` sin marcar que la decisión de la corrida manual la reemplaza (auditor-seguridad final).
 - P-puesta-en-produccion-17 [observación] `IP_CLIENTE_CABECERA` también se respeta con `DJANGO_ENV=development` (runserver en la LAN deja falsificar `X-Real-IP`); el regex acepta `HTTP_X_FORWARDED_FOR`; la prueba de T7 debe usar un usuario inexistente para no gastar el cupo global del superusuario (auditor-seguridad T9 y T10).
 
 ### Decisiones
