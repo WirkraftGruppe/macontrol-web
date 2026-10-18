@@ -58,7 +58,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "csp.middleware.CSPMiddleware",
+    "config.csp.CSPMiddlewareOrdenado",
 ]
 
 # Tope del cuerpo de una petición, que revisa LimiteCuerpoMiddleware antes del CSRF.
