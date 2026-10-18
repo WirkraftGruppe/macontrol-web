@@ -9,7 +9,7 @@
 </head>
 <body>
   <main class="contenedor seccion centrado">
-    <img src="{% static 'img/logo.png' %}" width="96" height="96" alt="MAControl">
+    <img src="{% static 'img/logo-nav.png' %}" width="96" height="24" alt="MAControl">
     <h1>Página no encontrada</h1>
     <p class="texto-suave">La dirección que buscaba no existe o ya no está disponible.</p>
     <a class="btn btn-primario" href="{% if request_path|slice:':7' == '/admin/' %}/admin/{% else %}/{% endif %}">Volver al inicio</a>
