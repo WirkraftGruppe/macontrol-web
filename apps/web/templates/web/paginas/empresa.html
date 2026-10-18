@@ -38,13 +38,13 @@
     <ul class="beneficios">
       <li>Adaptabilidad horaria</li>
       <li>Logística y compromiso</li>
-      <li>Director técnico matriculado</li>
+      <li>{% if config.director_tecnico %}Director técnico: {{ config.director_tecnico }}{% else %}Director técnico matriculado{% endif %}</li>
       <li>Personal idóneo y responsable</li>
       <li>Métodos e insumos de alta calidad</li>
       <li>Grupo de operarios aplicadores calificados</li>
       <li>Protocolos de seguridad + seguro de trabajo</li>
-      <li>Empresa inscripta y habilitada — Ministerio de Agroindustria</li>
-      <li>Empresa certificada según art. 4º del Decreto Reglamentario 499/91 de la Ley de Agroquímicos 10.699/88</li>
+      <li>{{ config.habilitacion }}</li>
+      <li>{{ config.ley }}</li>
       <li>Extiende certificado por control de plagas apto para presentar ante entes reguladores</li>
     </ul>
   </div>

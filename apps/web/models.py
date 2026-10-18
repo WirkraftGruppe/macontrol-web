@@ -67,6 +67,10 @@ class Configuracion(models.Model):
         help_text='Lista de {"nombre": "...", "url": "..."}.',
     )
 
+    habilitacion = models.CharField("habilitación", max_length=200, blank=True)
+    ley = models.CharField("certificación legal", max_length=240, blank=True)
+    director_tecnico = models.CharField("director técnico", max_length=120, blank=True)
+
     class Meta:
         verbose_name = "configuración"
         verbose_name_plural = "configuración"
@@ -104,25 +108,17 @@ class Configuracion(models.Model):
         return f"https://wa.me/54{digitos}"
 
 
-class PaginaServicioQuerySet(models.QuerySet):
-    def publicadas(self):
-        """Páginas publicadas cuyo tipo de servicio está activo."""
-        return (
-            self.filter(publicado=True, tipo__activo=True)
-            .select_related("tipo")
-            .order_by("tipo_id")
-        )
+class ServicioQuerySet(models.QuerySet):
+    def publicados(self):
+        """Servicios publicados, en el orden del menú."""
+        return self.filter(publicado=True).order_by("orden", "nombre")
 
 
-class PaginaServicio(models.Model):
-    """Contenido público de un tipo de servicio."""
+class Servicio(models.Model):
+    """Un servicio de la Carta con su página pública."""
 
-    tipo = models.OneToOneField(
-        "servicios.TipoServicio",
-        on_delete=models.PROTECT,
-        related_name="pagina",
-        verbose_name="tipo de servicio",
-    )
+    nombre = models.CharField("nombre", max_length=120)
+    slug = models.SlugField("identificador en la URL", max_length=80, unique=True)
     titulo_seo = models.CharField("título para buscadores", max_length=160)
     resumen = models.TextField("resumen")
     problema = models.TextField("problema que resuelve")
@@ -146,26 +142,27 @@ class PaginaServicio(models.Model):
         validators=[validar_sectores],
         help_text="Lista de valores de Sector.",
     )
-    imagen_portada = models.ImageField(
-        "imagen de portada",
+    foto = models.ImageField(
+        "foto de portada",
         upload_to=ruta_portada,
         blank=True,
         validators=VALIDADORES_IMAGEN,
     )
+    orden = models.PositiveSmallIntegerField("orden", default=0)
     publicado = models.BooleanField("publicado", default=False)
 
-    objects = PaginaServicioQuerySet.as_manager()
+    objects = ServicioQuerySet.as_manager()
 
     class Meta:
-        verbose_name = "página de servicio"
-        verbose_name_plural = "páginas de servicio"
-        ordering = ["tipo_id"]
+        verbose_name = "servicio"
+        verbose_name_plural = "servicios"
+        ordering = ["orden", "nombre"]
 
     def __str__(self):
-        return self.titulo_seo
+        return self.nombre
 
     def get_absolute_url(self):
-        return reverse("web:servicio", args=[self.tipo.slug])
+        return reverse("web:servicio", args=[self.slug])
 
 
 class ClienteDestacadoQuerySet(models.QuerySet):

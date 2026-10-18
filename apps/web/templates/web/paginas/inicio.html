@@ -31,7 +31,7 @@
       {% for pagina in paginas_nav %}
       <a class="tarjeta-enlace" href="{{ pagina.get_absolute_url }}">
         <div class="tarjeta">
-          <h3 class="tarjeta-titulo">{{ pagina.tipo.nombre }}</h3>
+          <h3 class="tarjeta-titulo">{{ pagina.nombre }}</h3>
           <p class="tarjeta-texto">{{ pagina.resumen }}</p>
         </div>
       </a>
@@ -46,7 +46,7 @@
       <span class="eyebrow">Mantenimiento edilicio</span>
       <h2>Espacios recuperados</h2>
       <p class="texto-suave">MAControl S.A. cuenta además con un equipo de profesionales calificados en el área de mantenimiento edilicio: recuperamos y mantenemos en condiciones espacios/sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.</p>
-      {% for pagina in paginas_nav %}{% if pagina.tipo.slug == "mantenimiento-edilicio" %}<a class="btn btn-secundario" href="{{ pagina.get_absolute_url }}">Ver mantenimiento edilicio</a>{% endif %}{% endfor %}
+      {% for pagina in paginas_nav %}{% if pagina.slug == "mantenimiento-edilicio" %}<a class="btn btn-secundario" href="{{ pagina.get_absolute_url }}">Ver mantenimiento edilicio</a>{% endif %}{% endfor %}
     </div>
     <div class="banda-edilicia-imagen">
       <img src="{{ edilicia.url }}" width="{{ edilicia.ancho }}" height="{{ edilicia.alto }}" alt="Hidrolavado de una fachada desde un andamio, con arnés" loading="lazy">

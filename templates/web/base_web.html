@@ -35,7 +35,7 @@
           {% if url_empresa %}<a href="{{ url_empresa }}">Empresa</a>{% endif %}
           {% if url_contacto %}<a href="{{ url_contacto }}">Contacto</a>{% endif %}
           <span class="nav-movil-titulo">Servicios</span>
-          {% for pagina in paginas_nav %}<a class="nav-movil-servicio" href="{{ pagina.get_absolute_url }}">{{ pagina.tipo.nombre }}</a>{% endfor %}
+          {% for pagina in paginas_nav %}<a class="nav-movil-servicio" href="{{ pagina.get_absolute_url }}">{{ pagina.nombre }}</a>{% endfor %}
         </nav>
       </details>
     </div>
@@ -57,7 +57,7 @@
         </div>
         <div>
           <h2 class="pie-titulo">Servicios</h2>
-          {% for pagina in paginas_nav %}<p><a href="{{ pagina.get_absolute_url }}">{{ pagina.tipo.nombre }}</a></p>{% endfor %}
+          {% for pagina in paginas_nav %}<p><a href="{{ pagina.get_absolute_url }}">{{ pagina.nombre }}</a></p>{% endfor %}
         </div>
       </div>
       <p class="pie-legal">{% if config %}{{ config.razon_social }}{% else %}MAControl S.A.{% endif %}</p>

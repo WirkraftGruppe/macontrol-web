@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ClienteDestacado, Configuracion, PaginaServicio
+from .models import ClienteDestacado, Configuracion, Servicio
 
 
 @admin.register(Configuracion)
@@ -14,11 +14,11 @@ class ConfiguracionAdmin(admin.ModelAdmin):
         return False
 
 
-@admin.register(PaginaServicio)
-class PaginaServicioAdmin(admin.ModelAdmin):
-    list_display = ("titulo_seo", "tipo", "publicado")
+@admin.register(Servicio)
+class ServicioAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "orden", "publicado")
     list_filter = ("publicado",)
-    search_fields = ("titulo_seo", "tipo__nombre")
+    search_fields = ("nombre", "titulo_seo")
 
 
 @admin.register(ClienteDestacado)
