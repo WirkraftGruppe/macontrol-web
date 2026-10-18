@@ -1,19 +1,27 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: (ninguno)
+Plan activo: docs/planes/2026-10-12-demo-portatil.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| — | main | — | demo del cliente 2026-10-13 con `demo.bat`; próximo plan a elegir entre los pendientes abiertos (robustez-dominio, despliegue, sitio-cierre) | sesión 2026-10-12 cerrada (robustez-panel fusionado) |
+| demo-portatil | plan/demo-portatil | 2 (cerrada, TODO en PASA) | el usuario decide el merge a `main`; zip en `dist/macontrol-demo.zip` (65,4 MB) | sesión 2026-10-13 cerrada |
 
 Siguiente: 82 abiertos según `pendientes.py` tras fusionar robustez-panel (incluye P-robustez-panel-1 a -6 y -9 a -14 y los de `demo-cliente`; las etiquetas se revisan en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-13 — Plan `demo-portatil`: demo autocontenida con Python embebido
+Hecho:
+- Plan Chico `demo-portatil` (commit_base 74f544d), dos olas, cada subtarea con verificador.
+  - T1: `herramientas/empaquetar_demo.py` arma `dist/macontrol-demo/` con Python 3.13.15 embebido (tamaño y SHA-256 fijos, tomado del `.sigstore`), wheels `--only-binary` con el pip del venv, código por `git ls-files`, `demo.bat` portátil con IP detectada y `LEEME.txt`; zip de 65,4 MB. Test `test_sin_weasyprint` (WeasyPrint no se importa en ningún lado).
+  - T3: `herramientas/humo_demo.py` arranca el `demo.bat` portátil, comprueba `/`, la redirección de `/panel/` y el login de demo-admin, y apaga; sección "Llevar la demo a otra PC" en `docs/demo-cliente.md`.
+- Verificación TODO: una FALLA por choque con el hook de cierre en `dist/prueba/` y luego PASA 26/26 sobre e8d79fa.
+Pendiente: el merge a `main` lo decide el usuario; P-demo-portatil-1 a -5 en el plan.
 
 ### 2026-10-12 — Plan `robustez-panel`: puntos, geocodificación, filtros, incidencias y diseño del panel, fusión en `main`
 Hecho:

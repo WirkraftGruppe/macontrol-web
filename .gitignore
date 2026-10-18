@@ -29,3 +29,6 @@ images-for-content/
 *.jpeg
 *.jpg
 !static/img/**
+
+# Salida del empaquetador de la demo portátil
+dist/

@@ -62,3 +62,24 @@ En la ventana de `demo.bat`, presionar Ctrl+C y confirmar. Cerrar la ventana tam
 
 - Para restaurar los datos de ejemplo, volver a ejecutar `demo.bat`: `cargar_demo` se puede repetir sin duplicar.
 - Para empezar de cero, apagar el servidor, borrar el archivo `demo.sqlite3` de la carpeta del proyecto y ejecutar `demo.bat` de nuevo.
+
+## Llevar la demo a otra PC
+
+En esta PC, desde la raíz del proyecto, generar el paquete:
+
+```bash
+./venv/Scripts/python.exe herramientas/empaquetar_demo.py
+```
+
+- La primera vez descarga Python embebido y las dependencias; con `--sin-descarga` usa la caché ya descargada.
+- `--destino <carpeta>` cambia dónde se deja el resultado.
+- El resultado es `dist/macontrol-demo.zip`.
+
+En la otra PC:
+
+1. Copiar el `.zip` (por ejemplo con un pendrive) y descomprimirlo.
+2. Hacer doble clic en `demo.bat`.
+3. Aceptar el aviso del firewall en redes privadas.
+4. Desde el celular, en la misma Wi-Fi, abrir la dirección "Teléfono" que muestra la ventana.
+
+La demo portátil no genera PDF. Para reiniciar los datos, apagar el servidor y borrar `demo.sqlite3`.
