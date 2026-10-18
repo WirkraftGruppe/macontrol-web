@@ -25,12 +25,15 @@ Guía para alojar el sitio público de MAControl. Nada de esto se ejecuta solo: 
 | `CSRF_TRUSTED_ORIGINS` | el mismo dominio con esquema, p. ej. `https://demo.up.railway.app` (varios, separados por comas) |
 | `SITE_URL` | obligatoria y con `https://`: `https://demo.up.railway.app` (origen público; arma el canonical, Open Graph y sitemap). Sin ella el arranque aborta |
 | `NUM_PROXIES` | obligatoria, entero >= 0 solo con dígitos ASCII; cuántos proxies de confianza hay delante de Django (define la IP del cliente para el límite de intentos del login). Sin ella el arranque aborta. El valor para Railway lo confirma T7 (ver "`NUM_PROXIES` en Railway") |
+| `IP_CLIENTE_CABECERA` | `HTTP_X_REAL_IP` en Railway: nombre de `request.META` (forma `HTTP_[A-Z0-9_]+`) con la IP del cliente que fija el borde; tiene prioridad sobre `NUM_PROXIES`. Si la cabecera falta o no es una IP, se usa `REMOTE_ADDR` |
 | `MEDIA_ROOT` | `/data/media` (ruta del volumen, punto 4) |
 
 Variables de build (las lee `collectstatic` al importar `prod.py`): `DJANGO_ENV`, `SECRET_KEY`, `DATABASE_URL`, `ALLOWED_HOSTS`, `SITE_URL` y `NUM_PROXIES`. `CSRF_TRUSTED_ORIGINS`, si está definida, también se valida (solo `https://host`, sin `*` ni ruta).
 
 ### `NUM_PROXIES` en Railway
 `ip_del_cliente` (`config/red.py`) toma la N-ésima IP desde el final de `X-Forwarded-For`. La documentación de Railway (https://docs.railway.com/networking/public-networking/specs-and-limits, consultada el 2026-10-18) lista entre los encabezados de la petición `X-Real-IP` ("for identifying client's remote IP"), `X-Forwarded-Proto` y `X-Forwarded-Host`; **no menciona `X-Forwarded-For`** ni cuántos saltos agrega el borde. Por eso el valor no se fija acá: lo confirma T7 en el primer despliegue, mirando un `X-Forwarded-For` real, y queda anotado con su fuente. Un valor mal puesto hace que todos los clientes compartan IP (o que el cliente elija la suya).
+
+Por eso en Railway se usa `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`: `ip_del_cliente` toma la IP de `X-Real-IP`, que documenta Railway, e ignora `X-Forwarded-For` y `NUM_PROXIES`. Que el borde pise un `X-Real-IP` enviado por el cliente se comprueba en el primer despliegue (T7) con fallos de login que falsifican la cabecera: si con IP falsas distintas el sexto fallo del mismo usuario no da 429, el borde no la pisa y el despliegue no sigue. El resultado queda anotado acá.
 
 El dominio público se genera en `Settings` -> `Networking` -> `Generate Domain`. Las variables no se versionan: `.env.example` solo lista los nombres.
 

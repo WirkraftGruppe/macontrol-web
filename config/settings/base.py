@@ -25,6 +25,11 @@ def leer_num_proxies():
 # Proxies inversos de confianza delante de Django; define la IP real del cliente.
 NUM_PROXIES = leer_num_proxies()
 
+# Cabecera de request.META con la IP del cliente que fija el borde del hosting
+# (en Railway, HTTP_X_REAL_IP); con valor tiene prioridad sobre NUM_PROXIES.
+# Vacía: se usa NUM_PROXIES. Ver config/red.py.
+IP_CLIENTE_CABECERA = env.str("IP_CLIENTE_CABECERA", default="")
+
 # Cupos del login del admin: solo cuentan los intentos fallidos.
 INTENTOS_FALLIDOS_POR_IP = 20  # fallos por IP dentro de la ventana
 VENTANA_MINUTOS = 15  # ventana de los cupos por IP y por (usuario, IP)
