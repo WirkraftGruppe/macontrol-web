@@ -84,8 +84,11 @@ class Configuracion(models.Model):
 
     @classmethod
     def obtener(cls):
-        """Devuelve la fila única, creándola vacía si falta."""
-        return cls.objects.get_or_create(pk=1)[0]
+        """Devuelve la fila única, o una instancia vacía sin guardar si falta."""
+        try:
+            return cls.objects.get(pk=1)
+        except cls.DoesNotExist:
+            return cls(pk=1)
 
     @staticmethod
     def _digitos(texto):

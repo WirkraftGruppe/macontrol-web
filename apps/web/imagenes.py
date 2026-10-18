@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .validators import TAMANO_MAXIMO_IMAGEN
+
 FORMATOS_PERMITIDOS = ("JPEG", "PNG", "WEBP")
 
 
@@ -15,8 +17,11 @@ def reprocesar_imagen(archivo, *, formato_salida: str) -> ContentFile:
 
     JPEG sale en RGB; PNG conserva el canal alfa. Lanza ValidationError si el
     formato real no es JPEG/PNG/WEBP, el archivo está corrupto o supera el tope
-    de píxeles de Pillow.
+    de píxeles de Pillow. El tamaño se controla antes de abrir el archivo.
     """
+    tamano = getattr(archivo, "size", None)
+    if tamano is not None and tamano > TAMANO_MAXIMO_IMAGEN:
+        raise ValidationError("La imagen no puede pesar más de 2 MB.")
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
