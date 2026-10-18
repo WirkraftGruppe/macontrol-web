@@ -1,19 +1,25 @@
 # Bitácora de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-12-demo-portatil.md
+Plan activo: docs/planes/2026-10-17-separacion-web.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| demo-portatil | plan/demo-portatil | 2 (cerrada, TODO en PASA) | el usuario decide el merge a `main`; zip en `dist/macontrol-demo.zip` (65,4 MB) | sesión 2026-10-13 cerrada |
+| separacion-web | plan/separacion-web | plan en redacción (sin commitear) | `juez-plan` y aprobación del usuario antes de `docs(plan)` | sesión 2026-10-18 abierta |
 
 Siguiente: 82 abiertos según `pendientes.py` tras fusionar robustez-panel (incluye P-robustez-panel-1 a -6 y -9 a -14 y los de `demo-cliente`; las etiquetas se revisan en el próximo triage). Regla de cuándo preguntar: CLAUDE.md § Reglas globales, regla 8.
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`; los anteriores están en `docs/planes/2026-10-03-pendientes-heredados.md`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-18 — Fusión de `demo-portatil` en `main`
+Hecho:
+- `plan/demo-portatil` fusionada en `main` (4c2bcda) por pedido del usuario; sus decisiones copiadas a `docs/decisiones.md`.
+- `../macontrol-web` existe (clone de este repositorio) y lo trabaja otra sesión en `plan/web-independiente`; contiene `docs/00-contenido-fuente.md` y `docs/02-diseno.md`.
+Pendiente: plan `separacion-web` (Detach) en redacción.
 
 ### 2026-10-13 — Plan `demo-portatil`: demo autocontenida con Python embebido
 Hecho:
