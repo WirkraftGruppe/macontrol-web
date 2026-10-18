@@ -313,10 +313,10 @@ commit_base: da3eef5
 |---|---|
 | T1 | hecha |
 | T2 | hecha |
-| T3 | en curso |
-| T4 | en curso |
-| T5 | pendiente |
-| T6 | pendiente |
+| T3 | hecha |
+| T4 | hecha |
+| T5 | hecha |
+| T6 | en curso |
 | T7 | pendiente |
 
 ### Corridas
@@ -327,6 +327,12 @@ commit_base: da3eef5
 | 2026-10-18 | T1 | eb66d12 | PASA (20/20) | verificador-b; sin --keepdb también 92 OK |
 | 2026-10-18 | T1 | eb66d12 | sin bloqueantes | auditor-seguridad: 2 menores (comentario SITE_URL/QR, despliegue.md), 2 observaciones (EXIF hasta T6, base nueva) |
 | 2026-10-18 | T2 | (integración) | PASA (1/1) | principal; worktree-integrar.sh exit 0, 92 tests OK |
+| 2026-10-18 | T3 | 6a76cdb | PASA (19/19) | verificador; 92→91 tests explicado (−7 de apps/servicios, +6 en apps/web) |
+| 2026-10-18 | T3 | 6a76cdb | PASA (19/19) | verificador-b; textos de los 9 servicios idénticos al fixture anterior |
+| 2026-10-18 | T3 | 6a76cdb | sin bloqueantes | auditor-seguridad: M1 humo sin DJANGO_SETTINGS_MODULE, M2 sin test de validadores de foto; O1-O3 |
+| 2026-10-18 | T4 | 2c5dda5 | PASA (8/8) | verificador |
+| 2026-10-18 | T4 | 2c5dda5 | PASA (8/8) | verificador-b; docs ubica 404/500 en templates/web/ (están en apps/web/templates/); vista previa llega en T6 |
+| 2026-10-18 | T5 | (integración) | PASA (7/7) | principal; worktree-integrar T3 y T4 exit 0 (91 tests); 30 planes a historico/ |
 
 ## Pendientes que deja este plan
 
