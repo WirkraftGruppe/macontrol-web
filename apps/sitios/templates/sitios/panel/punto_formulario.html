@@ -1,9 +1,0 @@
-{% extends "panel/base.html" %}
-{% block title %}{{ titulo }} · MAControl{% endblock %}
-{% block panel_contenido %}
-<h1>{{ titulo }}</h1>
-{% if es_alta %}<p class="ayuda">La ubicación se toma del primer escaneo.</p>{% endif %}
-{% if object.ubicacion_fijada_en %}<p class="ayuda">Punto fijado por escaneo el {{ object.ubicacion_fijada_en|date:"d/m/Y H:i" }}{% if object.ubicacion_fijada_por %} por {{ object.ubicacion_fijada_por.get_full_name|default:object.ubicacion_fijada_por.username }}{% endif %}. Podés corregir la ubicación abajo.</p>{% endif %}
-{% url 'panel:sitios:ficha' sitio.pk as ficha_url %}
-{% include "panel/partials/formulario.html" with cancelar_url=ficha_url %}
-{% endblock %}

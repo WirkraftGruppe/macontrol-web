@@ -1,7 +1,0 @@
-{% extends "panel/base.html" %}
-{% block title %}{{ view.titulo }} · MAControl{% endblock %}
-{% block panel_contenido %}
-  <h1>{{ view.titulo }}</h1>
-  {% url 'panel:productos:listado' as listado_url %}
-  {% include "panel/partials/formulario.html" with cancelar_url=listado_url %}
-{% endblock %}

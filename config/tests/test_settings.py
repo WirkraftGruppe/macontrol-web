@@ -35,14 +35,6 @@ def _correr(args, **entorno):
 
 
 class SettingsTests(SimpleTestCase):
-    def test_cupo_alta_campo_definido(self):
-        """Las altas de campo tienen su propio cupo, separado de crear_visita."""
-        from config.settings import base
-
-        cupos = base.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
-        self.assertEqual(cupos.get("alta_campo"), "300/hour")
-        self.assertEqual(cupos["crear_visita"], "120/hour")
-
     def test_samesite_lax_fijado(self):
         """SameSite y el tope de archivos se fijan explícitos en base.py."""
         from config.settings import base
@@ -200,34 +192,3 @@ class SiteUrlTests(SimpleTestCase):
         )
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(r.stdout.strip().splitlines()[-1], "https://ejemplo.com.ar")
-
-
-class DistanciaMaximaTests(SimpleTestCase):
-    def test_fuera_de_rango_falla(self):
-        """DISTANCIA_MAXIMA_M fuera de 50–5000, o no entera, impide arrancar."""
-        for valor in ("49", "5001", "0", "trescientos"):
-            with self.subTest(valor=valor):
-                r = _correr(
-                    ["check"], DJANGO_ENV="development", DISTANCIA_MAXIMA_M=valor
-                )
-                self.assertNotEqual(r.returncode, 0)
-                self.assertIn("DISTANCIA_MAXIMA_M", r.stdout + r.stderr)
-
-    def test_dentro_de_rango_y_default(self):
-        """Los extremos se aceptan y sin variable vale 300."""
-        for valor, esperado in (("50", "50"), ("5000", "5000"), (None, "300")):
-            with self.subTest(valor=valor):
-                entorno = {"DJANGO_ENV": "development"}
-                if valor is not None:
-                    entorno["DISTANCIA_MAXIMA_M"] = valor
-                r = _correr(
-                    [
-                        "shell",
-                        "-c",
-                        "from django.conf import settings as s;"
-                        " print(s.DISTANCIA_MAXIMA_M)",
-                    ],
-                    **entorno,
-                )
-                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertEqual(r.stdout.strip().splitlines()[-1], esperado)

@@ -2,7 +2,6 @@
 
 import re
 import uuid
-from pathlib import Path
 
 from django.conf import settings
 from django.core.management import call_command
@@ -10,10 +9,8 @@ from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.views.defaults import server_error
 
-from apps.servicios.models import TipoServicio
-from apps.web.models import Configuracion, PaginaServicio, Sector
+from apps.web.models import Configuracion, Sector, Servicio
 
-RAIZ = Path(__file__).resolve().parents[3]
 SLUG_MIPU = "servicio-mipu"
 
 
@@ -70,10 +67,7 @@ class ServicioTests(ConContenido):
         self.assertContains(respuesta, "El problema")
         self.assertContains(respuesta, "Gastronómicos y comercios en general")
         self.assertContains(respuesta, "img/empresa-oficina-equipo")
-        PaginaServicio.objects.filter(tipo__slug=SLUG_MIPU).update(publicado=False)
-        self.assertEqual(self.client.get(url).status_code, 404)
-        PaginaServicio.objects.filter(tipo__slug=SLUG_MIPU).update(publicado=True)
-        TipoServicio.objects.filter(slug=SLUG_MIPU).update(activo=False)
+        Servicio.objects.filter(slug=SLUG_MIPU).update(publicado=False)
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertEqual(self.client.get("/servicio/no-existe/").status_code, 404)
 
@@ -82,7 +76,7 @@ class ServicioTests(ConContenido):
         respuesta = self.client.get(url)
         self.assertNotContains(respuesta, "Preguntas frecuentes")
         self.assertNotContains(respuesta, 'class="faq"')
-        PaginaServicio.objects.filter(tipo__slug=SLUG_MIPU).update(
+        Servicio.objects.filter(slug=SLUG_MIPU).update(
             faq=[{"pregunta": "¿Cada cuánto?", "respuesta": "Según el plan."}]
         )
         respuesta = self.client.get(url)
@@ -135,7 +129,7 @@ class SeoTests(ConContenido):
         self.assertEqual(robots.status_code, 200)
         self.assertIn("text/plain", robots["Content-Type"])
         texto = robots.content.decode()
-        for ruta in ("/panel/", "/api/", "/admin/", "/q/"):
+        for ruta in ("/admin/", "/q/"):
             self.assertIn(f"Disallow: {ruta}\n", texto)
         self.assertIn(f"Sitemap: {base}/sitemap.xml", texto)
         for ruta in ("/", "/empresa/", "/contacto/", f"/servicio/{SLUG_MIPU}/"):
@@ -164,9 +158,8 @@ class ErroresTests(ConContenido):
         self.assertIn("Error del servidor", error.content.decode())
         self.assertIn("css/web.css", error.content.decode())
 
-    def test_404_bajo_panel_enlaza_al_panel(self):
+    def test_404_enlaza_al_inicio_o_al_admin(self):
         casos = {
-            "/panel/no-existe/": 'href="/panel/"',
             "/admin/no-existe/": 'href="/admin/"',
             "/no-existe/": 'href="/"',
         }
@@ -174,18 +167,3 @@ class ErroresTests(ConContenido):
             html = render_to_string("404.html", {"request_path": ruta})
             self.assertIn(enlace, html, ruta)
             self.assertIn("noindex", html, ruta)
-
-
-class PlantillasTests(TestCase):
-    def test_ninguna_plantilla_publica_tiene_form_ni_presupuesto(self):
-        carpetas = [RAIZ / "templates/web", RAIZ / "apps/web/templates/web/paginas"]
-        archivos = [a for c in carpetas for a in c.rglob("*") if a.is_file()]
-        archivos += [
-            RAIZ / "apps/web/templates/404.html",
-            RAIZ / "apps/web/templates/500.html",
-        ]
-        self.assertGreaterEqual(len(archivos), 10)
-        for archivo in archivos:
-            texto = archivo.read_text(encoding="utf-8").lower()
-            self.assertNotIn("<form", texto, archivo)
-            self.assertNotIn("presupuesto", texto, archivo)

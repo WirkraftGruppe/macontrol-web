@@ -1,95 +1,5 @@
 [
   {
-    "model": "servicios.tiposervicio",
-    "pk": 1,
-    "fields": {
-      "nombre": "Desinfección, sanitización y desodorización",
-      "slug": "desinfeccion-sanitizacion-desodorizacion",
-      "descripcion": "Eliminación de olores, microorganismos, virus, hongos y bacterias que generan enfermedades en el ser humano y su ambiente.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 2,
-    "fields": {
-      "nombre": "Control de plagas urbanas",
-      "slug": "control-plagas-urbanas",
-      "descripcion": "Excluir, ahuyentar y erradicar: insectos voladores y rastreros, artrópodos, mamíferos y aves.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 3,
-    "fields": {
-      "nombre": "Servicio MIPU (Manejo Integral de Plagas Urbanas)",
-      "slug": "servicio-mipu",
-      "descripcion": "Programa de monitoreo, detección, exclusión y prevención de plagas.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 4,
-    "fields": {
-      "nombre": "Mosquitos vectores — erradicación y prevención",
-      "slug": "mosquitos-vectores",
-      "descripcion": "Erradicación de mosquitos, huevos y larvas para prevenir picaduras y enfermedades como Dengue, Zika y Chikungunya.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 5,
-    "fields": {
-      "nombre": "Control de murciélagos",
-      "slug": "control-murcielagos",
-      "descripcion": "Trabajo integral: exclusión del murciélago, limpieza de guano, reacondicionamiento de estructuras dañadas, revisión de espacios, sellamientos y desinfección de superficies afectadas.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 6,
-    "fields": {
-      "nombre": "Exclusión de palomas y otras aves",
-      "slug": "exclusion-palomas-aves",
-      "descripcion": "Pinches plásticos o metálicos, redes, sistemas ecológicos de ahuyentamiento y exclusión por alergénico.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 7,
-    "fields": {
-      "nombre": "Limpieza y desinfección de tanques de agua y cisternas",
-      "slug": "limpieza-tanques-cisternas",
-      "descripcion": "Eliminación de hongos, virus, bacterias, algas, insectos y suciedad.",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 8,
-    "fields": {
-      "nombre": "Manejo integral de plagas en edificios / departamentos",
-      "slug": "manejo-plagas-edificios",
-      "descripcion": "Control mensual sanitario específico para cada espacio (ventilaciones, pozos de ascensores, sótanos, salas recreativas, calefacciones, cuartos de máquinas, cocheras, pasillos).",
-      "activo": true
-    }
-  },
-  {
-    "model": "servicios.tiposervicio",
-    "pk": 9,
-    "fields": {
-      "nombre": "Mantenimiento edilicio",
-      "slug": "mantenimiento-edilicio",
-      "descripcion": "Recuperamos y mantenemos en condiciones espacios/sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.",
-      "activo": true
-    }
-  },
-  {
     "model": "web.configuracion",
     "pk": 1,
     "fields": {
@@ -110,18 +20,21 @@
           "direccion": "Presidente Perón 427"
         }
       ],
-      "redes": []
+      "redes": [],
+      "habilitacion": "Empresa inscripta y habilitada — Ministerio de Agroindustria",
+      "ley": "Empresa certificada según art. 4º del Decreto Reglamentario 499/91 de la Ley de Agroquímicos 10.699/88",
+      "director_tecnico": ""
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 1,
     "fields": {
-      "tipo": 1,
+      "nombre": "Desinfección, sanitización y desodorización",
+      "slug": "desinfeccion-sanitizacion-desodorizacion",
       "titulo_seo": "Desinfección, sanitización y desodorización en Castelli y Chascomús",
       "resumen": "Eliminación de olores, microorganismos, virus, hongos y bacterias que generan enfermedades en el ser humano y su ambiente.",
       "problema": "Los grandes focos de transmisión se generan en lugares de contacto frecuente y alto tránsito, como oficinas, sanitarios, vestuarios y comedores.",
-      "adicional": "Importante: los productos utilizados no manchan, no mojan y no corroen ninguna superficie.",
       "metodos": [
         {
           "titulo": "Análisis de campo previo",
@@ -132,21 +45,22 @@
           "descripcion": "Correcta distribución de producto en todo tipo de superficies."
         }
       ],
+      "adicional": "Importante: los productos utilizados no manchan, no mojan y no corroen ninguna superficie.",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 1,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 2,
     "fields": {
-      "tipo": 2,
+      "nombre": "Control de plagas urbanas",
+      "slug": "control-plagas-urbanas",
       "titulo_seo": "Control de plagas urbanas en Castelli y Chascomús",
       "resumen": "Excluir, ahuyentar y erradicar insectos voladores y rastreros, artrópodos, mamíferos y aves, con productos regulados y aprobados por ANMAT y SENASA.",
       "problema": "Las plagas y vectores son reservorio de enfermedades transmisibles al ser humano. El objetivo es el equilibrio ambiental y evitar incidentes sanitarios y zoonóticos.",
-      "adicional": "También realizamos servicio particular o planificado de control de plagas portuario, agrícola, industrial y de espacios verdes.",
       "metodos": [
         {
           "titulo": "Productos regulados",
@@ -157,21 +71,22 @@
           "descripcion": "Hormigas, cucarachas, moscas, mosquitos, polillas, caracoles, bicho taladro, termitas, arañas, ácaros, pulgas, garrapatas, piojillo, aves, murciélagos, roedores, alacranes y otras."
         }
       ],
+      "adicional": "También realizamos servicio particular o planificado de control de plagas portuario, agrícola, industrial y de espacios verdes.",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 2,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 3,
     "fields": {
-      "tipo": 3,
+      "nombre": "Servicio MIPU (Manejo Integral de Plagas Urbanas)",
+      "slug": "servicio-mipu",
       "titulo_seo": "Servicio MIPU: manejo integral de plagas urbanas",
       "resumen": "Programa de monitoreo, detección, exclusión y prevención de plagas, recomendado para gastronómicos y sectores de manipulación de alimentos.",
       "problema": "Un mejor control de patógenos evita enfermedades de empleados y clientes, evita contaminaciones y pérdidas de productos, y protege la imagen comercial.",
-      "adicional": "",
       "metodos": [
         {
           "titulo": "Análisis y mapeo",
@@ -186,23 +101,24 @@
           "descripcion": "Se presenta un plan de trabajo específico según demanda, lugar y necesidad del cliente."
         }
       ],
+      "adicional": "",
       "faq": [],
       "sectores": [
         "gastronomicos-y-comercios"
       ],
-      "imagen_portada": "",
+      "orden": 3,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 4,
     "fields": {
-      "tipo": 4,
+      "nombre": "Mosquitos vectores — erradicación y prevención",
+      "slug": "mosquitos-vectores",
       "titulo_seo": "Control de mosquitos vectores: erradicación y prevención",
       "resumen": "Erradicación de mosquitos, huevos y larvas para prevenir picaduras y enfermedades como Dengue, Zika y Chikungunya.",
       "problema": "Los mosquitos vectores transmiten enfermedades como Dengue, Zika y Chikungunya.",
-      "adicional": "Incluye acondicionamiento de espacios verdes destinados a eventos y actividades.",
       "metodos": [
         {
           "titulo": "Erradicación",
@@ -213,21 +129,22 @@
           "descripcion": "Acciones para prevenir las picaduras y las enfermedades que transmiten."
         }
       ],
+      "adicional": "Incluye acondicionamiento de espacios verdes destinados a eventos y actividades.",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 4,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 5,
     "fields": {
-      "tipo": 5,
+      "nombre": "Control de murciélagos",
+      "slug": "control-murcielagos",
       "titulo_seo": "Control de murciélagos",
       "resumen": "Trabajo integral: exclusión del murciélago, limpieza de guano, reacondicionamiento de estructuras dañadas, revisión de espacios, sellamientos y desinfección de superficies afectadas.",
       "problema": "El murciélago es un riesgo sanitario y zoonótico: es transmisor de rabia.",
-      "adicional": "",
       "metodos": [
         {
           "titulo": "Exclusión",
@@ -242,21 +159,22 @@
           "descripcion": "Cámaras infrarrojas y detectores de calor para espacios reducidos, cerrados u oscuros."
         }
       ],
+      "adicional": "",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 5,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 6,
     "fields": {
-      "tipo": 6,
+      "nombre": "Exclusión de palomas y otras aves",
+      "slug": "exclusion-palomas-aves",
       "titulo_seo": "Exclusión de palomas y otras aves",
       "resumen": "Pinches plásticos o metálicos, redes, sistemas ecológicos de ahuyentamiento y exclusión por alergénico.",
       "problema": "Las palomas generan suciedad, hongos y daños estructurales; transmiten criptococosis, salmonelosis, alveolitis alérgica, histoplasmosis y psitacosis.",
-      "adicional": "",
       "metodos": [
         {
           "titulo": "Pinches",
@@ -271,21 +189,22 @@
           "descripcion": "Sistemas ecológicos de ahuyentamiento y exclusión por alergénico."
         }
       ],
+      "adicional": "",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 6,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 7,
     "fields": {
-      "tipo": 7,
+      "nombre": "Limpieza y desinfección de tanques de agua y cisternas",
+      "slug": "limpieza-tanques-cisternas",
       "titulo_seo": "Limpieza y desinfección de tanques de agua y cisternas",
       "resumen": "Eliminación de hongos, virus, bacterias, algas, insectos y suciedad en tanques portátiles, domésticos, institucionales e industriales.",
       "problema": "Los tanques de agua y las cisternas acumulan hongos, virus, bacterias, algas, insectos y suciedad.",
-      "adicional": "Importante: análisis químico de potabilidad y dureza antes y después del trabajo (opcional, a solicitud).",
       "metodos": [
         {
           "titulo": "Tanques portátiles, domésticos, institucionales e industriales",
@@ -296,21 +215,22 @@
           "descripcion": "Análisis químico de potabilidad y dureza antes y después del trabajo, opcional y a solicitud."
         }
       ],
+      "adicional": "Importante: análisis químico de potabilidad y dureza antes y después del trabajo (opcional, a solicitud).",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 7,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 8,
     "fields": {
-      "tipo": 8,
+      "nombre": "Manejo integral de plagas en edificios / departamentos",
+      "slug": "manejo-plagas-edificios",
       "titulo_seo": "Manejo integral de plagas en edificios y departamentos",
       "resumen": "Control mensual sanitario específico para cada espacio, con productos de gran calidad residual y baja toxicidad.",
       "problema": "Los edificios tienen espacios donde las plagas se alojan: ventilaciones, pozos de ascensores, sótanos, salas recreativas, calefacciones, cuartos de máquinas, cocheras y pasillos.",
-      "adicional": "",
       "metodos": [
         {
           "titulo": "Edificios y torres",
@@ -325,23 +245,24 @@
           "descripcion": "Trabajo integral en todo el edificio: depósitos, sectores de desechos, salas de máquinas, pasillos, pozos de ascensores, patios internos y sótanos. Incluye capacitación en seguridad e higiene para empleados y material informativo de correcta manipulación de alimentos para propietarios e inquilinos."
         }
       ],
+      "adicional": "",
       "faq": [],
       "sectores": [
         "torres-edificios-condominios"
       ],
-      "imagen_portada": "",
+      "orden": 8,
       "publicado": true
     }
   },
   {
-    "model": "web.paginaservicio",
+    "model": "web.servicio",
     "pk": 9,
     "fields": {
-      "tipo": 9,
+      "nombre": "Mantenimiento edilicio",
+      "slug": "mantenimiento-edilicio",
       "titulo_seo": "Mantenimiento edilicio",
       "resumen": "Recuperamos y mantenemos en condiciones espacios y sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.",
       "problema": "Los espacios y sectores se dañan o deterioran por uso, paso del tiempo y plagas.",
-      "adicional": "MAControl S.A. cuenta con un equipo de profesionales calificados en el área de mantenimiento edilicio.",
       "metodos": [
         {
           "titulo": "Recuperación",
@@ -352,9 +273,10 @@
           "descripcion": "Mantenimiento en condiciones, con valor agregado para clientes y sus inmuebles."
         }
       ],
+      "adicional": "MAControl S.A. cuenta con un equipo de profesionales calificados en el área de mantenimiento edilicio.",
       "faq": [],
       "sectores": [],
-      "imagen_portada": "",
+      "orden": 9,
       "publicado": true
     }
   },

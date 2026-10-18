@@ -5,9 +5,9 @@ from django.test import TestCase
 
 
 class AdminSiteTests(TestCase):
-    def test_administrador_sin_superuser_no_entra_al_admin(self):
+    def test_staff_sin_superuser_no_entra_al_admin(self):
         usuario = get_user_model().objects.create_user(
-            "jefe", password="clave-larga-123", rol="administrador", is_staff=True
+            "jefe", password="clave-larga-123", is_staff=True
         )
         self.client.force_login(usuario)
         r = self.client.get("/admin/")

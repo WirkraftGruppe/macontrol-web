@@ -24,15 +24,9 @@ class AjustesIngresoTests(SimpleTestCase):
         with mock.patch.dict(os.environ, {"NUM_PROXIES": "2"}):
             self.assertEqual(base.leer_num_proxies(), 2)
 
-    def test_drf_usa_el_mismo_num_proxies(self):
-        self.assertEqual(settings.REST_FRAMEWORK["NUM_PROXIES"], settings.NUM_PROXIES)
-
     def test_cupos_de_ingreso_definidos(self):
         self.assertEqual(settings.INTENTOS_FALLIDOS_POR_IP, 20)
         self.assertEqual(settings.VENTANA_MINUTOS, 15)
         self.assertEqual(settings.FALLOS_POR_USUARIO_E_IP, 5)
         self.assertEqual(settings.FALLOS_POR_USUARIO, 50)
         self.assertEqual(settings.VENTANA_USUARIO_MINUTOS, 60)
-        self.assertEqual(
-            settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]["token"], "10/min"
-        )
