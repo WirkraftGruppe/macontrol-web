@@ -1,6 +1,5 @@
 """Settings compartidos por todos los entornos. Las variables salen del entorno."""
 
-from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -28,68 +27,12 @@ def leer_num_proxies():
 # Proxies inversos de confianza delante de Django; define la IP real del cliente.
 NUM_PROXIES = leer_num_proxies()
 
-# Cupos del login del panel y del admin: solo cuentan los intentos fallidos.
+# Cupos del login del admin: solo cuentan los intentos fallidos.
 INTENTOS_FALLIDOS_POR_IP = 20  # fallos por IP dentro de la ventana
 VENTANA_MINUTOS = 15  # ventana de los cupos por IP y por (usuario, IP)
 FALLOS_POR_USUARIO_E_IP = 5  # fallos por par (usuario, IP) dentro de la ventana
 FALLOS_POR_USUARIO = 50  # fallos globales por usuario, desde cualquier IP
 VENTANA_USUARIO_MINUTOS = 60  # ventana del cupo global por usuario
-
-
-def leer_atraso_maximo_horas():
-    """Atraso máximo de `realizada_en` en una visita desde la app, en horas.
-
-    Entero entre 1 y 8760 (un año); default 168 (una semana). El tope evita que un
-    valor enorme desborde la fecha al validar y dé 500 recién en el primer uso.
-    """
-    crudo = env("ATRASO_MAXIMO_HORAS", default="168")
-    try:
-        valor = int(crudo)
-    except ValueError:
-        valor = 0
-    if not 1 <= valor <= 8760:
-        raise ImproperlyConfigured(
-            "ATRASO_MAXIMO_HORAS debe ser un entero entre 1 y 8760."
-        )
-    return valor
-
-
-# Una visita desde la app con `realizada_en` más atrasada da 400: la carga el
-# administrador como manual (P-api-movil-16).
-ATRASO_MAXIMO_HORAS = leer_atraso_maximo_horas()
-
-# Una visita abierta desde hace más horas la cierra `cerrar_visitas_abiertas` con
-# cierre "sistema" (plan puntos-control).
-VISITA_ABIERTA_MAXIMO_HORAS = 16
-
-
-def leer_distancia_maxima_m():
-    """Metros entre un escaneo y el punto a partir de los cuales hay incidencia.
-
-    Entero entre 50 y 5000; default 300. Por debajo de 50 el error del GPS de un
-    teléfono marcaría incidencias falsas; por encima de 5000 la verificación deja de
-    decir algo.
-    """
-    crudo = env("DISTANCIA_MAXIMA_M", default="300")
-    try:
-        valor = int(crudo)
-    except ValueError:
-        valor = 0
-    if not 50 <= valor <= 5000:
-        raise ImproperlyConfigured(
-            "DISTANCIA_MAXIMA_M debe ser un entero entre 50 y 5000."
-        )
-    return valor
-
-
-# Una revisión o una apertura a más metros del punto (o del sitio, si el punto no
-# tiene coordenadas) marca `incidencia_ubicacion`; nunca se rechaza
-# (plan cierre-puntos).
-DISTANCIA_MAXIMA_M = leer_distancia_maxima_m()
-
-# Precisión del GPS, en metros, a partir de la cual una lectura ya no fija ni propone
-# coordenadas de un sitio o de un punto (plan cierre-puntos).
-PRECISION_MAXIMA_M = 50
 
 
 INSTALLED_APPS = [
@@ -99,22 +42,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "rest_framework",
-    "rest_framework_simplejwt.token_blacklist",
-    "drf_spectacular",
-    "drf_spectacular_sidecar",
     "csp",
-    "simple_history",
-    "apps.accounts",
-    "apps.clientes",
-    "apps.sitios",
     "apps.servicios",
-    "apps.proyectos",
-    "apps.visitas",
-    "apps.productos",
-    "apps.informes",
-    "apps.panel",
-    "apps.api",
     "apps.web",
 ]
 
@@ -127,7 +56,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
-    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -149,8 +77,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-
-AUTH_USER_MODEL = "accounts.User"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -179,73 +105,26 @@ MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LOGIN_URL = "/panel/ingresar/"
-LOGIN_REDIRECT_URL = "/panel/"
+LOGIN_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = "/admin/"
 
 # Origen público del sitio; arma el contenido de los QR (`SITE_URL` + `/q/<uuid>/`).
 # Un `SITE_URL=` vacío (como en `.env.example`) también cae al valor por defecto: un QR
 # con ruta relativa no lo abre ningún teléfono.
 SITE_URL = env("SITE_URL", default="") or "https://macontrol.com.ar"
 SITE_URL = SITE_URL.rstrip("/")
-LOGOUT_REDIRECT_URL = "/panel/ingresar/"
+LOGOUT_REDIRECT_URL = "/admin/login/"
 
-# Explícito aunque coincide con el valor por defecto de Django: la vista de Swagger
-# (`?script` de drf-spectacular) incrusta el token CSRF y depende de esta política.
+# Explícito aunque coincide con el valor por defecto de Django: la cookie de sesión
+# no viaja en las peticiones POST entre sitios.
 SESSION_COOKIE_SAMESITE = "Lax"
 
-# Las teselas de OpenStreetMap exigen la cabecera Referer: con `same-origin` (el valor
-# por defecto de Django) OSM responde 403. Hacia otros orígenes solo viaja el origen.
+# Hacia otros orígenes solo viaja el origen; con `same-origin` (el valor por defecto
+# de Django) no viajaría ni eso.
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
-# Un POST de visita lleva como máximo MAX_FOTOS (10) archivos; 12 deja margen.
+# Tope de archivos por petición (los formularios del admin suben pocos).
 DATA_UPLOAD_MAX_NUMBER_FILES = 12
-
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication"
-    ],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_PAGINATION_CLASS": "apps.api.paginacion.PaginacionEstandar",
-    "PAGE_SIZE": 20,
-    "EXCEPTION_HANDLER": "apps.api.excepciones.manejar_excepcion",
-    "DEFAULT_THROTTLE_RATES": {
-        "token": "10/min",
-        "qr": "30/min",
-        "crear_visita": "120/hour",
-        # Altas de campo (sitio, punto, ubicación): no agotan crear_visita.
-        "alta_campo": "300/hour",
-    },
-    "NUM_PROXIES": NUM_PROXIES,
-}
-
-# `SpectacularSwaggerSplitView` con `?script` incrusta el token CSRF en JS; no es
-# explotable mientras `SESSION_COOKIE_SAMESITE` siga en "Lax" (ver arriba).
-SPECTACULAR_SETTINGS = {
-    "TITLE": "API de MAControl",
-    "DESCRIPTION": "API de la app móvil de los empleados de MAControl S.A.",
-    "VERSION": "1.0.0",
-    "SERVE_INCLUDE_SCHEMA": False,
-    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
-    "SERVE_AUTHENTICATION": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
-    ],
-    "COMPONENT_SPLIT_REQUEST": True,
-    "SWAGGER_UI_DIST": "SIDECAR",
-    "SWAGGER_UI_FAVICON_HREF": "SIDECAR",
-}
-
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
-    "UPDATE_LAST_LOGIN": False,
-    "ALGORITHM": "HS256",
-    "CHECK_REVOKE_TOKEN": True,
-}
 
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {

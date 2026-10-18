@@ -51,7 +51,7 @@ class RegistroTests(SimpleTestCase):
         usuario = get_user_model()(pk=7, username="x")
         r = _record("usuario %s", (usuario,))
         FiltroDatosPersonales().filter(r)
-        self.assertEqual(r.getMessage(), "usuario <accounts.User pk=7>")
+        self.assertEqual(r.getMessage(), "usuario <auth.User pk=7>")
 
     def test_handler_de_consola_usa_el_filtro(self):
         config = settings.LOGGING
@@ -162,7 +162,7 @@ class FiltroAuditoriaTests(SimpleTestCase):
     def test_modelo_dentro_de_lista(self):
         usuario = get_user_model()(pk=3)
         r = _filtrar("%s", ([usuario],))
-        self.assertEqual(r.getMessage(), "['<accounts.User pk=3>']")
+        self.assertEqual(r.getMessage(), "['<auth.User pk=3>']")
 
     def test_extra_con_estructuras_anidadas(self):
         r = _filtrar("m", datos=[{"token": "S15"}], access="x")
@@ -181,7 +181,7 @@ class FiltroAuditoriaTests(SimpleTestCase):
         r = _filtrar({"cuit": "S1"})
         self.assertEqual(r.getMessage(), "{'cuit': '[oculto]'}")
         usuario = get_user_model()(pk=9)
-        self.assertEqual(_filtrar(usuario).getMessage(), "<accounts.User pk=9>")
+        self.assertEqual(_filtrar(usuario).getMessage(), "<auth.User pk=9>")
 
     def test_loggers_de_django_usan_solo_el_handler_filtrado(self):
         for nombre in ("django", "django.server"):

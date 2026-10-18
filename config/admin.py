@@ -10,7 +10,7 @@ from django.utils.decorators import method_decorator
 from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 
-from apps.accounts.limites import LimiteIngresoMixin
+from config.limites import LimiteIngresoMixin
 
 
 class LoginAdministracion(LimiteIngresoMixin, LoginView):

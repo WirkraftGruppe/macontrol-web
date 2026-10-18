@@ -1,16 +1,16 @@
 import re
 
-from django.shortcuts import render
+from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import path
 
 
-def _pagina_con_base(request):
-    return render(request, "base.html")
+def _pagina_con_estilo(request):
+    return HttpResponse(f'<style nonce="{request.csp_nonce}"></style>')
 
 
-# La home actual es texto fijo sin plantilla; esta ruta de prueba renderiza base.html.
-urlpatterns = [path("base/", _pagina_con_base)]
+# Ruta de prueba: ninguna página pública lleva <style> en línea; esta sí, con el nonce.
+urlpatterns = [path("base/", _pagina_con_estilo)]
 
 
 class CspTests(TestCase):
@@ -22,8 +22,8 @@ class CspTests(TestCase):
         self.assertNotIn("unsafe-inline", csp)
 
     @override_settings(ROOT_URLCONF=__name__)
-    def test_style_de_base_lleva_el_nonce_de_la_cabecera(self):
-        """El nonce de la cabecera coincide con el del <style> de base.html."""
+    def test_style_lleva_el_nonce_de_la_cabecera(self):
+        """El nonce de la cabecera coincide con el del <style> de la página."""
         respuesta = self.client.get("/base/")
         csp = respuesta["Content-Security-Policy"]
         en_cabecera = re.search(r"'nonce-([^']+)'", csp)
