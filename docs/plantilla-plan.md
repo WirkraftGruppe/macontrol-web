@@ -38,8 +38,8 @@ de cierre global cuando todas están `hecha`. Por eso el estado vive en la tabla
   hash se anota en `## Registro de verificación`.
 - **objetivo**: <una oración: qué cambia para el usuario final cuando esto está hecho>
 - **fuera de alcance**: <qué NO se toca, explícito>
-- **áreas**: web | panel | api | dominio (modelos y servicios) | infraestructura
-- **seguridad**: sí/no — <si sí: qué toca (auth, roles, get_queryset de la API, fotos, QR, geolocalización, certificados, settings de producción, datos personales) y por lo tanto corre también `auditor-seguridad`>
+- **áreas**: web | admin | infraestructura
+- **seguridad**: sí/no — <si sí: qué toca (autenticación del admin, subida o servido de imágenes, settings de producción, cabeceras, datos de la empresa) y por lo tanto corre también `auditor-seguridad`>
 
 ## Contexto mínimo
 
@@ -49,14 +49,14 @@ que aplica. Sin narrativa.>
 
 ## Olas
 
-<!-- Las olas siguen el grafo de FK entre apps (CLAUDE.md § 5, "Olas"). Dentro de una ola todas las
+<!-- Las olas siguen la dependencia entre subtareas (CLAUDE.md § 5, "Olas"); `apps/web` es la única app con migraciones. Dentro de una ola todas las
 subtareas corren en paralelo, cada una en su worktree; la ola siguiente ramifica desde la integración
 de la anterior (subtarea `Integración (principal)`). Si el plan no necesita paralelismo, una sola ola. -->
 
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
-| 1 | T1, T2, T3 (integración) | <apps sin FK entre sí> |
-| 2 | T4, T5 (integración) | <apps que dependen de la ola 1> |
+| 1 | T1, T2, T3 (integración) | <ninguna, o web si T1 o T2 crea la migración> |
+| 2 | T4, T5 (integración) | <web, solo si ninguna subtarea de la ola 1 creó migraciones en ella> |
 
 ## Subtareas
 
@@ -73,7 +73,7 @@ Reglas para escribir criterios (las hace cumplir el verificador, no el implement
 - Toda subtarea que corrige un defecto lleva un [test] que reproduzca el defecto.
 - Un [test] tiene que ser NUEVO respecto de commit_base.
 - Prohibido: "funciona", "tests pasando", "revisado", "sin regresiones", "quedó implementado".
-- Dos subtareas no escriben el mismo archivo ni crean migraciones en la misma app en paralelo.
+- Dos subtareas no escriben el mismo archivo ni crean migraciones en `apps/web` en paralelo.
 - Presupuesto: `presupuesto.sh . '<commit_base>' <N> --subtarea T<n>` mide los commits `T<n>:`
   (sin merges; también suma `T<n>b:`, por eso ese sufijo no se usa: si el trabajo no entra,
   lo que falta va en una subtarea nueva `T<m>` con presupuesto y criterios propios, como
@@ -90,22 +90,22 @@ la tabla de estado la marca `hecha`, y tiene fila en `### Estado de subtareas` y
 Presupuesto de la integración: si solo hace merges y commits `registro:`, `--subtarea T<n>` mediría 0
 y pasaría siempre; entonces el presupuesto es "no aplica", salvo que el principal haga commits
 `T<n>:` de ajuste, y en ese caso lleva `--subtarea T<n>`. -->
-### T1 — <título imperativo, p. ej. "Crear el modelo Sitio con qr_codigo único">
+### T1 — <título imperativo, p. ej. "Agregar el campo orden a Servicio">
 
 - **Ola**: <n>
 - **Depende de**: — | T<n>
-- **Puede tocar**: `apps/sitios/models.py`, `apps/sitios/migrations/0001_initial.py`, `apps/sitios/tests/test_models.py`
-- **No puede tocar**: `docs/planes/`, `config/settings/`, migraciones existentes de otras apps
+- **Puede tocar**: `apps/web/models.py`, `apps/web/migrations/0001_initial.py`, `apps/web/tests/test_models.py`
+- **No puede tocar**: `docs/planes/`, `config/settings/`, `templates/web/base_web.html`
 - **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Models
 - **Worktree**: sí (por defecto; `no` solo si es pasivo o un único archivo de documentación)
 - **Ruta**: inline | delegada · Evidencia: … · Commit: …
 - **Presupuesto**: <N> líneas agregadas (por defecto 400)
 - **Qué hacer**: <2 a 5 líneas concretas. Qué modelo, qué campo, qué comportamiento.>
 - **Criterios**:
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.SitioTests.test_qr_codigo_se_genera_al_crear --keepdb`
-  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios.tests.test_models.SitioTests.test_qr_codigo_es_unico --keepdb`
-  - `[grep-1]` `grep -n "qr_codigo = models.UUIDField" apps/sitios/models.py`
-  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.sitios --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_models.ServicioTests.test_orden_por_defecto_es_cero --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_models.ServicioTests.test_slug_es_unico --keepdb`
+  - `[grep-1]` `grep -n "orden = models" apps/web/models.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T1`
 
@@ -129,7 +129,7 @@ y pasaría siempre; entonces el presupuesto es "no aplica", salvo que el princip
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
   2. Desde la raíz (no desde dentro del worktree: exit 3), `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
-  3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
+  3. Migrar (`makemigrations --check --dry-run`) y ajustar imports si hace falta.
   4. Crear los worktrees de la ola siguiente con `bash .claude/hooks/worktree-crear.sh <slug> T4 plan/<slug>`.
 - **Presupuesto**: no aplica (solo merges y commits `registro:`); si el principal hace commits `T3:` de ajuste, `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T3`
 - **Criterios**:
@@ -156,7 +156,7 @@ y pasaría siempre; entonces el presupuesto es "no aplica", salvo que el princip
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . <rama_base>` de cada subtarea, no los informes.
   2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` por cada subtarea de la ola.
-  3. Cablear `apps/api/urls.py` y `apps/panel/urls.py`, migrar y ajustar imports si hace falta.
+  3. Migrar (`makemigrations --check --dry-run`) y ajustar imports si hace falta.
   4. Con todo integrado, el cierre global y la verificación `TODO`.
 - **Presupuesto**: no aplica (solo merges y commits `registro:`); si el principal hace commits `T5:` de ajuste, `bash .claude/hooks/presupuesto.sh . '<commit_base>' <N> --subtarea T5`
 - **Criterios**:

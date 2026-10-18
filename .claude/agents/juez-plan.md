@@ -79,10 +79,9 @@ fallar?, ¿falla si la subtarea no se hace? Patrones concretos:
   ejecutándolo.
 - **Migraciones en paralelo**: dos subtareas sin dependencia que crean migraciones en la
   misma app producen un conflicto de grafo; es hallazgo (b) y (c).
-- **Olas que rompen el grafo de FK**: las olas del plan respetan el grafo de FK de
-  `convenciones-proyecto` (accounts, clientes, servicios, productos → sitios → proyectos →
-  visitas → informes). Una subtarea que depende de migraciones de una app de una ola igual o
-  posterior es hallazgo (b).
+- **Olas que rompen la dependencia**: `apps/web` es la única app con migraciones. Una
+  subtarea que usa un modelo, una migración o un archivo que crea otra subtarea de una ola
+  igual o posterior es hallazgo (b).
 - **Presupuesto que mide archivos de otra subtarea**: un `[cmd]` de presupuesto usa
   `--subtarea T<n>` o rutas que no se solapan con las de otra subtarea; si no, cuenta
   líneas ajenas y falla o pasa por error.
@@ -117,11 +116,12 @@ dueño es hallazgo bloqueante, aunque ninguna otra subtarea lo toque.
 
 ### (d) Alcance sensible sin `seguridad: sí`
 
-Si alguna subtarea toca autenticación (JWT, login, sesiones), `apps/accounts/`, roles y
-permisos, `get_queryset` de la API, subida o servido de fotos, generación o resolución
-de QR (`/q/`, `qr_codigo`), geolocalización, certificados PDF, settings de producción o
-despliegue, o datos personales (empleados, clientes, coordenadas), y el encabezado dice
-`seguridad: no` (o no lo dice), es hallazgo. Citas la subtarea y el archivo sensible.
+Si alguna subtarea toca la autenticación del admin (login, sesiones, límite de intentos,
+`config/admin.py`, `config/limites.py`, `config/red.py`), la subida o el servido de
+imágenes (`apps/web/imagenes.py`, `apps/web/forms.py`, `media/`), la resolución de QR
+(`/q/`), las cabeceras de seguridad (CSP, Referrer-Policy), settings de producción o
+despliegue, o datos de la empresa, y el encabezado dice `seguridad: no` (o no lo dice),
+es hallazgo. Citas la subtarea y el archivo sensible.
 
 ## Formato del informe
 
