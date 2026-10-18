@@ -1,17 +1,26 @@
 # Bitácora del sitio público de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-17-web-independiente.md
+Plan activo: docs/planes/2026-10-18-puesta-en-produccion.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| web-independiente | plan/web-independiente | 3 (cerrada, TODO en PASA) | el usuario decide el merge a `main` | sesión 2026-10-18 cerrada |
+| web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
+| puesta-en-produccion | plan/puesta-en-produccion | 1 (sin empezar) | ejecutar T1, T2 y T3 en paralelo (otra sesión) | plan commiteado a5d491f, commit_base a5d491f |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-18 — Fusión de `web-independiente` en `main` y plan `puesta-en-produccion`
+Hecho:
+- `plan/web-independiente` fusionada en `main` local (f1cdc1b), con la suite en verde (98 tests). `origin/main` traía la fusión de `demo-portatil`; sus agregados a la bitácora y las decisiones fueron a `docs/historico/`. Sin push.
+- `origin` es compartido con el repo detach (ramas `separacion-web-*`): no se hace push de `main` desde acá. El plan nuevo renombra ese remoto a `detach` y usa un repositorio nuevo de GitHub.
+- Plan Completo `puesta-en-produccion` (commit a5d491f) en tres olas: imágenes y media (T1), login del admin y tope de cuerpo (T2), logo y hero (T3), settings de producción (T5) y despliegue real en Railway (T7) con dominio `*.up.railway.app` y volumen. juez-plan: 7 bloqueantes corregidos; excepción de propiedad de T5 aprobada por el usuario.
+- Decisiones del usuario: los datos de la empresa y las imágenes llegan más adelante; no se usan logos de clientes (el campo queda); el logo oficial es `static/img/logo.png`.
+Pendiente: ejecutar el plan en otra sesión desde `plan/puesta-en-produccion`; en T7 el usuario crea el repositorio en GitHub y autoriza cada acción externa.
 
 ### 2026-10-18 — Plan `web-independiente`: el repositorio queda solo con el sitio público
 Hecho:

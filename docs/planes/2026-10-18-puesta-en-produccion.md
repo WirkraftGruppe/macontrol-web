@@ -335,7 +335,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 <!-- Corte del congelado: desde este encabezado hacia abajo, el principal lo actualiza durante la
 ejecución. Lo de arriba no se toca sin un commit `docs(plan): puesta-en-produccion — modificado: <motivo>`. -->
 
-commit_base: <hash del commit docs(plan): puesta-en-produccion>
+commit_base: a5d491f
 
 ### Estado de subtareas
 
