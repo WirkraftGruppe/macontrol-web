@@ -311,10 +311,10 @@ commit_base: da3eef5
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | en curso |
+| T4 | en curso |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -323,6 +323,10 @@ commit_base: da3eef5
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-18 | T1 | eb66d12 | PASA (21/21) | verificador |
+| 2026-10-18 | T1 | eb66d12 | PASA (20/20) | verificador-b; sin --keepdb también 92 OK |
+| 2026-10-18 | T1 | eb66d12 | sin bloqueantes | auditor-seguridad: 2 menores (comentario SITE_URL/QR, despliegue.md), 2 observaciones (EXIF hasta T6, base nueva) |
+| 2026-10-18 | T2 | (integración) | PASA (1/1) | principal; worktree-integrar.sh exit 0, 92 tests OK |
 
 ## Pendientes que deja este plan
 
