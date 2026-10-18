@@ -316,8 +316,8 @@ commit_base: da3eef5
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | en curso |
-| T7 | pendiente |
+| T6 | hecha |
+| T7 | en curso |
 
 ### Corridas
 
@@ -333,11 +333,38 @@ commit_base: da3eef5
 | 2026-10-18 | T4 | 2c5dda5 | PASA (8/8) | verificador |
 | 2026-10-18 | T4 | 2c5dda5 | PASA (8/8) | verificador-b; docs ubica 404/500 en templates/web/ (están en apps/web/templates/); vista previa llega en T6 |
 | 2026-10-18 | T5 | (integración) | PASA (7/7) | principal; worktree-integrar T3 y T4 exit 0 (91 tests); 30 planes a historico/ |
+| 2026-10-18 | T6 | 4b867b6 | PASA (11/11) | verificador |
+| 2026-10-18 | T6 | 4b867b6 | PASA (11/11) | verificador-b |
+| 2026-10-18 | T6 | 4b867b6 | sin bloqueantes | auditor-seguridad: 1 menor (imagen reemplazada no se borra), 3 observaciones |
 
 ## Pendientes que deja este plan
 
 ### Problemas
 
+- P-web-independiente-1 [importante] `media/` no se sirve en producción (`prod.py` con `FileSystemStorage` y sin ruta `/media/`): las fotos de servicio y los logos de clientes subidos desde el admin dan 404 y, en Railway sin volumen, se pierden en cada despliegue. Falta volumen o almacenamiento de objetos y una ruta o proxy acotados a `media/` (de P-sitio-publico-1, P-demo-cliente-1, P-demo-cliente-8).
+- P-web-independiente-2 [importante] `NUM_PROXIES` tiene default 0 también en producción y la caché es LocMem por proceso: detrás del proxy del hosting todos comparten `REMOTE_ADDR` y 20 fallos anónimos bloquean el login del admin a todos; con N workers los cupos se multiplican. Hacer obligatoria la variable en `prod.py` y configurar `CACHES` compartida (de P-limites-ingreso-3, P-pendientes-heredados-21, P-demo-cliente-5).
+- P-web-independiente-3 [importante] Barrera de `config/settings/dev.py`: aborta solo con `RAILWAY_ENVIRONMENT`; si el hosting inyecta otras variables, un servicio con `DJANGO_ENV=development` arranca con `DEBUG=True` y expone la página técnica (de P-pendientes-heredados-15, P-demo-cliente-4).
+- P-web-independiente-4 [menor] Límites del login del admin (`config/limites.py`): IPv4 mapeadas en IPv6 caen todas en el balde `::/64`; los baldes no son atómicos (`get`→`set`); las claves de caché usan SHA-256 sin sal (`salted_hmac`); `leer_num_proxies` acepta `"1_0"` y dígitos no ASCII (de P-limites-ingreso-2, -5, -6, -8).
+- P-web-independiente-5 [menor] Sin tope de bytes por pedido: el login del admin y los formularios del admin parsean multipart antes del rechazo, y `reprocesar_imagen` decodifica la imagen completa antes de cualquier tope de bytes (solo `MAX_IMAGE_PIXELS`). Tope en el proxy o middleware previo a CSRF, y `archivo.size` antes de abrir (de P-contrato-app-6, P-panel-23, P-sitio-publico-14; auditor-seguridad T6).
+- P-web-independiente-6 [menor] `CSRF_TRUSTED_ORIGINS` en `prod.py` acepta comodines y `http://`; `prod.py` no valida que `SITE_URL` empiece con `https://` (de P-demo-cliente-6, P-panel-8).
+- P-web-independiente-7 [menor] El admin no borra del storage la imagen reemplazada, quitada o la de un objeto borrado: `ReprocesaImagenesMixin.save` borra solo con `commit=True` y el admin guarda con `commit=False` (`apps/web/forms.py:34-41`); la URL vieja sigue sirviendo el archivo. Mover el borrado a `save_model`/`delete_model` con `transaction.on_commit`, con test (auditor-seguridad T6).
+- P-web-independiente-8 [menor] `Configuracion.obtener()` crea la fila pk=1 en un GET público si falta (de P-sitio-publico-8).
+- P-web-independiente-9 [menor] Lighthouse móvil: LCP 3,2 s por la foto del hero y `web.css` bloqueante; `static/img/logo.png` mide 1080×1080 y se muestra a 44 px (de P-sitio-publico-15); `/static/` sin caché larga bajo `runserver` (P-sitio-publico-16).
+- P-web-independiente-10 [menor] `herramientas/humo_web.py` no fija `DJANGO_SETTINGS_MODULE`: con un `config.settings.prod` exportado en el shell, el humo da 301 a https (auditor-seguridad T3, M1).
+- P-web-independiente-11 [menor] Falta un test de regresión de `Servicio.foto` (validadores y `upload_to` con uuid), análogo al del logo (auditor-seguridad T3, M2); y tests de pk inexistente en la vista previa, GIF renombrado, red `http://` o con credenciales y `X-Robots-Tag` (auditor-seguridad T6).
+- P-web-independiente-12 [menor] La vista previa del admin (`apps/web/admin.py`) repite el armado de contexto de la vista pública `servicio` usando funciones privadas de `views.py`; extraer una función compartida `contexto_servicio` (implementador T6).
+- P-web-independiente-13 [menor] Comentario desactualizado en `config/settings/base.py` sobre `SITE_URL` como origen de los QR; hoy arma canonical, Open Graph y sitemap (auditor-seguridad T1).
+- P-web-independiente-14 [menor] Filtro de logging `config/registro.py`: oculta claves inocuas con las subcadenas, no cubre `teléfono` con tilde, `cookie`, `session`, ni mensajes ya formateados (de P-pendientes-heredados-26).
+- P-web-independiente-15 [observación] Faltan datos de la empresa: si el 02241 49 6047 atiende WhatsApp, horario, handle real de Instagram, número de habilitación y nombre y matrícula del director técnico, autorización de uso de logos de clientes, fotos de estaciones cebaderas y sellado de techos; el logo "MAControl Group" es provisorio (de P-sitio-publico-4, P-pendientes-heredados-31, -33).
+- P-web-independiente-16 [observación] Portadas estáticas provisorias (`PORTADA_POR_SLUG`): murciélagos y tanques usan la del hero; los cuatro pasos de "Cómo trabajamos" muestran solo el título (de P-sitio-publico-10, -11).
+- P-web-independiente-17 [observación] La miniatura del admin usa un atributo `style` que la CSP (`style-src 'self' nonce`) bloquea: la imagen se ve en tamaño real. Resolver con `width`/`height` o CSS estático, nunca con `unsafe-inline` (auditor-seguridad T6).
+- P-web-independiente-18 [observación] `empresa.html` deja un `<li>` vacío si `habilitacion` o `ley` quedan en blanco (auditor-seguridad T3, O3).
+- P-web-independiente-19 [observación] `railway.json` usa `"builder": "RAILPACK"` y `restartPolicyType: ON_FAILURE` sin validar contra Railway; `docs/despliegue.md` debe confirmarse en el primer despliegue con base nueva (de P-demo-cliente-13).
+
 ### Decisiones
+
+- 2026-10-18 — Se creó `venv/` en la raíz con Python 3.13 y el `requirements.txt` del proyecto completo, porque la copia no lo traía — sin venv no corre ningún criterio; los paquetes de más quedan solo en el venv local — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-18 — Los hallazgos menores y observaciones de auditor-seguridad sobre T1, T3 y T6 no entran al ciclo de corrección y se re-declaran como pendientes — piso de severidad: solo los bloqueantes se corrigen en el plan — reemplaza a: (nada) — decidida por Claude, revisable
+- 2026-10-18 — T7 corrige en `docs/01` y `convenciones-proyecto` la ubicación de `404.html`/`500.html` (`apps/web/templates/`), señalada por verificador-b en T4 — corrección mecánica de una línea por archivo — reemplaza a: (nada) — decidida por Claude, revisable
 
 ### Cierra
