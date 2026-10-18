@@ -30,9 +30,9 @@ MENSAJE_BLOQUEO = (
 def normalizar_usuario(texto):
     """Normaliza un nombre de usuario: NFKC, sin espacios en los extremos, casefold.
 
-    Solo arma las claves de los límites: no toca la base ni el login. `auth.User`
-    guarda el nombre tal cual lo escribió quien lo creó; la autenticación sigue
-    comparando el nombre original, y las variantes de escritura comparten cupo.
+    Esta función solo arma las claves de los límites: no toca la base ni el login.
+    `auth.User` guarda el nombre tal cual lo escribió quien lo creó; la autenticación
+    sigue comparando el nombre original, y las variantes de escritura comparten cupo.
     """
     return unicodedata.normalize("NFKC", texto or "").strip().casefold()
 
