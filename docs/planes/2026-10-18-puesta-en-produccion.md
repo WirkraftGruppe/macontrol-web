@@ -341,10 +341,10 @@ commit_base: a5d491f
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -354,11 +354,26 @@ commit_base: a5d491f
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-10-18 | T3 (verificador, verificador-b) | 0bb8f78 | PASA 8/8 | — |
+| 2026-10-18 | T1 (verificador, verificador-b) | e53f14a | PASA 20/20 | auditor-seguridad: 0 bloqueantes (1 menor, 2 observaciones) |
+| 2026-10-18 | T2 (verificador, verificador-b) | ad7ec4d | PASA 12/12 | auditor-seguridad: 1 bloqueante (incr de DatabaseCache reinicia el vencimiento) → ronda 1 |
+| 2026-10-18 | T2 ronda 1 (verificador, verificador-b) | 4b7b2a9 | PASA 12/12 | reauditoría: bloqueante cerrado, sin bloqueantes nuevos |
+| 2026-10-18 | T4 (principal) | 21238a8 | PASA 3/3 | integraciones 795d81f (T1), 62046e9 (T3), 21238a8 (T2); 127 tests |
 
 ## Pendientes que deja este plan
 
 ### Problemas
 
+- P-puesta-en-produccion-1 [menor] Por el admin, `forms.ImageField.to_python` abre y verifica la imagen con todos los plugins de Pillow antes de que `reprocesar_imagen` controle tamaño y formato (`apps/web/forms.py`, `clean_foto`/`clean_logo`): el tope de P-5 se cumple en la función pero no en el flujo del admin. Usar un `FileField` propio vía `field_classes` y un test por POST al admin con `Image.open` simulado (auditor-seguridad T1).
+- P-puesta-en-produccion-2 [observación] `_borrar_al_confirmar` (`apps/web/admin.py`) borra en un único callback de `on_commit` no robusto: si un `storage.delete` falla (p. ej. `PermissionError` en el volumen), el admin ve un 500 con la base ya confirmada y el resto queda sin borrar. `robust=True` o `try/except OSError` por nombre con aviso en el registro (auditor-seguridad T1). `media_publica` sirve con `FileResponse`, sin `X-Accel-Redirect` (implementador T1).
+- P-puesta-en-produccion-3 [menor] `config/limites.py`: el docstring del módulo dice que `cache.add` + `cache.incr` es "atómico entre procesos", pero con `DatabaseCache` `incr` es get→set (más `touch`) y bajo concurrencia se pierden incrementos, acotado por la cantidad de workers; además `baldes_llenos` se consulta antes del hash de la contraseña. Corregir el docstring o pasar a una tabla propia con `F("cuenta") + 1` (auditor-seguridad T2).
+- P-puesta-en-produccion-4 [menor] El filtro de `config/registro.py` compara por segmento y dejó de ocultar plurales y compuestos que antes se ocultaban: `accesstoken`, `refreshtoken`, `userpassword`, `passwords`, `tokens`, `telefonos`, `contraseñas`, `HTTPCookie`, `cookies`, `emails`, `e-mail`. Fragmentos fuertes por subcadena y débiles por segmento con plural quitado (auditor-seguridad T2). Hoy no hay emisor propio que los registre.
+- P-puesta-en-produccion-5 [observación] Límites con ventana fija: ráfaga de hasta 2× el máximo en el borde, con la misma tasa sostenida; el docstring de `config/tests/test_limites.py` dice "ventana deslizante"; `test_incremento_con_databasecache_conserva_el_fin_de_ventana` solo acota el vencimiento por abajo (auditor-seguridad T2).
+- P-puesta-en-produccion-6 [observación] El docstring de `LoginAdministracion` (`config/admin.py`) menciona "el del panel", que ya no existe en este repositorio (auditor-seguridad T2).
+
 ### Decisiones
+
+- 2026-10-18 — `registrar_fallo` fija el vencimiento de cada contador al fin de su ventana (`cache.touch` después de `incr`), porque `DatabaseCache.incr` lo reinicia al TIMEOUT por defecto — bloqueante de auditor-seguridad en T2, decidida por Claude, revisable — reemplaza a: (nada)
+- 2026-10-18 — La caché `DatabaseCache` de producción lleva `OPTIONS["MAX_ENTRIES"]` alto (100 000) para que el cull no borre contadores activos del login — hallazgo importante de auditor-seguridad en T2, va como indicación a T5 sin cambiar criterios; decidida por Claude, revisable — reemplaza a: (nada)
 
 ### Cierra
