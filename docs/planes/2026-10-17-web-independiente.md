@@ -305,13 +305,13 @@ Inventario de solo lectura de lo que usa `apps/web` hoy (1e049a3):
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): web-independiente>
+commit_base: da3eef5
 
 ### Estado de subtareas
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
+| T1 | en curso |
 | T2 | pendiente |
 | T3 | pendiente |
 | T4 | pendiente |
