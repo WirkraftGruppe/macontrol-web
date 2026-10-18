@@ -17,6 +17,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 RUTAS = ["/", "/servicio/control-plagas-urbanas/"]
 ESPERA_MAXIMA = 60
+_NO_HEREDADAS = ("NUM_PROXIES", "ALLOWED_HOSTS", "SECRET_KEY", "MEDIA_ROOT")
 
 
 def puerto_libre():
@@ -58,8 +59,15 @@ def apagar(proceso):
 
 def main():
     with tempfile.TemporaryDirectory() as carpeta:
+        # Sin variables heredadas de un hosting ni de un shell con otra configuración.
+        heredado = {
+            k: v
+            for k, v in os.environ.items()
+            if not k.startswith("RAILWAY_") and k not in _NO_HEREDADAS
+        }
         entorno = {
-            **os.environ,
+            **heredado,
+            "DJANGO_SETTINGS_MODULE": "config.settings",
             "DJANGO_ENV": "development",
             "PYTHONIOENCODING": "utf-8",
             "DATABASE_URL": "sqlite:///" + (Path(carpeta) / "humo.sqlite3").as_posix(),

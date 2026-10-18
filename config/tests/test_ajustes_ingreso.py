@@ -24,6 +24,16 @@ class AjustesIngresoTests(SimpleTestCase):
         with mock.patch.dict(os.environ, {"NUM_PROXIES": "2"}):
             self.assertEqual(base.leer_num_proxies(), 2)
 
+    def test_num_proxies_solo_digitos_ascii(self):
+        """Dígitos de otros alfabetos, separadores y espacios no son un entero."""
+        for valor in ("\u0663", "\uff11", "1_0", " 2", "2 ", "+2", ""):
+            with self.subTest(valor=valor):
+                with mock.patch.dict(os.environ, {"NUM_PROXIES": valor}):
+                    with self.assertRaises(ImproperlyConfigured):
+                        base.leer_num_proxies()
+        with mock.patch.dict(os.environ, {"NUM_PROXIES": "10"}):
+            self.assertEqual(base.leer_num_proxies(), 10)
+
     def test_cupos_de_ingreso_definidos(self):
         self.assertEqual(settings.INTENTOS_FALLIDOS_POR_IP, 20)
         self.assertEqual(settings.VENTANA_MINUTOS, 15)
