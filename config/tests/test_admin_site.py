@@ -1,7 +1,8 @@
 """El admin técnico solo admite superusuarios."""
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 
 class AdminSiteTests(TestCase):
@@ -20,3 +21,12 @@ class AdminSiteTests(TestCase):
         )
         self.client.force_login(usuario)
         self.assertEqual(self.client.get("/admin/").status_code, 200)
+
+    @override_settings(
+        MIDDLEWARE=[
+            *settings.MIDDLEWARE,
+            "django.contrib.auth.middleware.LoginRequiredMiddleware",
+        ]
+    )
+    def test_login_del_admin_no_requiere_sesion_con_login_required_middleware(self):
+        self.assertEqual(self.client.get("/admin/login/").status_code, 200)

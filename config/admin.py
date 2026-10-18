@@ -3,6 +3,7 @@
 from django.contrib.admin import AdminSite
 from django.contrib.admin.forms import AdminAuthenticationForm
 from django.contrib.auth import REDIRECT_FIELD_NAME
+from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponseRedirect
 from django.urls import reverse
@@ -22,6 +23,7 @@ class SitioAdministracion(AdminSite):
         return request.user.is_active and request.user.is_superuser
 
     @method_decorator(never_cache)
+    @method_decorator(login_not_required)
     def login(self, request, extra_context=None):
         """Igual que `AdminSite.login`, pero con el límite de intentos fallidos."""
         if request.method == "GET" and self.has_permission(request):

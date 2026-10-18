@@ -188,3 +188,29 @@ class FiltroAuditoriaTests(SimpleTestCase):
             cfg = settings.LOGGING["loggers"][nombre]
             self.assertEqual(cfg["handlers"], ["consola"])
             self.assertIs(cfg["propagate"], False)
+
+    def test_claves_con_tilde_cookie_y_sesion_se_ocultan(self):
+        claves = [
+            "contraseña",
+            "Contraseña_nueva",
+            "Teléfono",
+            "Cookie",
+            "HTTP_COOKIE",
+            "sessionid",
+            "session_key",
+            "csrftoken",
+            "csrfToken",
+            "correo",
+            "Email",
+            "user_email",
+        ]
+        r = _filtrar("%(a)s", ({**dict.fromkeys(claves, "S"), "nombre": "ok"},))
+        self.assertEqual(r.args["nombre"], "ok")
+        for clave in claves:
+            self.assertEqual(r.args[clave], "[oculto]", clave)
+
+    def test_claves_inocuas_no_se_ocultan(self):
+        inocuas = ["accesibilidad", "secretaria", "tokenizador", "descripcion", "id"]
+        r = _filtrar("%(a)s", (dict.fromkeys(inocuas, "visible"),))
+        for clave in inocuas:
+            self.assertEqual(r.args[clave], "visible", clave)
