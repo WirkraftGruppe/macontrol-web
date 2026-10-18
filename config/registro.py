@@ -2,15 +2,15 @@
 
 import logging
 import re
+import unicodedata
 from collections.abc import Mapping
 
 from django.db.models import Model
 
-# Fragmentos que, contenidos en el nombre de una clave, marcan su valor como sensible.
+# Segmentos que, presentes en el nombre de una clave, marcan su valor como sensible.
 FRAGMENTOS_SENSIBLES = (
     "password",
     "contrasena",
-    "contraseña",
     "token",
     "access",
     "refresh",
@@ -21,6 +21,13 @@ FRAGMENTOS_SENSIBLES = (
     "longitud",
     "telefono",
     "contacto",
+    "cookie",
+    "session",
+    "sessionid",
+    "csrftoken",
+    "csrfmiddlewaretoken",
+    "correo",
+    "email",
 )
 OCULTO = "[oculto]"
 # Detalle de IntegrityError de PostgreSQL: "Key (cuit)=(2012…) already exists".
@@ -38,9 +45,17 @@ _ESTANDAR = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
 }
 
 
+def _segmentos(clave):
+    """Segmentos en minúscula y sin tildes ("Teléfono_x" -> telefono, x)."""
+    clave = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", clave)
+    clave = unicodedata.normalize("NFKD", clave).casefold()
+    clave = "".join(c for c in clave if not unicodedata.combining(c))
+    return [s.rstrip("0123456789") or s for s in re.split(r"[^a-z0-9]+", clave) if s]
+
+
 def _es_sensible(clave):
     return isinstance(clave, str) and any(
-        f in clave.lower() for f in FRAGMENTOS_SENSIBLES
+        s in FRAGMENTOS_SENSIBLES for s in _segmentos(clave)
     )
 
 
