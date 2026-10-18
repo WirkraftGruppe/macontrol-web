@@ -69,7 +69,7 @@ macontrol-web/
 │   └── 02-diseno.md                  # tokens del sistema visual
 ├── config/                  # settings (base/dev/prod), urls, admin con límite de intentos
 ├── apps/web/                # modelos, admin, vistas, plantillas, fixture y tests del sitio
-├── templates/web/           # base_web.html, 404.html, 500.html
+├── templates/web/           # base_web.html (404.html y 500.html están en apps/web/templates/)
 ├── static/                  # css/web.css, fuentes, logo y fotos
 ├── herramientas/humo_web.py # prueba de humo del sitio
 ├── media/                   # logos y fotos subidos (fuera de git)

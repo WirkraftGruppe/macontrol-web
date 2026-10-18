@@ -24,8 +24,8 @@ config/            settings/{__init__,base,dev,prod}.py · urls.py · asgi/wsgi
 apps/
   web/             sitio público: models.py (Servicio, ClienteDestacado, Configuracion, Sector) · admin.py (con vista previa)
                    forms.py · imagenes.py · validators.py · views.py · urls.py · fixtures/contenido_inicial.json
-                   templates/web/paginas/ · tests/
-templates/web/     base_web.html, 404.html y 500.html
+                   templates/web/paginas/ · templates/404.html y 500.html · tests/
+templates/web/     base_web.html
 static/            css/web.css, fonts, img (logo y fotos)
 herramientas/      humo_web.py (prueba de humo del sitio)
 media/             logos de clientes y fotos de servicios (ignorado por git)
