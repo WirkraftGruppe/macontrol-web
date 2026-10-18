@@ -317,7 +317,7 @@ commit_base: da3eef5
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T7 | en curso |
+| T7 | hecha |
 
 ### Corridas
 
