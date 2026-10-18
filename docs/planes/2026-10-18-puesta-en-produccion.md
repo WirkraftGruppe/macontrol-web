@@ -73,6 +73,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 - 2026-10-18 — Excepción a la tabla de propiedad: T5 (delegada) escribe `config/settings/*.py`, `config/urls.py` y `requirements*.txt`, que son del principal. Corre sola en su ola, así que se cumple "nunca en paralelo" — aprobada por el usuario el 2026-10-18 al aprobar el plan — reemplaza a: (nada)
 - 2026-10-18 — El merge de `plan/puesta-en-produccion` en `main` y el push al repositorio nuevo ocurren en T7, después de verificar T1–T6, y solo con la autorización explícita del usuario en ese momento — frontera del esquema — reemplaza a: (nada)
 - 2026-10-18 — Detrás de Railway la IP del cliente se toma de la cabecera que fija el borde (`IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`), con prioridad sobre `NUM_PROXIES`; se agregan T9 (delegada, `config/red.py`) y T10 (integración y setting, principal) antes del despliegue, que pasa a la ola 4 — decisión del usuario (opción a de P-puesta-en-produccion-7) — reemplaza a: (nada)
+- 2026-10-18 — La cabecera CSP sale con las directivas en el orden de `CONTENT_SECURITY_POLICY` (`default-src` primero) con un middleware propio sobre django-csp, que las arma con un `set()` y cambia el orden con la semilla de hash de cada arranque; se agregan T11 (delegada) y T12 (integración, principal, con redespliegue) — decisión del usuario ante la FALLA del criterio de CSP de T7 en la verificación TODO — reemplaza a: (nada)
 
 ## Olas
 
@@ -82,6 +83,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 | 2 | T5, T6 (integración y verificación previa al despliegue) | ninguna |
 | 3 | T9 (IP del cliente por cabecera), T10 (integración, principal) | ninguna |
 | 4 | T7 (despliegue, principal), T8 (cierre, principal) | ninguna |
+| 5 | T11 (orden de la CSP), T12 (integración y redespliegue, principal) | ninguna |
 
 ## Subtareas
 
@@ -367,6 +369,46 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
   - `[grep-1]` `grep -n "reemplaza a: 2026-09-28 (logo" docs/decisiones.md`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 300 --subtarea T8`
 
+### T11 — Orden fijo de las directivas de la CSP
+
+- **Ola**: 5
+- **Depende de**: T8
+- **Puede tocar**: `config/csp.py` (nuevo), `config/tests/test_csp.py` (nuevo)
+- **No puede tocar**: `docs/planes/`, `config/settings/**`, `config/urls.py`, `config/red.py`, `config/limites.py`, `apps/**`, `templates/**`, `static/**`, `docs/**`, `.claude/**`
+- **Skill a leer antes**: `.agents/skills/django-security/SKILL.md` (cabeceras), `.agents/skills/python-best-practices/SKILL.md`
+- **Worktree**: sí (`worktrees/puesta-en-produccion-T11`)
+- **Ruta**: delegada (`implementador`)
+- **Presupuesto**: 150 líneas agregadas
+- **Qué hacer**:
+  1. `config/csp.py` define `CSPMiddlewareOrdenado(csp.middleware.CSPMiddleware)`: después de `super().process_response`, reordena las directivas de `Content-Security-Policy` y de `Content-Security-Policy-Report-Only` (si están) según el orden de las claves de `settings.CONTENT_SECURITY_POLICY["DIRECTIVES"]` (y del de `CONTENT_SECURITY_POLICY_REPORT_ONLY`); las que no figuren van al final en el orden en que llegaron. No cambia ningún valor (nonce incluido) ni agrega o quita directivas.
+  2. El docstring explica por qué: django-csp 4.0 arma la política con `set(chain(...))` (`csp/utils.py`) y el orden depende de `PYTHONHASHSEED`.
+  3. Los tests montan el middleware con `override_settings(MIDDLEWARE=…)` o lo llaman directo; el registro en settings lo hace T12.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_csp.CspOrdenadoTests.test_directivas_siguen_el_orden_de_settings --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_csp.CspOrdenadoTests.test_reordenar_conserva_valores_y_nonce --keepdb`
+  - `[cmd]` `for s in 0 1 2 3 4 5 6 7 8 9; do PYTHONHASHSEED=$s DJANGO_SETTINGS_MODULE=config.settings PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe -c "import django; django.setup(); from django.http import HttpResponse; from django.test import RequestFactory; from config.csp import CSPMiddlewareOrdenado; r = CSPMiddlewareOrdenado(lambda p: HttpResponse())(RequestFactory().get('/')); assert r['Content-Security-Policy'].startswith(\"default-src 'self'\"), r['Content-Security-Policy']" || exit 1; done`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 150 --subtarea T11`
+
+### T12 — Integración, registro del middleware y redespliegue (principal)
+
+- **Ola**: 5 (después de verificar y auditar T11)
+- **Depende de**: T11
+- **Pasos**:
+  1. Revisar `cambios.sh` de T11 e integrarla con `worktree-integrar.sh puesta-en-produccion T11 plan/puesta-en-produccion config/csp.py config/tests/test_csp.py`.
+  2. En un commit `T12: …`: `config/settings/base.py` reemplaza `"csp.middleware.CSPMiddleware"` por `"config.csp.CSPMiddlewareOrdenado"` en el mismo lugar de `MIDDLEWARE`.
+  3. `verificador` y `verificador-b` sobre T11 y T12, y `auditor-seguridad` sobre los commits de T11 y T12.
+  4. Merge `--no-ff` en `main`, push a `origin` (nunca a `detach`), esperar el redespliegue de Railway y volver a correr los criterios de T7.
+- **Presupuesto**: `bash .claude/hooks/presupuesto.sh . '<commit_base>' 30 --subtarea T12`
+- **Criterios**:
+  - `[cmd]` `git log --oneline plan/puesta-en-produccion | grep -q "T11: integra puesta-en-produccion-T11"`
+  - `[cmd]` `test -z "$(git worktree list | grep puesta-en-produccion-T)"`
+  - `[grep-1]` `grep -n '"config.csp.CSPMiddlewareOrdenado",' config/settings/base.py`
+  - `[grep-0]` `grep -n '"csp.middleware.CSPMiddleware"' config/settings/base.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
+  - `[cmd]` `git fetch -q origin && git merge-base --is-ancestor "$(git log --format=%H --grep='^T12: ' -1 plan/puesta-en-produccion)" origin/main`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 30 --subtarea T12`
+
 ## Criterios de cierre global
 
 - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py check`
@@ -395,8 +437,10 @@ commit_base: a5d491f
 | T6 | hecha |
 | T9 | hecha |
 | T10 | hecha |
-| T7 | pendiente |
-| T8 | pendiente |
+| T7 | hecha |
+| T8 | hecha |
+| T11 | pendiente |
+| T12 | pendiente |
 
 ### Corridas
 
@@ -411,6 +455,7 @@ commit_base: a5d491f
 | 2026-10-18 | T1–T6 + cierre global (verificador, verificador-b) | 704116d | PASA 72/72 | auditor-seguridad integrado: 0 bloqueantes para desplegar, 1 observación (P-13) |
 | 2026-10-18 | T9 (verificador, verificador-b) | 213dee4 | 7/7 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO (f0328b8, opción a del usuario) | auditor-seguridad: 0 bloqueantes, 1 menor (P-14); integrada edcb4cf, 139 tests |
 | 2026-10-18 | T9 + T10 (verificador, verificador-b) | 28e2ffb | 15/15 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad T10: 0 bloqueantes, 1 importante (P-15), 2 menores (P-14, P-16), 2 observaciones (P-17) |
+| 2026-10-18 | TODO T1–T10 + cierre global (verificador, verificador-b) | 5353b19 | FALLA 2/105: CSP de T7 (orden de directivas de django-csp) y congelado.sh (CONTRATO MODIFICADO) | auditor-seguridad final: 0 bloqueantes, 2 menores (P-22, P-23), 1 observación; → T11/T12 (contrato modificado) |
 
 ## Pendientes que deja este plan
 
@@ -436,6 +481,8 @@ commit_base: a5d491f
 - P-puesta-en-produccion-19 [menor] Sigue lo restante de P-web-independiente-9: `srcset` del hero y CSS crítico para el LCP móvil.
 - P-puesta-en-produccion-20 [observación] El dominio propio `macontrol.com.ar` no está conectado; el sitio sale por `web-production-0c499.up.railway.app` (plan posterior).
 - P-puesta-en-produccion-21 [observación] `Strict-Transport-Security` sale con `max-age=3600` en producción: subirlo (y evaluar `includeSubDomains`/`preload`) cuando se conecte el dominio propio.
+- P-puesta-en-produccion-22 [menor] `GET /media/servicios/a%00.png` da 500 en vez de 404: `media_publica` (`apps/web/views.py:155-165`) deja pasar `\x00` y `resolve()`/`is_file()` lanzan `ValueError: embedded null byte`. Sin traceback ni filtrado, pero cualquiera genera 500 y trazas a voluntad. Rechazar `\x00` junto con `..`, `\` y `:`, con un caso en `test_rechaza_rutas_fuera_de_carpetas_publicas` (auditor-seguridad final).
+- P-puesta-en-produccion-23 [observación] `docs/despliegue.md` (líneas 57 y 76) cita P-puesta-en-produccion-9, que se cerró y siguió como P-18; `docs/decisiones.md` dice que `cache_sitio` se crea en el `preDeployCommand` sin marcar que la decisión de la corrida manual la reemplaza (auditor-seguridad final).
 - P-puesta-en-produccion-17 [observación] `IP_CLIENTE_CABECERA` también se respeta con `DJANGO_ENV=development` (runserver en la LAN deja falsificar `X-Real-IP`); el regex acepta `HTTP_X_FORWARDED_FOR`; la prueba de T7 debe usar un usuario inexistente para no gastar el cupo global del superusuario (auditor-seguridad T9 y T10).
 
 ### Decisiones
