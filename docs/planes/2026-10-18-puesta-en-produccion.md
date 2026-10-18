@@ -345,7 +345,7 @@ commit_base: a5d491f
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
+| T5 | hecha |
 | T6 | pendiente |
 | T7 | pendiente |
 | T8 | pendiente |
@@ -359,6 +359,7 @@ commit_base: a5d491f
 | 2026-10-18 | T2 (verificador, verificador-b) | ad7ec4d | PASA 12/12 | auditor-seguridad: 1 bloqueante (incr de DatabaseCache reinicia el vencimiento) → ronda 1 |
 | 2026-10-18 | T2 ronda 1 (verificador, verificador-b) | 4b7b2a9 | PASA 12/12 | reauditoría: bloqueante cerrado, sin bloqueantes nuevos |
 | 2026-10-18 | T4 (principal) | 21238a8 | PASA 3/3 | integraciones 795d81f (T1), 62046e9 (T3), 21238a8 (T2); 127 tests |
+| 2026-10-18 | T5 (verificador, verificador-b) | 1142e12 | PASA 21/21 | auditor-seguridad: 0 bloqueantes (1 importante, 2 menores, 3 observaciones); integrada en T6 con 135 tests |
 
 ## Pendientes que deja este plan
 
@@ -370,6 +371,12 @@ commit_base: a5d491f
 - P-puesta-en-produccion-4 [menor] El filtro de `config/registro.py` compara por segmento y dejó de ocultar plurales y compuestos que antes se ocultaban: `accesstoken`, `refreshtoken`, `userpassword`, `passwords`, `tokens`, `telefonos`, `contraseñas`, `HTTPCookie`, `cookies`, `emails`, `e-mail`. Fragmentos fuertes por subcadena y débiles por segmento con plural quitado (auditor-seguridad T2). Hoy no hay emisor propio que los registre.
 - P-puesta-en-produccion-5 [observación] Límites con ventana fija: ráfaga de hasta 2× el máximo en el borde, con la misma tasa sostenida; el docstring de `config/tests/test_limites.py` dice "ventana deslizante"; `test_incremento_con_databasecache_conserva_el_fin_de_ventana` solo acota el vencimiento por abajo (auditor-seguridad T2).
 - P-puesta-en-produccion-6 [observación] El docstring de `LoginAdministracion` (`config/admin.py`) menciona "el del panel", que ya no existe en este repositorio (auditor-seguridad T2).
+- P-puesta-en-produccion-7 [importante] `config/red.py` solo sabe leer `X-Forwarded-For` con `NUM_PROXIES`; la documentación de Railway (https://docs.railway.com/networking/public-networking/specs-and-limits) garantiza `X-Real-IP` y no `X-Forwarded-For`. Si el borde no agrega su salto, `NUM_PROXIES=1` deja falsificar la IP y saltear los baldes por IP; `NUM_PROXIES=0` comparte la IP del borde y 20 fallos anónimos bloquean el login a todos. `docs/despliegue.md` pide confirmarlo "mirando un `X-Forwarded-For` real", sin mecanismo para hacerlo. Propuesta del auditor: modo por cabecera (`IP_CLIENTE_CABECERA`) en `config/red.py` y prueba en T7 con `curl` falsificando ambas cabeceras (auditor-seguridad T5). Se decide antes de T7.
+- P-puesta-en-produccion-8 [menor] El cull de `DatabaseCache` borra por orden alfabético de clave, no por antigüedad: con un flujo sostenido desde muchas /64 (≈2 500 grupos llenan 100 000 entradas) los culls terminan alcanzando `ingreso:usuario:<admin>` y reinician su balde. Caché aparte para el login (`cache_ingreso`, `MAX_ENTRIES` muy alto) o, como mínimo, corregir el comentario de `prod.py` (auditor-seguridad T5).
+- P-puesta-en-produccion-9 [menor] `railway.json` declara `preDeployCommand` como array de dos comandos sin fuente que confirme que Railway ejecuta cada elemento por separado; si no, no se crea `cache_sitio` y todo POST al login da 500. Confirmar con la documentación o unirlos con `&&` (auditor-seguridad T5).
+- P-puesta-en-produccion-10 [observación] Sin control automático de CVE de las versiones fijadas en `requirements.txt` (`pip-audit` no instalado) (auditor-seguridad T5).
+- P-puesta-en-produccion-11 [observación] `prod.py` acepta valores mal formados que fallan cerrados: `CSRF_TRUSTED_ORIGINS` con credenciales, mayúsculas o espacios; `SITE_URL` con ruta, consulta o `#`; `ALLOWED_HOSTS="*"`; `MEDIA_ROOT` sin definir (las fotos irían al disco efímero) (auditor-seguridad T5).
+- P-puesta-en-produccion-12 [observación] No se confirmó que Railpack pase las variables del servicio al `buildCommand` (`collectstatic` exige las de `prod.py`); se ve en el primer despliegue (implementador T5).
 
 ### Decisiones
 

@@ -8,7 +8,7 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
-| puesta-en-produccion | plan/puesta-en-produccion | 1 (sin empezar) | ejecutar T1, T2 y T3 en paralelo (otra sesión) | plan commiteado a5d491f, commit_base a5d491f |
+| puesta-en-produccion | plan/puesta-en-produccion | 2 cerrada (T1–T5 integradas) | T6: verificación previa; después autorización del usuario para T7 (despliegue) | sesión 2026-10-18, commit_base a5d491f |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
