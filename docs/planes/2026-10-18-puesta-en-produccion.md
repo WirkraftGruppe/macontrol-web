@@ -346,7 +346,7 @@ commit_base: a5d491f
 | T3 | hecha |
 | T4 | hecha |
 | T5 | hecha |
-| T6 | pendiente |
+| T6 | hecha |
 | T7 | pendiente |
 | T8 | pendiente |
 
@@ -360,6 +360,7 @@ commit_base: a5d491f
 | 2026-10-18 | T2 ronda 1 (verificador, verificador-b) | 4b7b2a9 | PASA 12/12 | reauditoría: bloqueante cerrado, sin bloqueantes nuevos |
 | 2026-10-18 | T4 (principal) | 21238a8 | PASA 3/3 | integraciones 795d81f (T1), 62046e9 (T3), 21238a8 (T2); 127 tests |
 | 2026-10-18 | T5 (verificador, verificador-b) | 1142e12 | PASA 21/21 | auditor-seguridad: 0 bloqueantes (1 importante, 2 menores, 3 observaciones); integrada en T6 con 135 tests |
+| 2026-10-18 | T1–T6 + cierre global (verificador, verificador-b) | 704116d | PASA 72/72 | auditor-seguridad integrado: 0 bloqueantes para desplegar, 1 observación (P-13) |
 
 ## Pendientes que deja este plan
 
@@ -377,6 +378,7 @@ commit_base: a5d491f
 - P-puesta-en-produccion-10 [observación] Sin control automático de CVE de las versiones fijadas en `requirements.txt` (`pip-audit` no instalado) (auditor-seguridad T5).
 - P-puesta-en-produccion-11 [observación] `prod.py` acepta valores mal formados que fallan cerrados: `CSRF_TRUSTED_ORIGINS` con credenciales, mayúsculas o espacios; `SITE_URL` con ruta, consulta o `#`; `ALLOWED_HOSTS="*"`; `MEDIA_ROOT` sin definir (las fotos irían al disco efímero) (auditor-seguridad T5).
 - P-puesta-en-produccion-12 [observación] No se confirmó que Railpack pase las variables del servicio al `buildCommand` (`collectstatic` exige las de `prod.py`); se ve en el primer despliegue (implementador T5).
+- P-puesta-en-produccion-13 [observación] `MEDIA_ROOT=` definida vacía no cae al default (`config/settings/base.py`, django-environ devuelve `''`): las fotos irían a `/app/servicios` fuera del volumen y se perderían en el siguiente despliegue. `env(...) or default` en `base.py` y abortar en `prod.py` si `MEDIA_ROOT` no es absoluta (auditor-seguridad, integración T6).
 
 ### Decisiones
 
