@@ -43,12 +43,42 @@ class DisenoWebTests(TestCase):
 
     def test_logo_declara_width_y_height(self):
         html = render_to_string("web/base_web.html")
-        etiqueta = re.search(r"<img[^>]*logo\.png[^>]*>", html).group(0)
+        etiqueta = re.search(r"<img[^>]*logo-nav\.png[^>]*>", html).group(0)
         ancho = re.search(r'\bwidth="(\d+)"', etiqueta)
         alto = re.search(r'\bheight="(\d+)"', etiqueta)
         self.assertTrue(ancho and alto, "el logo necesita width y height")
-        with Image.open(settings.BASE_DIR / "static/img/logo.png") as logo:
+        with Image.open(settings.BASE_DIR / "static/img/logo-nav.png") as logo:
             real_ancho, real_alto = logo.size
         self.assertAlmostEqual(
             int(ancho.group(1)) / int(alto.group(1)), real_ancho / real_alto, places=1
         )
+
+    def test_logo_de_navegacion_es_version_reducida(self):
+        html = render_to_string("web/base_web.html")
+        self.assertIn("img/logo-nav.png", html)
+        self.assertIn('width="206" height="52"', html)
+        with Image.open(settings.BASE_DIR / "static/img/logo-nav.png") as reducido:
+            self.assertEqual(reducido.size, (412, 104))
+            self.assertEqual(reducido.mode, "RGBA")
+        with Image.open(settings.BASE_DIR / "static/img/logo.png") as oficial:
+            self.assertGreater(oficial.size[0], 412)
+
+    def test_logo_de_errores_y_qr_respeta_proporcion(self):
+        for plantilla in ("404.html", "500.html", "web/paginas/qr.html"):
+            with self.subTest(plantilla=plantilla):
+                html = render_to_string(plantilla)
+                etiqueta = re.search(r"<img[^>]*logo-nav\.png[^>]*>", html).group(0)
+                ancho = int(re.search(r'\bwidth="(\d+)"', etiqueta).group(1))
+                alto = int(re.search(r'\bheight="(\d+)"', etiqueta).group(1))
+                self.assertAlmostEqual(ancho / alto, 412 / 104, places=1)
+
+    def test_hero_con_fetchpriority_alta(self):
+        html = self.client.get("/").content.decode()
+        etiqueta = re.search(r"<img[^>]*hero-pulverizacion[^>]*>", html).group(0)
+        self.assertIn('fetchpriority="high"', etiqueta)
+        self.assertNotIn("loading=", etiqueta)
+        with Image.open(
+            settings.BASE_DIR / "static/img/hero-pulverizacion-quincho.webp"
+        ) as hero:
+            ancho, alto = hero.size
+        self.assertIn(f'width="{ancho}" height="{alto}"', etiqueta)

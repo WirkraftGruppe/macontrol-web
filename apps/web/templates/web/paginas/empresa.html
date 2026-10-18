@@ -43,8 +43,8 @@
       <li>Métodos e insumos de alta calidad</li>
       <li>Grupo de operarios aplicadores calificados</li>
       <li>Protocolos de seguridad + seguro de trabajo</li>
-      <li>{{ config.habilitacion }}</li>
-      <li>{{ config.ley }}</li>
+      {% if config.habilitacion %}<li>{{ config.habilitacion }}</li>{% endif %}
+      {% if config.ley %}<li>{{ config.ley }}</li>{% endif %}
       <li>Extiende certificado por control de plagas apto para presentar ante entes reguladores</li>
     </ul>
   </div>

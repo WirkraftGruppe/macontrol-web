@@ -1,10 +1,15 @@
 """Límites de fallos de ingreso al admin (ventana deslizante)."""
 
+from datetime import UTC, datetime
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.core.management import call_command
+from django.db import connection
+from django.test import RequestFactory, TestCase, override_settings
+
+from config.limites import registrar_fallo
 
 CLAVE = "clave-segura-123"
 IP = "203.0.113.5"
@@ -91,3 +96,59 @@ class LimitesAdminTests(TestCase):
         )
         otra = self._ingresar("adm", CLAVE, "2001:db8:1:3::1")
         self.assertRedirects(otra, "/admin/", fetch_redirect_response=False)
+
+    def test_ipv4_mapeada_usa_su_propio_balde(self):
+        self._fallar(5, ip="::ffff:203.0.113.5")
+        self.assertEqual(self._ingresar("adm", CLAVE, IP).status_code, 429)
+
+    def test_claves_de_cache_usan_hmac_con_sal(self):
+        from django.utils.crypto import salted_hmac
+
+        self._fallar(1)
+        esperado = salted_hmac("config.limites", IP).hexdigest()
+        claves = [k for k in cache._cache if "ingreso:ip:" in k]
+        self.assertEqual(len(claves), 1)
+        self.assertIn(esperado, claves[0])
+
+    def test_registrar_fallo_usa_incremento_atomico(self):
+        peticion = RequestFactory().post("/admin/login/", REMOTE_ADDR=IP)
+        with (
+            mock.patch.object(cache, "get") as leer,
+            mock.patch.object(cache, "set") as escribir,
+            mock.patch.object(cache, "add") as agregar,
+            mock.patch.object(cache, "incr") as incrementar,
+        ):
+            registrar_fallo(peticion, "adm")
+        self.assertEqual(agregar.call_count, 3)
+        self.assertEqual(incrementar.call_count, 3)
+        leer.assert_not_called()
+        escribir.assert_not_called()
+
+    def test_incremento_con_databasecache_conserva_el_fin_de_ventana(self):
+        """`DatabaseCache.incr` reinicia el vencimiento al TIMEOUT (300 s)"""
+        tabla = "cache_prueba_limites"
+        caches = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+                "LOCATION": tabla,
+            }
+        }
+        with override_settings(CACHES=caches):
+            call_command("createcachetable", tabla, verbosity=0)
+            self.addCleanup(cache.clear)
+            peticion = RequestFactory().post("/admin/login/", REMOTE_ADDR=IP)
+            # Justo al inicio de ambas ventanas, para que el resto sea siempre > 600 s.
+            with mock.patch("config.limites.time") as reloj:
+                reloj.time.return_value = 3600 * 1000 + 1
+                registrar_fallo(peticion, "adm")
+                registrar_fallo(peticion, "adm")
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT expires FROM {tabla}")
+                filas = [fila[0] for fila in cursor.fetchall()]
+        self.assertEqual(len(filas), 3)
+        ahora = datetime.now(UTC).replace(tzinfo=None)
+        for vencimiento in filas:
+            if not isinstance(vencimiento, datetime):
+                vencimiento = datetime.fromisoformat(str(vencimiento))
+            restante = (vencimiento.replace(tzinfo=None) - ahora).total_seconds()
+            self.assertGreater(restante, 600)
