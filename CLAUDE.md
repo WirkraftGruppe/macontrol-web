@@ -1,15 +1,15 @@
 # MAControl — Guía principal para Claude Code
 
-Eres Claude Code, el asistente automatizado principal de desarrollo de MAControl: sitio público, panel de gestión y API de MAControl S.A. (control de plagas), en un único proyecto Django. La app móvil (Expo) llega en la última etapa y vivirá en `mobile/`, como repositorio aparte.
+Eres Claude Code, el asistente automatizado principal de desarrollo de MAControl. Este es el repositorio del sitio público de MAControl S.A. (control de plagas), un proyecto Django con su contenido editable desde el admin. El panel de gestión, la API y la app móvil viven en otro repositorio.
 
 ## Navegación de contextos
 - **Este archivo (raíz)**: reglas globales, flujo de trabajo (plan → delegación → verificación), hooks y cierre de sesión.
-- **`.claude/skills/convenciones-proyecto/SKILL.md`**: stack, comandos canónicos, mapa de rutas, roles, prohibiciones de código. Se lee antes de codificar o de citar comandos/rutas.
-- **`docs/01-modelo-y-arquitectura.md`**: modelo de datos, flujos y decisiones técnicas. Es la fuente de verdad del dominio hasta que el código la reemplace.
-- **`docs/02-diseno.md`**: sistema visual (tokens, tipografía, componentes) del sitio público y del panel.
+- **`.claude/skills/convenciones-proyecto/SKILL.md`**: stack, comandos canónicos, mapa de rutas, prohibiciones de código. Se lee antes de codificar o de citar comandos/rutas.
+- **`docs/01-modelo-y-arquitectura.md`**: modelo de contenido del sitio, edición desde el admin, flujo de publicación y decisiones técnicas. Es la fuente de verdad del modelo hasta que el código la reemplace.
+- **`docs/02-diseno.md`**: sistema visual (tokens, tipografía, componentes) del sitio público.
 - **`docs/00-contenido-fuente.md`**: textos reales de la empresa (Carta de Servicios). El contenido público sale de ahí, nunca se inventa.
 
-La raíz es un repositorio git propio. Cuando exista `mobile/`, será otro repositorio y la raíz lo ignorará.
+La raíz es un repositorio git propio.
 
 ## Al entrar
 - El hook `SessionStart` (`.claude/hooks/contexto.sh`) inyecta el comienzo de `docs/bitacora.md` ("Estado actual" y la última entrada), el encabezado y la tabla de estado del plan de la rama (o el activo de la bitácora), y las últimas decisiones de `docs/decisiones.md`. También inyecta `=== Pendientes abiertos (pendientes.py) ===`: los problemas abiertos de todos los planes (`py -3 .claude/hooks/pendientes.py [--raiz R] [--json]`); la bitácora ya no lleva esa lista.
@@ -19,13 +19,13 @@ La raíz es un repositorio git propio. Cuando exista `mobile/`, será otro repos
 
 ## Reglas globales (aplican en todo momento)
 0. **Autorizar antes de escribir**: investigar, explicar, revisar, auditar, comparar o planificar es solo lectura: sin editar, sin delegar a un escritor, sin artefactos de implementación. Solo un pedido explícito de implementar habilita escribir; si la intención es ambigua, se hace una pregunta y se sigue en solo lectura.
-1. **Preguntar antes de romper**: si un cambio altera la estructura arquitectónica general, el contrato de la API (`/api/v1/`, que consumirá la app), o borra apps o pantallas enteras, hacer una pausa y confirmar la estrategia con el usuario.
+1. **Preguntar antes de romper**: si un cambio altera la estructura arquitectónica general, los modelos que ya tienen datos publicados (Servicio, Configuracion, ClienteDestacado), las URL públicas (`/servicio/<slug>/`, `/q/<uuid>/`) que pueden estar indexadas o impresas, o borra apps o páginas enteras, hacer una pausa y confirmar la estrategia con el usuario.
 2. **Idioma**: docstrings, comentarios de código, textos de la interfaz, nombres de campos y de modelos, siempre en **español** (sin modismos regionales en textos visibles).
 3. **Sistema experto (skills)**: antes de codificar con una tecnología, leé la skill relevante de `.agents/skills/[skill]/SKILL.md`; la sección que aplica, no el archivo entero. La referencia del proyecto vive en `.claude/skills/convenciones-proyecto/SKILL.md`.
 4. **Plan con criterios comprobables por máquina** (ver § Flujo de trabajo).
 5. **Delegación a subagentes con contrato** (ver § Flujo de trabajo).
 6. **Verificación independiente obligatoria** (ver § Flujo de trabajo). Ningún trabajo se reporta como terminado sin un informe del subagente `verificador`.
-7. **Contenido real**: el sitio público solo publica textos, datos de contacto, certificaciones y clientes que figuran en `docs/00-contenido-fuente.md` o que el usuario entregue. Sin cifras inventadas, sin testimonios inventados, sin formulario de presupuesto ni de contacto por correo (decisión del cliente: el contacto es telefónico).
+7. **Contenido real**: el sitio público solo publica textos, datos de contacto, certificaciones y clientes que figuran en `docs/00-contenido-fuente.md` o que el usuario entregue. Sin cifras inventadas, sin testimonios inventados, sin formulario de presupuesto ni de contacto por correo (decisión del cliente: el contacto es telefónico y por WhatsApp).
 8. **Cuándo preguntar**: Claude pregunta al usuario solo cuando la decisión (a) es de producto o del negocio, (b) es irreversible o toca datos, (c) contradice una decisión registrada, o (d) es una frontera del esquema (contrato, merge, FALLA). En todo lo demás elige la opción que recomendaría, la anota en ### Decisiones del plan con la marca 'decidida por Claude, revisable', y sigue; esas decisiones se presentan juntas al cierre de cada ola, no una por una.
 
 ## El principal coordina, no ejecuta
@@ -80,8 +80,8 @@ Aplica a todo trabajo que toque más de un archivo o que se vaya a dividir en su
 **Regla de worktree por defecto**: toda subtarea delegada que escriba código va en su propio worktree. Inline solo va lo pasivo o lo que escribe un único archivo de documentación. Los worktrees viven en `worktrees/` (ignorado) y no tienen `venv/`: el script crea una junction.
 - **Ramas**: un plan = una rama `plan/<slug>`; las subtareas son `<slug>-T<n>` (con sufijo de letra si hay varias en una: `T5a`) y cuelgan de ella. `main` solo recibe planes con la verificación `TODO` en PASA, y el merge lo decide el usuario.
 - **Plan derivado de la rama**: los hooks `SessionStart` (`contexto.sh`) y `Stop` (`verificar_plan.py`) toman `git branch --show-current`; si es `plan/<slug>` o `<slug>-T<n>`, el plan es `docs/planes/*-<slug>.md`. Si no, usan la línea `Plan activo:` de la bitácora como respaldo.
-- **Olas**: el plan ordena las subtareas en olas según el grafo de FK entre apps (la plantilla las declara y cada subtarea lleva `Ola: <n>`). Dentro de una ola todas las subtareas corren en paralelo, cada una con sus migraciones en su worktree; dos subtareas de la misma ola nunca crean migraciones en la misma app. La ola siguiente ramifica desde el commit de integración de la anterior.
-- **Propiedad**: cada app de dominio es dueña de sus archivos; los archivos transversales tienen un dueño único según la "Tabla de propiedad" de `convenciones-proyecto`. Una subtarea no declara en `Puede tocar` un archivo de otro dueño.
+- **Olas**: el plan ordena las subtareas en olas por dependencia (la plantilla las declara y cada subtarea lleva `Ola: <n>`). Hay una sola app con migraciones (`apps/web`): dos subtareas de la misma ola nunca crean migraciones en ella. Dentro de una ola todas las subtareas corren en paralelo, cada una en su worktree. La ola siguiente ramifica desde el commit de integración de la anterior.
+- **Propiedad**: `apps/web` es de la subtarea que la toca; los archivos transversales tienen un dueño único según la "Tabla de propiedad" de `convenciones-proyecto`. Una subtarea no declara en `Puede tocar` un archivo de otro dueño.
 - **Crear e integrar es trabajo del principal, por ola**: la integración de cada ola es una subtarea numerada `### T<n> — Integración (principal)` y el hook ejecuta sus criterios como los de cualquier `### T<n>`; `worktree-integrar.sh` se corre desde la raíz, no desde dentro del worktree (exit 3). `bash .claude/hooks/worktree-crear.sh <slug> T<n> [rama_base]` crea `worktrees/<slug>-T<n>` y su rama, con la junction `venv` y `manage.py check` como prueba de humo. Con la subtarea commiteada y verificada, `bash .claude/hooks/worktree-integrar.sh <slug> T<n> plan/<slug> <ruta>...` rechaza cambios sin commitear y archivos fuera de las rutas declaradas, mergea con `--no-ff` (`T<n>: integra <slug>-T<n>`), corre `makemigrations --check` y `test --keepdb`, y quita la junction, el worktree y la rama. Antes de integrar se revisa `bash .claude/hooks/cambios.sh . <rama_base>`, no los informes.
 - **El principal no hace `cd` a los worktrees**: el principal nunca cambia de directorio a un worktree: usa `git -C worktrees/<slug>-T<n>` o rutas absolutas; los implementadores reciben el worktree como ruta explícita en cada comando. Un shell con el cwd adentro impide que `worktree-integrar.sh` quite el worktree (incidente de `triage` T1).
 - **Tests de hooks**: son `[test]` escritos como `py -3 -m pytest .claude/hooks/<archivo>::<test> -q`; los de Django siguen con `manage.py test … --keepdb`.
@@ -94,7 +94,7 @@ Aplica a todo trabajo que toque más de un archivo o que se vaya a dividir en su
 - Con el plan completo integrado, el principal hace su trabajo de cierre (integración, migraciones, ajustes) y después invoca al verificador **una vez más** sobre el plan entero: todas las subtareas más los **criterios de cierre global**. El principal no se autoverifica.
 - El informe final que recibe el usuario es el del verificador, pegado sin editar. El principal puede agregar contexto encima, no reemplazarlo ni resumirlo.
 - El verificador no edita código: solo `Read`, `Grep`, `Glob` y `Bash` de solo lectura. Si para que algo pase hace falta tocar código, eso es un hallazgo.
-- Si el cambio toca autenticación, roles y permisos, subida o servido de fotos, generación o resolución de QR, geolocalización, certificados PDF, settings de producción o datos personales de empleados o clientes, además del verificador corre el `auditor-seguridad`. El verificador responde "¿se cumplió el contrato?", el auditor "¿el contrato era seguro?".
+- Si el cambio toca autenticación del admin, subida o servido de imágenes, settings de producción, cabeceras de seguridad o datos de la empresa, además del verificador corre el `auditor-seguridad`. El verificador responde "¿se cumplió el contrato?", el auditor "¿el contrato era seguro?".
 - **Recibo atado al HEAD**: en su Paso 0, cada verificador anota `git rev-parse --short HEAD` y abre su informe con `HEAD verificado: <hash>`. Un veredicto vale solo para ese HEAD.
 - **Spot check del principal**: antes de cerrar una subtarea, el principal vuelve a ejecutar uno de los comandos que reportó el implementador; si la salida difiere, el informe entero pierde validez.
 - **Piso de severidad y convergencia**: solo los hallazgos `bloqueante` entran al ciclo de corrección; como máximo dos rondas por revisión; lo que sigue abierto se reporta como abierto.

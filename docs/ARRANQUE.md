@@ -9,11 +9,11 @@ $src = "C:\Users\Emanuel\Desktop\WEB\TerritoryOS"
 $dst = "C:\Users\Emanuel\Desktop\WEB\MaControl"
 robocopy "$src\.claude\hooks" "$dst\.claude\hooks" verificar_plan.py test_verificar_plan.py test_contexto.py test_presupuesto.py congelado.sh presupuesto.sh cambios.sh
 robocopy "$src\.claude\hooks\fixtures" "$dst\.claude\hooks\fixtures" /E
-foreach ($s in "django-conventions","django-expert","django-patterns","django-rest-framework","django-security","django-fullstack-developer","jwt-security","api-design-principles","api-security-best-practices","postgresql-table-design","python-best-practices","python-performance-optimization","test-driven-development","systematic-debugging","frontend-design","web-design-guidelines") {
+foreach ($s in "django-conventions","django-expert","django-patterns","django-security","django-fullstack-developer","postgresql-table-design","python-best-practices","python-performance-optimization","test-driven-development","systematic-debugging","frontend-design","web-design-guidelines") {
   robocopy "$src\.agents\skills\$s" "$dst\.agents\skills\$s" /E
 }
 ```
-No copiar `settings.local.json` (es local de cada proyecto) ni las skills de móvil todavía (`react-native-*`, `mobile-*`, `vercel-*`): entran con la etapa de la app.
+No copiar `settings.local.json` (es local de cada proyecto) ni las skills de móvil, de API o de JWT (`react-native-*`, `mobile-*`, `vercel-*`, `django-rest-framework`, `jwt-security`, `api-*`): este repositorio es solo el sitio público.
 
 3. Entorno:
 ```powershell
@@ -30,4 +30,4 @@ git commit -m "docs: base del repositorio (esquema de agentes, modelo, diseño, 
 
 5. Abrir Claude Code en la carpeta, entrar en modo plan y pegar el prompt de `docs/prompts/00-arranque.md`. El plan que resulte se congela con `docs(plan): esqueleto` y se ejecuta con el flujo de `CLAUDE.md`.
 
-6. Después del esqueleto, los planes siguientes en orden sugerido: modelos de dominio (clientes, sitios, servicios, proyectos, productos) → visitas y servicio de actualización del proyecto → API (auth JWT, resolver QR, crear visita, historial) → panel (mapa, proyectos, asignación, carga manual) → informes (certificado, etiqueta QR, historial PDF) → sitio público.
+6. Después del esqueleto, los planes siguientes en orden sugerido: modelo de contenido (Servicio, Configuracion, ClienteDestacado) → admin con vista previa y login con límite de intentos → páginas públicas (home, servicio, empresa, contacto) → SEO y despliegue (`docs/despliegue.md`: base nueva con `migrate`, `loaddata contenido_inicial` y `createsuperuser`).
