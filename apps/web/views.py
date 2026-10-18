@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, render
 from django.templatetags.static import static
 from django.urls import reverse
 
-from .models import ClienteDestacado, Configuracion, PaginaServicio, Sector
+from .models import ClienteDestacado, Configuracion, Sector, Servicio
 
 # Imagen estática, con su tamaño real, para las páginas sin portada cargada.
 IMAGENES = {
@@ -44,7 +44,7 @@ def _pagina(request, plantilla, *, titulo, descripcion, ruta, og_imagen=None, **
     }
     contexto = {
         "config": Configuracion.obtener(),
-        "paginas_nav": PaginaServicio.objects.publicadas(),
+        "paginas_nav": Servicio.objects.publicados(),
         "seo": seo,
         **extra,
     }
@@ -68,15 +68,15 @@ def inicio(request):
 
 
 def servicio(request, slug):
-    pagina = get_object_or_404(PaginaServicio.objects.publicadas(), tipo__slug=slug)
-    if pagina.imagen_portada:
-        portada = {"url": pagina.imagen_portada.url, "ancho": 1200, "alto": 675}
+    pagina = get_object_or_404(Servicio.objects.publicados(), slug=slug)
+    if pagina.foto:
+        portada = {"url": pagina.foto.url, "ancho": 1200, "alto": 675}
     else:
         portada = _imagen(PORTADA_POR_SLUG.get(slug, "hero"))
     return _pagina(
         request,
         "web/paginas/servicio.html",
-        titulo=pagina.titulo_seo or pagina.tipo.nombre,
+        titulo=pagina.titulo_seo or pagina.nombre,
         descripcion=pagina.resumen,
         ruta=pagina.get_absolute_url(),
         og_imagen=portada["url"],
@@ -85,7 +85,7 @@ def servicio(request, slug):
         sectores=[
             Sector(valor).label for valor in pagina.sectores if valor in Sector.values
         ],
-        relacionados=PaginaServicio.objects.publicadas().exclude(pk=pagina.pk),
+        relacionados=Servicio.objects.publicados().exclude(pk=pagina.pk),
     )
 
 
@@ -120,7 +120,7 @@ def qr(request, codigo):
 
 def sitemap(request):
     rutas = [reverse("web:inicio"), reverse("web:empresa"), reverse("web:contacto")]
-    rutas += [p.get_absolute_url() for p in PaginaServicio.objects.publicadas()]
+    rutas += [p.get_absolute_url() for p in Servicio.objects.publicados()]
     urls = [settings.SITE_URL + ruta for ruta in rutas]
     return render(
         request,

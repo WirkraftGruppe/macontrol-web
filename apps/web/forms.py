@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.validators import URLValidator
 
 from .imagenes import reprocesar_imagen
-from .models import ClienteDestacado, Configuracion, PaginaServicio, Sector
+from .models import ClienteDestacado, Configuracion, Sector, Servicio
 
 
 class ReprocesaImagenesMixin:
@@ -105,13 +105,16 @@ class ConfiguracionForm(forms.ModelForm):
             "whatsapp",
             "correo",
             "horario",
+            "habilitacion",
+            "ley",
+            "director_tecnico",
             "direcciones",
             "redes",
         ]
 
 
-class PaginaServicioForm(ReprocesaImagenesMixin, forms.ModelForm):
-    formatos_imagen = {"imagen_portada": "JPEG"}
+class ServicioForm(ReprocesaImagenesMixin, forms.ModelForm):
+    formatos_imagen = {"foto": "JPEG"}
 
     metodos = ListaDeObjetosField(claves=("titulo", "descripcion"), label="Métodos")
     faq = ListaDeObjetosField(
@@ -125,8 +128,10 @@ class PaginaServicioForm(ReprocesaImagenesMixin, forms.ModelForm):
     )
 
     class Meta:
-        model = PaginaServicio
+        model = Servicio
         fields = [
+            "nombre",
+            "slug",
             "titulo_seo",
             "resumen",
             "problema",
@@ -134,12 +139,13 @@ class PaginaServicioForm(ReprocesaImagenesMixin, forms.ModelForm):
             "metodos",
             "faq",
             "sectores",
-            "imagen_portada",
+            "foto",
+            "orden",
             "publicado",
         ]
 
-    def clean_imagen_portada(self):
-        return self._reprocesar("imagen_portada")
+    def clean_foto(self):
+        return self._reprocesar("foto")
 
 
 class ClienteDestacadoForm(ReprocesaImagenesMixin, forms.ModelForm):

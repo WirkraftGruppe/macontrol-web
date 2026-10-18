@@ -1,7 +1,4 @@
-"""Tests de los modelos de contenido del sitio público y de su fixture inicial."""
-
-import json
-from pathlib import Path
+"""Tests de los modelos de contenido del sitio público."""
 
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -10,8 +7,7 @@ from django.http import HttpResponse
 from django.test import TestCase, override_settings
 from django.urls import include, path
 
-from apps.servicios.models import TipoServicio
-from apps.web.models import ClienteDestacado, Configuracion, PaginaServicio, Sector
+from apps.web.models import ClienteDestacado, Configuracion, Sector, Servicio
 from apps.web.validators import TAMANO_MAXIMO_IMAGEN
 
 urlpatterns = [
@@ -31,7 +27,6 @@ urlpatterns = [
         ),
     )
 ]
-RAIZ = Path(__file__).resolve().parents[3]
 CLIENTES_CARTA = [
     "ESAB", "Nutrisur", "Villa del Sur", "Danone", "Howard Johnson", "Banco Nación",
     "Banco Provincia", "YPF Agro", "YPF", "Día", "Open Sports", "Super Beef", "La Zona",
@@ -78,69 +73,73 @@ class ConfiguracionTests(TestCase):
 
 
 @override_settings(ROOT_URLCONF=__name__)
-class PaginaServicioTests(TestCase):
+class ServicioTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         call_command("loaddata", "contenido_inicial", verbosity=0)
 
-    def test_fixture_una_pagina_por_tipo_y_faq_vacia(self):
-        self.assertEqual(PaginaServicio.objects.count(), TipoServicio.objects.count())
-        self.assertEqual(PaginaServicio.objects.count(), 9)
-        for pagina in PaginaServicio.objects.all():
-            self.assertEqual(pagina.faq, [])
-            self.assertTrue(pagina.publicado)
-            pagina.full_clean()
-            self.assertEqual(pagina.tipo.pagina, pagina)
-        publicadas = list(PaginaServicio.objects.publicadas())
-        self.assertEqual([p.tipo_id for p in publicadas], list(range(1, 10)))
+    def test_publicados_ordena_por_orden_y_excluye_no_publicados(self):
+        Servicio.objects.all().delete()
+        for nombre, orden, publicado in (
+            ("B", 2, True), ("A", 2, True), ("Z", 1, True), ("Oculto", 0, False),
+        ):  # fmt: skip
+            Servicio.objects.create(
+                nombre=nombre,
+                slug=nombre.lower(),
+                titulo_seo=nombre,
+                resumen="r",
+                problema="p",
+                orden=orden,
+                publicado=publicado,
+            )
+        nombres = [s.nombre for s in Servicio.objects.publicados()]
+        self.assertEqual(nombres, ["Z", "A", "B"])
+
+    def test_fixture_nueve_servicios_con_faq_vacia_y_validos(self):
+        self.assertEqual(Servicio.objects.count(), 9)
+        for servicio in Servicio.objects.all():
+            self.assertEqual(servicio.faq, [])
+            self.assertTrue(servicio.publicado)
+            servicio.full_clean()
+        publicados = list(Servicio.objects.publicados())
+        self.assertEqual([s.orden for s in publicados], list(range(1, 10)))
         self.assertEqual(
-            publicadas[0].get_absolute_url(),
+            publicados[0].get_absolute_url(),
             "/servicio/desinfeccion-sanitizacion-desodorizacion/",
         )
 
-    def test_publicadas_excluye_tipos_inactivos_y_no_publicadas(self):
-        TipoServicio.objects.filter(pk=1).update(activo=False)
-        PaginaServicio.objects.filter(pk=2).update(publicado=False)
-        ids = [p.tipo_id for p in PaginaServicio.objects.publicadas()]
-        self.assertEqual(ids, [3, 4, 5, 6, 7, 8, 9])
-
-    def test_tipos_del_fixture_coinciden_con_servicios(self):
-        def leer(ruta):
-            with open(RAIZ / ruta, encoding="utf-8") as f:
-                return json.load(f)
-
-        origen = leer("apps/servicios/fixtures/tipos_servicio.json")
-        contenido = leer("apps/web/fixtures/contenido_inicial.json")
-        tipos = [o for o in contenido if o["model"] == "servicios.tiposervicio"]
-        self.assertEqual(tipos, origen)
-        self.assertEqual(contenido[: len(origen)], origen)
+    def test_slug_es_unico(self):
+        duplicado = Servicio.objects.get(pk=1)
+        duplicado.pk = None
+        with self.assertRaises(ValidationError) as ctx:
+            duplicado.full_clean()
+        self.assertIn("slug", ctx.exception.message_dict)
 
     def test_sectores_fuera_de_la_lista_se_rechazan(self):
-        pagina = PaginaServicio.objects.get(pk=1)
-        pagina.sectores = [Sector.SALUD.value, "astronautas"]
+        servicio = Servicio.objects.get(pk=1)
+        servicio.sectores = [Sector.SALUD.value, "astronautas"]
         with self.assertRaises(ValidationError) as ctx:
-            pagina.full_clean()
+            servicio.full_clean()
         self.assertIn("sectores", ctx.exception.message_dict)
-        pagina.sectores = "centros-de-salud"
+        servicio.sectores = "centros-de-salud"
         with self.assertRaises(ValidationError):
-            pagina.full_clean()
-        pagina.sectores = [Sector.SALUD.value, Sector.HOTELERIA.value]
-        pagina.full_clean()
+            servicio.full_clean()
+        servicio.sectores = [Sector.SALUD.value, Sector.HOTELERIA.value]
+        servicio.full_clean()
 
     @override_settings(ROOT_URLCONF="config.urls")
-    def test_solo_publicadas_en_home_y_sitemap(self):
-        PaginaServicio.objects.filter(pk=2).update(publicado=False)
-        TipoServicio.objects.filter(pk=3).update(activo=False)
+    def test_solo_publicados_en_home_y_sitemap(self):
+        Servicio.objects.filter(pk=2).update(publicado=False)
         home = self.client.get("/").content.decode()
         sitemap = self.client.get("/sitemap.xml").content.decode()
-        for pk, visible in ((1, True), (2, False), (3, False), (4, True)):
-            url = PaginaServicio.objects.get(pk=pk).get_absolute_url()
+        for pk, visible in ((1, True), (2, False), (3, True)):
+            url = Servicio.objects.get(pk=pk).get_absolute_url()
             self.assertEqual(url in home, visible, url)
             self.assertEqual(url in sitemap, visible, url)
 
     def test_sectores_del_fixture_son_validos(self):
-        for pagina in PaginaServicio.objects.all():
-            self.assertTrue(set(pagina.sectores) <= set(Sector.values))
+        for servicio in Servicio.objects.all():
+            self.assertTrue(set(servicio.sectores) <= set(Sector.values))
 
 
 class ClienteDestacadoTests(TestCase):
