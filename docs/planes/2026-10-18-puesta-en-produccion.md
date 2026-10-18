@@ -456,6 +456,7 @@ commit_base: a5d491f
 | 2026-10-18 | T9 (verificador, verificador-b) | 213dee4 | 7/7 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO (f0328b8, opción a del usuario) | auditor-seguridad: 0 bloqueantes, 1 menor (P-14); integrada edcb4cf, 139 tests |
 | 2026-10-18 | T9 + T10 (verificador, verificador-b) | 28e2ffb | 15/15 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad T10: 0 bloqueantes, 1 importante (P-15), 2 menores (P-14, P-16), 2 observaciones (P-17) |
 | 2026-10-18 | TODO T1–T10 + cierre global (verificador, verificador-b) | 5353b19 | FALLA 2/105: CSP de T7 (orden de directivas de django-csp) y congelado.sh (CONTRATO MODIFICADO) | auditor-seguridad final: 0 bloqueantes, 2 menores (P-22, P-23), 1 observación; → T11/T12 (contrato modificado) |
+| 2026-10-18 | T11 (verificador, verificador-b) | 98bf72a | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad: 0 bloqueantes, 3 menores (P-24), observaciones; integrada 2b81816, 142 tests |
 
 ## Pendientes que deja este plan
 
@@ -483,6 +484,7 @@ commit_base: a5d491f
 - P-puesta-en-produccion-21 [observación] `Strict-Transport-Security` sale con `max-age=3600` en producción: subirlo (y evaluar `includeSubDomains`/`preload`) cuando se conecte el dominio propio.
 - P-puesta-en-produccion-22 [menor] `GET /media/servicios/a%00.png` da 500 en vez de 404: `media_publica` (`apps/web/views.py:155-165`) deja pasar `\x00` y `resolve()`/`is_file()` lanzan `ValueError: embedded null byte`. Sin traceback ni filtrado, pero cualquiera genera 500 y trazas a voluntad. Rechazar `\x00` junto con `..`, `\` y `:`, con un caso en `test_rechaza_rutas_fuera_de_carpetas_publicas` (auditor-seguridad final).
 - P-puesta-en-produccion-23 [observación] `docs/despliegue.md` (líneas 57 y 76) cita P-puesta-en-produccion-9, que se cerró y siguió como P-18; `docs/decisiones.md` dice que `cache_sitio` se crea en el `preDeployCommand` sin marcar que la decisión de la corrida manual la reemplaza (auditor-seguridad final).
+- P-puesta-en-produccion-24 [menor] `CSPMiddlewareOrdenado` (`config/csp.py:43-47`) también reordena y normaliza cabeceras CSP que no armó (puestas por una vista, `@csp_exempt` o un prefijo excluido); los tests mockean `build_policy` y no cubren el nonce real ni `CSPNonceError`; el docstring de `reordenar_politica` no dice que quita segmentos vacíos; la clave de orden distingue mayúsculas (auditor-seguridad T11).
 - P-puesta-en-produccion-17 [observación] `IP_CLIENTE_CABECERA` también se respeta con `DJANGO_ENV=development` (runserver en la LAN deja falsificar `X-Real-IP`); el regex acepta `HTTP_X_FORWARDED_FOR`; la prueba de T7 debe usar un usuario inexistente para no gastar el cupo global del superusuario (auditor-seguridad T9 y T10).
 
 ### Decisiones
