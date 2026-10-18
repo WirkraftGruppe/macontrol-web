@@ -432,6 +432,10 @@ commit_base: a5d491f
 - P-puesta-en-produccion-14 [menor] `IP_CLIENTE_CABECERA` se valida recién en `ip_del_cliente` (`config/red.py:30-36`): un valor mal escrito (`X-Real-IP`, minúsculas, espacio final, que `env.str` no recorta) pasa el arranque y `check --deploy`, y todo POST a `/admin/login/` da 500 (falla cerrado). Validar con `_NOMBRE_CABECERA` al cargar settings (`base.py` o `prod.py`) y decidir si es obligatoria en Railway (auditor-seguridad T9 y T10).
 - P-puesta-en-produccion-15 [importante] La prueba de T7 descrita en `docs/despliegue.md` ("el sexto fallo da 429") también pasa si todos los clientes comparten el `REMOTE_ADDR` del proxy (borde que agrega en vez de pisar, `X-Real-IP` ausente o `IP_CLIENTE_CABECERA` sin cargar). Hace falta un control negativo: un fallo del mismo usuario inventado desde otra red real debe dar 200, no 429; cada POST con cookie y token CSRF de un GET previo (auditor-seguridad T10). Se aplica al ejecutar T7.
 - P-puesta-en-produccion-16 [menor] `docs/despliegue.md` (filas y sección de `NUM_PROXIES`, líneas 27, 34 y 66) y el paso 2 de T7 siguen hablando de fijar `NUM_PROXIES` por `X-Forwarded-For`, cuando con `IP_CLIENTE_CABECERA` definida no se usa (en Railway va `0`, que `prod.py` sigue exigiendo) (auditor-seguridad T10).
+- P-puesta-en-produccion-18 [importante] Confirmado en el primer despliegue (2026-10-18): el `preDeployCommand` de `railway.json` (array de dos comandos) no se ejecutó; no hubo tablas y `/` dio 500 hasta correr `migrate` y `createcachetable` a mano por `railway ssh`. Toda migración futura queda sin aplicar. Pasar a un solo comando (`migrate --noinput && createcachetable`) o al `startCommand`, y comprobarlo en el log del siguiente despliegue (reemplaza a P-puesta-en-produccion-9).
+- P-puesta-en-produccion-19 [menor] Sigue lo restante de P-web-independiente-9: `srcset` del hero y CSS crítico para el LCP móvil.
+- P-puesta-en-produccion-20 [observación] El dominio propio `macontrol.com.ar` no está conectado; el sitio sale por `web-production-0c499.up.railway.app` (plan posterior).
+- P-puesta-en-produccion-21 [observación] `Strict-Transport-Security` sale con `max-age=3600` en producción: subirlo (y evaluar `includeSubDomains`/`preload`) cuando se conecte el dominio propio.
 - P-puesta-en-produccion-17 [observación] `IP_CLIENTE_CABECERA` también se respeta con `DJANGO_ENV=development` (runserver en la LAN deja falsificar `X-Real-IP`); el regex acepta `HTTP_X_FORWARDED_FOR`; la prueba de T7 debe usar un usuario inexistente para no gastar el cupo global del superusuario (auditor-seguridad T9 y T10).
 
 ### Decisiones
@@ -439,4 +443,33 @@ commit_base: a5d491f
 - 2026-10-18 — `registrar_fallo` fija el vencimiento de cada contador al fin de su ventana (`cache.touch` después de `incr`), porque `DatabaseCache.incr` lo reinicia al TIMEOUT por defecto — bloqueante de auditor-seguridad en T2, decidida por Claude, revisable — reemplaza a: (nada)
 - 2026-10-18 — La caché `DatabaseCache` de producción lleva `OPTIONS["MAX_ENTRIES"]` alto (100 000) para que el cull no borre contadores activos del login — hallazgo importante de auditor-seguridad en T2, va como indicación a T5 sin cambiar criterios; decidida por Claude, revisable — reemplaza a: (nada)
 
+- 2026-10-18 — En Railway `NUM_PROXIES=0` (obligatoria para el arranque, sin uso con `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`), comprobado con control positivo y negativo de fallos de login — decidida por Claude, revisable — reemplaza a: (nada)
+- 2026-10-18 — `SECRET_KEY` de producción generada con `secrets.token_urlsafe(64)` y cargada por la CLI de Railway sin pasar por el chat ni el repositorio — decidida por Claude, revisable — reemplaza a: (nada)
+- 2026-10-18 — Las migraciones y `createcachetable` del primer despliegue se corrieron por `railway ssh` porque el `preDeployCommand` no se ejecutó; `loaddata contenido_inicial` en la misma corrida — decidida por Claude con autorización del usuario, revisable — reemplaza a: (nada)
+
 ### Cierra
+
+- cierra: P-web-independiente-1 — T1 sirve `/media/` acotado a `servicios/` y `clientes/` desde `MEDIA_ROOT`, y T7 lo monta en el volumen `/data` de Railway
+- cierra: P-web-independiente-2 — T5 hace obligatoria `NUM_PROXIES` y usa `DatabaseCache` compartida; T9/T10 toman la IP de `X-Real-IP`, comprobado en T7
+- cierra: P-web-independiente-3 — T5: `dev.py` aborta con cualquier variable de hosting
+- cierra: P-web-independiente-4 — T2 (IPv4 mapeadas, `salted_hmac`, contadores con `add`+`incr`) y T5 (`leer_num_proxies` solo dígitos ASCII)
+- cierra: P-web-independiente-5 — T2 `LimiteCuerpoMiddleware` (3 MB, antes de CSRF, registrado en T5) y T1 controla el tamaño antes de abrir la imagen
+- cierra: P-web-independiente-6 — T5 valida `CSRF_TRUSTED_ORIGINS` (https, sin comodín ni ruta) y `SITE_URL` https
+- cierra: P-web-independiente-7 — T1 `BorraArchivosMixin` con `transaction.on_commit`
+- cierra: P-web-independiente-8 — T1: `Configuracion.obtener()` no escribe en la base
+- cierra: P-web-independiente-9 — T3 `logo-nav.png` y `fetchpriority` en el hero; lo restante (srcset, CSS crítico) pasa a P-puesta-en-produccion-19
+- cierra: P-web-independiente-10 — T5: `humo_web.py` fija `DJANGO_SETTINGS_MODULE`
+- cierra: P-web-independiente-11 — T1 suma los tests de `Servicio.foto`, pk inexistente, GIF renombrado, red http y logo RGBA
+- cierra: P-web-independiente-12 — T1 `contexto_servicio` compartido
+- cierra: P-web-independiente-13 — T5 corrige el comentario de `SITE_URL`
+- cierra: P-web-independiente-14 — T2 normaliza claves y compara por segmento (lo que queda, en P-puesta-en-produccion-4)
+- cierra: P-web-independiente-17 — T1 miniatura con `width`/`height`
+- cierra: P-web-independiente-18 — T1 `empresa.html` sin ítems vacíos
+- cierra: P-web-independiente-19 — T7: Railpack y `ON_FAILURE` funcionaron en el primer despliegue; el `preDeployCommand` no (P-puesta-en-produccion-18)
+- cierra: P-web-independiente-20 — T2 `@method_decorator(login_not_required)`
+- cierra: P-web-independiente-21 — T2 docstring de `normalizar_usuario` y T5 fila de `NUM_PROXIES` en `docs/despliegue.md`
+- cierra: P-puesta-en-produccion-7 — T9/T10 `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`; T7 comprobó que el borde pisa la cabecera
+- cierra: P-puesta-en-produccion-9 — confirmado en T7; sigue como P-puesta-en-produccion-18
+- cierra: P-puesta-en-produccion-12 — Railway entrega las variables al build (https://docs.railway.com/guides/frontend-environment-variables) y `collectstatic` corrió en el primer despliegue
+- cierra: P-puesta-en-produccion-15 — T7 corrió el control positivo y el negativo (otra red real, sin 429)
+
