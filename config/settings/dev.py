@@ -9,9 +9,21 @@ from .base import *  # noqa: F403
 from .base import BASE_DIR, env
 
 # Un hosting nunca debe arrancar con DEBUG: expondría tracebacks y settings.
-if os.environ.get("RAILWAY_ENVIRONMENT"):
+_VARIABLES_DE_HOSTING = (
+    "RAILWAY_ENVIRONMENT",
+    "RAILWAY_ENVIRONMENT_ID",
+    "RAILWAY_PROJECT_ID",
+    "RAILWAY_SERVICE_ID",
+    "RAILWAY_PUBLIC_DOMAIN",
+    "RENDER",
+    "FLY_APP_NAME",
+    "DYNO",
+    "K_SERVICE",
+)
+_presentes = [v for v in _VARIABLES_DE_HOSTING if os.environ.get(v)]
+if _presentes:
     raise ImproperlyConfigured(
-        "RAILWAY_ENVIRONMENT está definida con DJANGO_ENV=development: en el "
+        f"{', '.join(_presentes)} está definida con DJANGO_ENV=development: en el "
         "hosting hay que usar DJANGO_ENV=production."
     )
 

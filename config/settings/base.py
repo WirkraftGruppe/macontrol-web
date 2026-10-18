@@ -1,5 +1,6 @@
 """Settings compartidos por todos los entornos. Las variables salen del entorno."""
 
+import re
 from pathlib import Path
 
 import environ
@@ -15,13 +16,10 @@ env = environ.Env()
 def leer_num_proxies():
     """Cantidad de proxies inversos de confianza (entero >= 0; default 0)."""
     crudo = env("NUM_PROXIES", default="0")
-    try:
-        valor = int(crudo)
-    except ValueError:
-        valor = -1
-    if valor < 0:
+    # Solo dígitos ASCII: int() aceptaría también "٣", "1_0" o " 2 ".
+    if not re.fullmatch(r"[0-9]+", crudo):
         raise ImproperlyConfigured("NUM_PROXIES debe ser un entero mayor o igual a 0.")
-    return valor
+    return int(crudo)
 
 
 # Proxies inversos de confianza delante de Django; define la IP real del cliente.
@@ -48,6 +46,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "config.limite_cuerpo.LimiteCuerpoMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -56,6 +55,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
 ]
+
+# Tope del cuerpo de una petición, que revisa LimiteCuerpoMiddleware antes del CSRF.
+LIMITE_CUERPO_BYTES = 3 * 1024 * 1024
 
 ROOT_URLCONF = "config.urls"
 
@@ -107,9 +109,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "/admin/login/"
 LOGIN_REDIRECT_URL = "/admin/"
 
-# Origen público del sitio; arma el contenido de los QR (`SITE_URL` + `/q/<uuid>/`).
-# Un `SITE_URL=` vacío (como en `.env.example`) también cae al valor por defecto: un QR
-# con ruta relativa no lo abre ningún teléfono.
+# Origen público del sitio; arma las URL absolutas del canonical, Open Graph y sitemap.
+# Un `SITE_URL=` vacío (como en `.env.example`) también cae al valor por defecto: una
+# URL relativa no sirve para el canonical ni para el sitemap.
 SITE_URL = env("SITE_URL", default="") or "https://macontrol.com.ar"
 SITE_URL = SITE_URL.rstrip("/")
 LOGOUT_REDIRECT_URL = "/admin/login/"
