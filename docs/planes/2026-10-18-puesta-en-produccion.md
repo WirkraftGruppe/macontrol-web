@@ -72,6 +72,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 - 2026-10-18 — La navegación usa `static/img/logo-nav.png`, una copia del logo oficial reducida a 412×104 (2× su tamaño de pantalla). `logo.png` queda intacto. El hero suma `fetchpriority="high"`; `srcset` y el CSS crítico quedan pendientes — decidida por Claude, revisable — reemplaza a: (nada)
 - 2026-10-18 — Excepción a la tabla de propiedad: T5 (delegada) escribe `config/settings/*.py`, `config/urls.py` y `requirements*.txt`, que son del principal. Corre sola en su ola, así que se cumple "nunca en paralelo" — aprobada por el usuario el 2026-10-18 al aprobar el plan — reemplaza a: (nada)
 - 2026-10-18 — El merge de `plan/puesta-en-produccion` en `main` y el push al repositorio nuevo ocurren en T7, después de verificar T1–T6, y solo con la autorización explícita del usuario en ese momento — frontera del esquema — reemplaza a: (nada)
+- 2026-10-18 — Detrás de Railway la IP del cliente se toma de la cabecera que fija el borde (`IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`), con prioridad sobre `NUM_PROXIES`; se agregan T9 (delegada, `config/red.py`) y T10 (integración y setting, principal) antes del despliegue, que pasa a la ola 4 — decisión del usuario (opción a de P-puesta-en-produccion-7) — reemplaza a: (nada)
 
 ## Olas
 
@@ -79,7 +80,8 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 |---|---|---|
 | 1 | T1, T2, T3, T4 (integración) | ninguna (T1 no cambia campos) |
 | 2 | T5, T6 (integración y verificación previa al despliegue) | ninguna |
-| 3 | T7 (despliegue, principal), T8 (cierre, principal) | ninguna |
+| 3 | T9 (IP del cliente por cabecera), T10 (integración, principal) | ninguna |
+| 4 | T7 (despliegue, principal), T8 (cierre, principal) | ninguna |
 
 ## Subtareas
 
@@ -266,10 +268,53 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
   - `[cmd]` `git log --oneline plan/puesta-en-produccion | grep -q "T5: integra puesta-en-produccion-T5"`
   - `[cmd]` `test -z "$(git worktree list | grep puesta-en-produccion-T)"`
 
-### T7 — Despliegue en Railway (principal, con confirmación del usuario en cada acción externa)
+### T9 — IP del cliente por la cabecera del borde
 
 - **Ola**: 3
-- **Depende de**: T6 y la autorización explícita del usuario
+- **Depende de**: T6
+- **Puede tocar**: `config/red.py`, `config/tests/test_red.py`
+- **No puede tocar**: `docs/planes/`, `config/settings/**`, `config/limites.py`, `config/admin.py`, `config/urls.py`, `.env.example`, `docs/**`, `apps/**`, `templates/**`, `static/**`, `.claude/**`
+- **Skill a leer antes**: `.agents/skills/django-security/SKILL.md` (autenticación), `.agents/skills/python-best-practices/SKILL.md`
+- **Worktree**: sí (`worktrees/puesta-en-produccion-T9`)
+- **Ruta**: delegada (`implementador`)
+- **Presupuesto**: 150 líneas agregadas
+- **Qué hacer** (resuelve P-puesta-en-produccion-7 en el código):
+  1. `ip_del_cliente` lee `getattr(settings, "IP_CLIENTE_CABECERA", "")`. Vacío: el comportamiento actual con `NUM_PROXIES` queda igual.
+  2. Con un valor: debe cumplir `^HTTP_[A-Z0-9_]+$` (nombre de `request.META`); si no, `ImproperlyConfigured`. Se toma `request.META[<valor>]` sin espacios y, si es una IP válida según `ipaddress.ip_address`, se devuelve esa; `X-Forwarded-For` y `NUM_PROXIES` se ignoran.
+  3. Si la cabecera falta o no es una IP válida, se devuelve `REMOTE_ADDR` (nunca un valor que elija el cliente sin validar).
+  4. El docstring explica el modo por cabecera y por qué en Railway es `HTTP_X_REAL_IP`.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_red.IpDelClienteTests.test_cabecera_configurada_tiene_prioridad_sobre_x_forwarded_for --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_red.IpDelClienteTests.test_cabecera_con_valor_que_no_es_ip_usa_la_direccion_remota --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_red.IpDelClienteTests.test_cabecera_ausente_usa_la_direccion_remota --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_red.IpDelClienteTests.test_nombre_de_cabecera_invalido_lanza_improperlyconfigured --keepdb`
+  - `[grep-1]` `grep -n "IP_CLIENTE_CABECERA" config/red.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 150 --subtarea T9`
+
+### T10 — Integración y setting de la cabecera (principal)
+
+- **Ola**: 3 (después de verificar y auditar T9)
+- **Depende de**: T9
+- **Pasos**:
+  1. Revisar `cambios.sh` de T9 e integrarla con `worktree-integrar.sh puesta-en-produccion T9 plan/puesta-en-produccion config/red.py config/tests/test_red.py`.
+  2. En un commit `T10: …` (el principal es dueño de `config/settings/*.py`): `config/settings/base.py` suma `IP_CLIENTE_CABECERA = env.str("IP_CLIENTE_CABECERA", default="")` con su comentario; `.env.example` suma `IP_CLIENTE_CABECERA=`; `docs/despliegue.md` suma su fila en la tabla de variables y la sección "`NUM_PROXIES` en Railway" explica que en Railway se usa `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`.
+  3. `verificador` y `verificador-b` sobre T9 y T10, y `auditor-seguridad` sobre los commits de T9 y T10.
+- **Presupuesto**: `bash .claude/hooks/presupuesto.sh . '<commit_base>' 60 --subtarea T10`
+- **Criterios**:
+  - `[cmd]` `git log --oneline plan/puesta-en-produccion | grep -q "T9: integra puesta-en-produccion-T9"`
+  - `[cmd]` `test -z "$(git worktree list | grep puesta-en-produccion-T)"`
+  - `[grep-1]` `grep -n '^IP_CLIENTE_CABECERA = env.str("IP_CLIENTE_CABECERA", default="")' config/settings/base.py`
+  - `[grep-1]` `grep -n "^IP_CLIENTE_CABECERA=" .env.example`
+  - `[grep-1]` `grep -nE "^\| .IP_CLIENTE_CABECERA. \|" docs/despliegue.md`
+  - `[cmd]` `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe -c "import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings'); django.setup(); from django.conf import settings; assert settings.IP_CLIENTE_CABECERA == 'HTTP_X_REAL_IP'"`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 60 --subtarea T10`
+
+### T7 — Despliegue en Railway (principal, con confirmación del usuario en cada acción externa)
+
+- **Ola**: 4
+- **Depende de**: T10 y la autorización explícita del usuario
 - **Pasos**:
   1. **Remotos y repositorio**:
      - `git remote rename origin detach`.
@@ -279,7 +324,8 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
   2. **Railway** (plugin o CLI, cada paso confirmado), siguiendo `docs/despliegue.md`:
      - proyecto nuevo, PostgreSQL y servicio conectado al repositorio nuevo, rama `main`;
      - volumen en `/data`;
-     - variables: `DJANGO_ENV=production`, `SECRET_KEY` generada, `DATABASE_URL` referenciada, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `SITE_URL`, `MEDIA_ROOT=/data/media` y `NUM_PROXIES` (valor según la documentación de Railway sobre `X-Forwarded-For`, citada en `docs/despliegue.md`);
+     - variables: `DJANGO_ENV=production`, `SECRET_KEY` generada, `DATABASE_URL` referenciada, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `SITE_URL`, `MEDIA_ROOT=/data/media`, `NUM_PROXIES` (valor según la documentación de Railway sobre `X-Forwarded-For`, citada en `docs/despliegue.md`) e `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`;
+     - prueba con `curl` que el borde pisa un `X-Real-IP` falsificado: fallos de login con la misma cabecera falsificada y distintos valores no deben esquivar el cupo por (usuario, IP); el resultado queda anotado en `docs/despliegue.md`;
      - dominio `*.up.railway.app`.
   3. **Datos iniciales**:
      - `loaddata contenido_inicial` por `railway run` o `railway ssh`, confirmado.
@@ -303,7 +349,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 
 ### T8 — Cierre (principal)
 
-- **Ola**: 3 (después de T7)
+- **Ola**: 4 (después de T7)
 - **Depende de**: T7
 - **Pasos**:
   1. En `## Pendientes que deja este plan`:
