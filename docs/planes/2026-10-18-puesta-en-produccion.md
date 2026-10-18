@@ -393,8 +393,8 @@ commit_base: a5d491f
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T9 | pendiente |
-| T10 | pendiente |
+| T9 | hecha |
+| T10 | hecha |
 | T7 | pendiente |
 | T8 | pendiente |
 
@@ -409,6 +409,8 @@ commit_base: a5d491f
 | 2026-10-18 | T4 (principal) | 21238a8 | PASA 3/3 | integraciones 795d81f (T1), 62046e9 (T3), 21238a8 (T2); 127 tests |
 | 2026-10-18 | T5 (verificador, verificador-b) | 1142e12 | PASA 21/21 | auditor-seguridad: 0 bloqueantes (1 importante, 2 menores, 3 observaciones); integrada en T6 con 135 tests |
 | 2026-10-18 | T1–T6 + cierre global (verificador, verificador-b) | 704116d | PASA 72/72 | auditor-seguridad integrado: 0 bloqueantes para desplegar, 1 observación (P-13) |
+| 2026-10-18 | T9 (verificador, verificador-b) | 213dee4 | 7/7 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO (f0328b8, opción a del usuario) | auditor-seguridad: 0 bloqueantes, 1 menor (P-14); integrada edcb4cf, 139 tests |
+| 2026-10-18 | T9 + T10 (verificador, verificador-b) | 28e2ffb | 15/15 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad T10: 0 bloqueantes, 1 importante (P-15), 2 menores (P-14, P-16), 2 observaciones (P-17) |
 
 ## Pendientes que deja este plan
 
@@ -427,6 +429,10 @@ commit_base: a5d491f
 - P-puesta-en-produccion-11 [observación] `prod.py` acepta valores mal formados que fallan cerrados: `CSRF_TRUSTED_ORIGINS` con credenciales, mayúsculas o espacios; `SITE_URL` con ruta, consulta o `#`; `ALLOWED_HOSTS="*"`; `MEDIA_ROOT` sin definir (las fotos irían al disco efímero) (auditor-seguridad T5).
 - P-puesta-en-produccion-12 [observación] No se confirmó que Railpack pase las variables del servicio al `buildCommand` (`collectstatic` exige las de `prod.py`); se ve en el primer despliegue (implementador T5).
 - P-puesta-en-produccion-13 [observación] `MEDIA_ROOT=` definida vacía no cae al default (`config/settings/base.py`, django-environ devuelve `''`): las fotos irían a `/app/servicios` fuera del volumen y se perderían en el siguiente despliegue. `env(...) or default` en `base.py` y abortar en `prod.py` si `MEDIA_ROOT` no es absoluta (auditor-seguridad, integración T6).
+- P-puesta-en-produccion-14 [menor] `IP_CLIENTE_CABECERA` se valida recién en `ip_del_cliente` (`config/red.py:30-36`): un valor mal escrito (`X-Real-IP`, minúsculas, espacio final, que `env.str` no recorta) pasa el arranque y `check --deploy`, y todo POST a `/admin/login/` da 500 (falla cerrado). Validar con `_NOMBRE_CABECERA` al cargar settings (`base.py` o `prod.py`) y decidir si es obligatoria en Railway (auditor-seguridad T9 y T10).
+- P-puesta-en-produccion-15 [importante] La prueba de T7 descrita en `docs/despliegue.md` ("el sexto fallo da 429") también pasa si todos los clientes comparten el `REMOTE_ADDR` del proxy (borde que agrega en vez de pisar, `X-Real-IP` ausente o `IP_CLIENTE_CABECERA` sin cargar). Hace falta un control negativo: un fallo del mismo usuario inventado desde otra red real debe dar 200, no 429; cada POST con cookie y token CSRF de un GET previo (auditor-seguridad T10). Se aplica al ejecutar T7.
+- P-puesta-en-produccion-16 [menor] `docs/despliegue.md` (filas y sección de `NUM_PROXIES`, líneas 27, 34 y 66) y el paso 2 de T7 siguen hablando de fijar `NUM_PROXIES` por `X-Forwarded-For`, cuando con `IP_CLIENTE_CABECERA` definida no se usa (en Railway va `0`, que `prod.py` sigue exigiendo) (auditor-seguridad T10).
+- P-puesta-en-produccion-17 [observación] `IP_CLIENTE_CABECERA` también se respeta con `DJANGO_ENV=development` (runserver en la LAN deja falsificar `X-Real-IP`); el regex acepta `HTTP_X_FORWARDED_FOR`; la prueba de T7 debe usar un usuario inexistente para no gastar el cupo global del superusuario (auditor-seguridad T9 y T10).
 
 ### Decisiones
 
