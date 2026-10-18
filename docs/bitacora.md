@@ -7,7 +7,7 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
-| web-independiente | plan/web-independiente | 3 (cierre) | verificación TODO; el usuario decide el merge a `main` | sesión 2026-10-18 |
+| web-independiente | plan/web-independiente | 3 (cerrada, TODO en PASA) | el usuario decide el merge a `main` | sesión 2026-10-18 cerrada |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
@@ -22,4 +22,5 @@ Hecho:
   - T6: admin en español con vista previa de servicios no publicados, imágenes sin EXIF y redes solo https.
 - Los planes viejos (30) están en `docs/planes/historico/`; la bitácora y las decisiones del proyecto completo, en `docs/historico/`. `pendientes.py` lee solo `docs/planes/*.md`: los pendientes del sitio se re-declararon como `P-web-independiente-<n>`.
 - Entorno: esta copia no traía `venv/`; se creó con Python 3.13 e `requirements.txt` del proyecto completo (sobran paquetes en el venv local, no en requirements). El `db.sqlite3` local, si existe, es de la estructura vieja: recrearlo con `migrate` y `loaddata contenido_inicial`.
-Pendiente: verificación TODO y la decisión del usuario sobre el merge a `main`.
+- Verificación TODO: una FALLA (7 criterios) por `__pycache__` ignorados de las apps retiradas en la raíz; borrados, PASA 83/83 con verificador y verificador-b sobre 0bb077f. auditor-seguridad sin bloqueantes en T1, T3, T6 y la integración.
+Pendiente: el merge a `main` lo decide el usuario; 21 pendientes P-web-independiente-1 a -21 (4 importantes: media en producción, NUM_PROXIES y caché, barrera de dev.py, borrado de imágenes reemplazadas).

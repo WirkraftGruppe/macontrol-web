@@ -339,6 +339,8 @@ commit_base: da3eef5
 | 2026-10-18 | TODO | 2064b81 | FALLA (76/83) | verificador; las 7 FALLA (no-existe de apps retiradas y grep-0 de T1/T3) por `__pycache__/*.pyc` ignorados en la raíz, de la corrida base de la suite antes de T1 |
 | 2026-10-18 | TODO | 2064b81 | FALLA (75/82) | verificador-b; misma causa |
 | 2026-10-18 | TODO | 2064b81 | sin bloqueantes | auditor-seguridad (integración): P-7 sube a importante, H1 a P-11, P-5 ampliado, P-20 y P-21 nuevos |
+| 2026-10-18 | TODO | 0bb077f | PASA (83/83) | verificador, tras borrar los `__pycache__` ignorados |
+| 2026-10-18 | TODO | 0bb077f | PASA (83/83) | verificador-b |
 
 ## Pendientes que deja este plan
 
