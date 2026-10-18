@@ -8,11 +8,20 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
-| puesta-en-produccion | plan/puesta-en-produccion | 2 cerrada (T1–T5 integradas) | T6: verificación previa; después autorización del usuario para T7 (despliegue) | sesión 2026-10-18, commit_base a5d491f |
+| puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 4: T7 desplegado, T8 cierre | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-10-18 — Plan `puesta-en-produccion`: el sitio público publicado en Railway
+Hecho:
+- URL pública: https://web-production-0c499.up.railway.app (proyecto Railway `macontrol-web`: servicio `web` desde `WirkraftGruppe/macontrol-web`, rama `main`; Postgres; volumen `web-media` en `/data`).
+- Ola 1: T1 (imágenes, `/media/` acotado desde el volumen, borrado al confirmar), T2 (login del admin: IPv4 mapeadas, `salted_hmac`, contadores atómicos con `cache.touch`, `login_not_required`, filtro de registro, tope de cuerpo de 3 MB), T3 (`logo-nav.png`, `fetchpriority`). Un bloqueante (vencimiento de `DatabaseCache.incr`) corregido en una ronda.
+- Ola 2: T5 (prod.py endurecido, `DatabaseCache`, versiones exactas, `railway.json`). Verificación T1–T6: PASA 72/72.
+- Ola 3 (contrato modificado f0328b8, opción a del usuario para P-7): T9/T10 toman la IP del cliente de `X-Real-IP` (`IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`); 15/15 criterios.
+- T7: `origin` renombrado a `detach`; `origin` → GitHub nuevo; merge en `main` y push. Prueba de `X-Real-IP` con control positivo (429 al sexto fallo con IP falsas) y negativo (otra red, sin 429). El `preDeployCommand` no corrió: migraciones, `createcachetable` y `loaddata contenido_inicial` por `railway ssh`.
+Pendiente: el usuario crea el superusuario (`! railway ssh -- python manage.py createsuperuser`); P-puesta-en-produccion-18 (preDeployCommand) y los datos e imágenes de la empresa (P-web-independiente-15 y -16).
 
 ### 2026-10-18 — Fusión de `web-independiente` en `main` y plan `puesta-en-produccion`
 Hecho:
