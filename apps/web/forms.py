@@ -1,4 +1,4 @@
-"""Formularios del panel para el contenido del sitio público."""
+"""Formularios para editar el contenido del sitio público desde el admin."""
 
 import json
 from urllib.parse import urlsplit
