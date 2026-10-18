@@ -1,9 +1,12 @@
 """Límites de fallos de ingreso al admin (ventana deslizante)."""
 
+from datetime import UTC, datetime
 from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.management import call_command
+from django.db import connection
 from django.test import RequestFactory, TestCase, override_settings
 
 from config.limites import registrar_fallo
@@ -120,3 +123,32 @@ class LimitesAdminTests(TestCase):
         self.assertEqual(incrementar.call_count, 3)
         leer.assert_not_called()
         escribir.assert_not_called()
+
+    def test_incremento_con_databasecache_conserva_el_fin_de_ventana(self):
+        """`DatabaseCache.incr` reinicia el vencimiento al TIMEOUT (300 s)"""
+        tabla = "cache_prueba_limites"
+        caches = {
+            "default": {
+                "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+                "LOCATION": tabla,
+            }
+        }
+        with override_settings(CACHES=caches):
+            call_command("createcachetable", tabla, verbosity=0)
+            self.addCleanup(cache.clear)
+            peticion = RequestFactory().post("/admin/login/", REMOTE_ADDR=IP)
+            # Justo al inicio de ambas ventanas, para que el resto sea siempre > 600 s.
+            with mock.patch("config.limites.time") as reloj:
+                reloj.time.return_value = 3600 * 1000 + 1
+                registrar_fallo(peticion, "adm")
+                registrar_fallo(peticion, "adm")
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT expires FROM {tabla}")
+                filas = [fila[0] for fila in cursor.fetchall()]
+        self.assertEqual(len(filas), 3)
+        ahora = datetime.now(UTC).replace(tzinfo=None)
+        for vencimiento in filas:
+            if not isinstance(vencimiento, datetime):
+                vencimiento = datetime.fromisoformat(str(vencimiento))
+            restante = (vencimiento.replace(tzinfo=None) - ahora).total_seconds()
+            self.assertGreater(restante, 600)

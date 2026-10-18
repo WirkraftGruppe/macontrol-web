@@ -79,6 +79,11 @@ def _clave_de_ventana(clave, ventana, ahora):
     return f"{clave}:{int(ahora // ventana)}"
 
 
+def _restante_de_ventana(ventana, ahora):
+    """Segundos que faltan para que cierre la ventana fija en curso."""
+    return int(ventana - (ahora % ventana)) + 1
+
+
 def baldes_llenos(request, usuario, solo_usuario=False):
     """True si algún balde alcanzó su máximo; `solo_usuario` omite el balde por IP."""
     ahora = time.time()
@@ -99,12 +104,15 @@ def registrar_fallo(request, usuario, solo_usuario=False):
     )
     for clave, _maximo, ventana in baldes:
         clave_ventana = _clave_de_ventana(clave, ventana, ahora)
-        cache.add(clave_ventana, 0, ventana)
+        restante = _restante_de_ventana(ventana, ahora)
+        cache.add(clave_ventana, 0, restante)
         try:
             cache.incr(clave_ventana)
         except ValueError:
             # Venció entre el add y el incr: se reabre la ventana con este fallo.
-            cache.add(clave_ventana, 1, ventana)
+            cache.add(clave_ventana, 1, restante)
+        # `DatabaseCache.incr` reinicia el vencimiento al TIMEOUT por defecto.
+        cache.touch(clave_ventana, restante)
 
 
 def limpiar_usuario_ip(request, usuario):
