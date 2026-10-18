@@ -1,8 +1,0 @@
-{% extends "panel/base.html" %}
-{% block title %}{{ titulo }} · MAControl{% endblock %}
-{% block panel_contenido %}
-<h1>{{ titulo }}</h1>
-<p class="ayuda">Formatos: JPG, PNG o PDF (se usa la primera página), hasta 20 MB.</p>
-{% url 'panel:sitios:ficha' sitio.pk as ficha_url %}
-{% include "panel/partials/formulario.html" with cancelar_url=ficha_url multipart=True enviar="Subir plano" %}
-{% endblock %}

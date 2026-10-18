@@ -135,7 +135,7 @@ class SeoTests(ConContenido):
         self.assertEqual(robots.status_code, 200)
         self.assertIn("text/plain", robots["Content-Type"])
         texto = robots.content.decode()
-        for ruta in ("/panel/", "/api/", "/admin/", "/q/"):
+        for ruta in ("/admin/", "/q/"):
             self.assertIn(f"Disallow: {ruta}\n", texto)
         self.assertIn(f"Sitemap: {base}/sitemap.xml", texto)
         for ruta in ("/", "/empresa/", "/contacto/", f"/servicio/{SLUG_MIPU}/"):
@@ -164,9 +164,8 @@ class ErroresTests(ConContenido):
         self.assertIn("Error del servidor", error.content.decode())
         self.assertIn("css/web.css", error.content.decode())
 
-    def test_404_bajo_panel_enlaza_al_panel(self):
+    def test_404_enlaza_al_inicio_o_al_admin(self):
         casos = {
-            "/panel/no-existe/": 'href="/panel/"',
             "/admin/no-existe/": 'href="/admin/"',
             "/no-existe/": 'href="/"',
         }

@@ -1,5 +1,0 @@
-{% extends "panel/base.html" %}
-{% block panel_contenido %}
-  {% url 'panel:usuarios:listado' as volver %}
-  {% include "panel/partials/formulario.html" with cancelar_url=volver %}
-{% endblock %}
