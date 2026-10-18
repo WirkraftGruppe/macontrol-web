@@ -1,27 +1,70 @@
 """Administración del contenido del sitio público, en español."""
 
 from django.contrib import admin
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.urls import path
 from django.utils.html import format_html
 
 from . import views
 from .forms import ClienteDestacadoForm, ConfiguracionForm, ServicioForm
-from .models import ClienteDestacado, Configuracion, Sector, Servicio
+from .models import ClienteDestacado, Configuracion, Servicio
 
 admin.site.site_header = "Administración de MAControl"
 admin.site.site_title = "MAControl"
 admin.site.index_title = "Contenido del sitio"
 
 
+def _borrar_al_confirmar(storage, nombres):
+    """Borra archivos del storage recién cuando la transacción se confirma."""
+    nombres = [nombre for nombre in nombres if nombre]
+    if nombres:
+        transaction.on_commit(lambda: [storage.delete(n) for n in nombres])
+
+
 def _miniatura(imagen):
-    """Imagen chica para el admin, o un guion si no hay archivo."""
+    """Imagen chica (hasta 160 x 80) para el admin, o un guion si no hay archivo."""
     if not imagen:
         return "—"
+    try:
+        escala = min(160 / imagen.width, 80 / imagen.height, 1)
+        ancho, alto = round(imagen.width * escala), round(imagen.height * escala)
+    except (OSError, ValueError):
+        ancho, alto = 160, 80
     return format_html(
-        '<img src="{}" alt="" style="max-height: 80px; max-width: 160px;">',
-        imagen.url,
+        '<img src="{}" alt="" width="{}" height="{}">', imagen.url, ancho, alto
     )
+
+
+class BorraArchivosMixin:
+    """Borra del storage los archivos reemplazados, quitados o de objetos borrados."""
+
+    campos_archivo = ()
+
+    def _nombres(self, obj):
+        return {campo: getattr(obj, campo).name for campo in self.campos_archivo}
+
+    def save_model(self, request, obj, form, change):
+        anteriores = {}
+        if change:
+            anteriores = self._nombres(self.model.objects.get(pk=obj.pk))
+        super().save_model(request, obj, form, change)
+        for campo, anterior in anteriores.items():
+            if anterior != getattr(obj, campo).name:
+                _borrar_al_confirmar(getattr(obj, campo).storage, [anterior])
+
+    def delete_model(self, request, obj):
+        nombres = self._nombres(obj)
+        super().delete_model(request, obj)
+        for campo, nombre in nombres.items():
+            _borrar_al_confirmar(getattr(obj, campo).storage, [nombre])
+
+    def delete_queryset(self, request, queryset):
+        objetos = list(queryset)
+        super().delete_queryset(request, queryset)
+        for obj in objetos:
+            for campo, nombre in self._nombres(obj).items():
+                _borrar_al_confirmar(getattr(obj, campo).storage, [nombre])
 
 
 @admin.register(Configuracion)
@@ -55,8 +98,9 @@ class ConfiguracionAdmin(admin.ModelAdmin):
 
 
 @admin.register(Servicio)
-class ServicioAdmin(admin.ModelAdmin):
+class ServicioAdmin(BorraArchivosMixin, admin.ModelAdmin):
     form = ServicioForm
+    campos_archivo = ("foto",)
     list_display = ("nombre", "orden", "publicado")
     list_editable = ("orden", "publicado")
     list_filter = ("publicado",)
@@ -85,34 +129,17 @@ class ServicioAdmin(admin.ModelAdmin):
     def vista_previa(self, request, pk):
         """Página pública del servicio, publicado o no, fuera de los buscadores."""
         servicio = get_object_or_404(Servicio, pk=pk)
-        if servicio.foto:
-            portada = {"url": servicio.foto.url, "ancho": 1200, "alto": 675}
-        else:
-            clave = views.PORTADA_POR_SLUG.get(servicio.slug, "hero")
-            portada = views._imagen(clave)
         respuesta = views._pagina(
-            request,
-            "web/paginas/servicio.html",
-            titulo=servicio.titulo_seo or servicio.nombre,
-            descripcion=servicio.resumen,
-            ruta=servicio.get_absolute_url(),
-            og_imagen=portada["url"],
-            pagina=servicio,
-            portada=portada,
-            sectores=[
-                Sector(valor).label
-                for valor in servicio.sectores
-                if valor in Sector.values
-            ],
-            relacionados=Servicio.objects.publicados().exclude(pk=servicio.pk),
+            request, "web/paginas/servicio.html", **views.contexto_servicio(servicio)
         )
         respuesta["X-Robots-Tag"] = "noindex"
         return respuesta
 
 
 @admin.register(ClienteDestacado)
-class ClienteDestacadoAdmin(admin.ModelAdmin):
+class ClienteDestacadoAdmin(BorraArchivosMixin, admin.ModelAdmin):
     form = ClienteDestacadoForm
+    campos_archivo = ("logo",)
     list_display = ("nombre", "orden", "activo")
     list_filter = ("activo",)
     search_fields = ("nombre",)

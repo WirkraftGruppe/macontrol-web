@@ -14,4 +14,5 @@ urlpatterns = [
     path("q/<uuid:codigo>/", views.qr, name="qr"),
     path("sitemap.xml", views.sitemap, name="sitemap"),
     path("robots.txt", views.robots, name="robots"),
+    path("media/<path:ruta>", views.media_publica, name="media"),
 ]

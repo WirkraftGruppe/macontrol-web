@@ -12,16 +12,10 @@ from .models import ClienteDestacado, Configuracion, Sector, Servicio
 
 
 class ReprocesaImagenesMixin:
-    """Reprocesa las imágenes nuevas y borra del storage la que se reemplaza."""
+    """Reprocesa las imágenes nuevas; el borrado del archivo viejo lo hace el admin."""
 
     # campo -> formato de salida
     formatos_imagen = {}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._anteriores = {
-            campo: getattr(self.instance, campo).name for campo in self.formatos_imagen
-        }
 
     def _reprocesar(self, campo):
         archivo = self.cleaned_data.get(campo)
@@ -30,15 +24,6 @@ class ReprocesaImagenesMixin:
                 archivo, formato_salida=self.formatos_imagen[campo]
             )
         return archivo
-
-    def save(self, commit=True):
-        instancia = super().save(commit=commit)
-        if commit:
-            for campo, anterior in self._anteriores.items():
-                actual = getattr(instancia, campo).name
-                if anterior and anterior != actual:
-                    getattr(instancia, campo).storage.delete(anterior)
-        return instancia
 
 
 class ListaDeObjetosField(forms.JSONField):

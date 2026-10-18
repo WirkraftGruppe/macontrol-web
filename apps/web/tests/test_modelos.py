@@ -54,11 +54,15 @@ class ConfiguracionTests(TestCase):
         self.assertEqual(Configuracion.objects.count(), 1)
         self.assertEqual(Configuracion.obtener().razon_social, "Otra")
 
-    def test_obtener_crea_la_fila_vacia(self):
+    def test_obtener_no_escribe_en_la_base(self):
         self.assertEqual(Configuracion.objects.count(), 0)
         config = Configuracion.obtener()
+        self.assertEqual(Configuracion.objects.count(), 0)
+        self.assertIsNone(config._state.db)
         self.assertEqual(config.pk, 1)
         self.assertEqual(config.direcciones, [])
+        Configuracion(razon_social="Guardada").save()
+        self.assertEqual(Configuracion.obtener().razon_social, "Guardada")
 
     def test_whatsapp_y_horario_vacios_y_href_de_telefono(self):
         call_command("loaddata", "contenido_inicial", verbosity=0)
@@ -175,4 +179,28 @@ class ClienteDestacadoTests(TestCase):
         self.assertTrue(
             any("2 MB" in m for m in ctx.exception.message_dict["logo"]),
             ctx.exception.message_dict,
+        )
+
+
+class FotoServicioTests(TestCase):
+    def test_foto_rechaza_extension_tamano_y_usa_uuid(self):
+        servicio = Servicio(
+            nombre="S", slug="s", titulo_seo="S", resumen="r", problema="p"
+        )
+        servicio.foto = SimpleUploadedFile("f.gif", b"GIF89a", "image/gif")
+        with self.assertRaises(ValidationError) as ctx:
+            servicio.full_clean()
+        self.assertIn("foto", ctx.exception.message_dict)
+
+        servicio.foto = SimpleUploadedFile(
+            "f.jpg", b"0" * (TAMANO_MAXIMO_IMAGEN + 1), "image/jpeg"
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            servicio.full_clean()
+        self.assertTrue(any("2 MB" in m for m in ctx.exception.message_dict["foto"]))
+
+        campo = Servicio._meta.get_field("foto")
+        self.assertRegex(
+            campo.generate_filename(servicio, "Mi Foto.JPG"),
+            r"^servicios[/\\][0-9a-f]{32}\.jpg$",
         )

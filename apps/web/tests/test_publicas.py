@@ -43,3 +43,11 @@ class PaginasPublicasTests(TestCase):
         self.assertContains(respuesta, "<li>Habilitación X</li>")
         self.assertContains(respuesta, "<li>Ley Y</li>")
         self.assertNotContains(respuesta, "Director técnico matriculado")
+
+    def test_empresa_sin_datos_legales_no_deja_items_vacios(self):
+        Configuracion.objects.filter(pk=1).update(
+            habilitacion="", ley="", director_tecnico=""
+        )
+        respuesta = self.client.get("/empresa/")
+        self.assertNotContains(respuesta, "<li></li>")
+        self.assertContains(respuesta, "<li>Director técnico matriculado</li>")
