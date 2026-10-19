@@ -476,8 +476,8 @@ commit_base: a5d491f
 | T8 | hecha |
 | T11 | hecha |
 | T12 | hecha |
-| T13 | pendiente |
-| T14 | pendiente |
+| T13 | hecha |
+| T14 | hecha |
 
 ### Corridas
 
@@ -495,6 +495,7 @@ commit_base: a5d491f
 | 2026-10-18 | TODO T1–T10 + cierre global (verificador, verificador-b) | 5353b19 | FALLA 2/105: CSP de T7 (orden de directivas de django-csp) y congelado.sh (CONTRATO MODIFICADO) | auditor-seguridad final: 0 bloqueantes, 2 menores (P-22, P-23), 1 observación; → T11/T12 (contrato modificado) |
 | 2026-10-18 | T11 (verificador, verificador-b) | 98bf72a | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad: 0 bloqueantes, 3 menores (P-24), observaciones; integrada 2b81816, 142 tests |
 | 2026-10-19 | TODO T1–T12 + cierre global (verificador, verificador-b) | 3d20bb3 | verificador: FALLA 1/116 (congelado.sh); verificador-b: FALLA 2/117 (congelado.sh y `test config` intermitente: test_variantes_unicode_del_usuario_comparten_cupo 302≠429 por cruce de ventana) | auditor-seguridad T12: sin hallazgos; → T13/T14 (contrato modificado) |
+| 2026-10-19 | T13 (verificador, verificador-b) | 2c400a3 | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | defecto reproducido con reloj 60 s antes del borde; integrada en T14 |
 
 ## Pendientes que deja este plan
 
@@ -558,5 +559,6 @@ commit_base: a5d491f
 - cierra: P-puesta-en-produccion-7 — T9/T10 `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`; T7 comprobó que el borde pisa la cabecera
 - cierra: P-puesta-en-produccion-9 — confirmado en T7; sigue como P-puesta-en-produccion-18
 - cierra: P-puesta-en-produccion-12 — Railway entrega las variables al build (https://docs.railway.com/guides/frontend-environment-variables) y `collectstatic` corrió en el primer despliegue
+- cierra: P-puesta-en-produccion-5 — T13: tests con reloj fijo y docstring "ventana fija"; la ráfaga de 2× en el borde queda como propiedad conocida de la ventana fija
 - cierra: P-puesta-en-produccion-15 — T7 corrió el control positivo y el negativo (otra red real, sin 429)
 
