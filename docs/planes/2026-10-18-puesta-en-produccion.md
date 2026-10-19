@@ -74,6 +74,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 - 2026-10-18 — El merge de `plan/puesta-en-produccion` en `main` y el push al repositorio nuevo ocurren en T7, después de verificar T1–T6, y solo con la autorización explícita del usuario en ese momento — frontera del esquema — reemplaza a: (nada)
 - 2026-10-18 — Detrás de Railway la IP del cliente se toma de la cabecera que fija el borde (`IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`), con prioridad sobre `NUM_PROXIES`; se agregan T9 (delegada, `config/red.py`) y T10 (integración y setting, principal) antes del despliegue, que pasa a la ola 4 — decisión del usuario (opción a de P-puesta-en-produccion-7) — reemplaza a: (nada)
 - 2026-10-18 — La cabecera CSP sale con las directivas en el orden de `CONTENT_SECURITY_POLICY` (`default-src` primero) con un middleware propio sobre django-csp, que las arma con un `set()` y cambia el orden con la semilla de hash de cada arranque; se agregan T11 (delegada) y T12 (integración, principal, con redespliegue) — decisión del usuario ante la FALLA del criterio de CSP de T7 en la verificación TODO — reemplaza a: (nada)
+- 2026-10-19 — Los tests de los cupos del login fijan el reloj (`config.limites.time.time`) en mitad de una ventana, porque con el reloj real un test que cruza un borde de ventana de 15 min ve el contador en cero y falla al azar; se agregan T13 (delegada) y T14 (integración, principal) — decisión del usuario ante la FALLA intermitente de `manage.py test config` en la verificación TODO — reemplaza a: (nada)
 
 ## Olas
 
@@ -84,6 +85,7 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
 | 3 | T9 (IP del cliente por cabecera), T10 (integración, principal) | ninguna |
 | 4 | T7 (despliegue, principal), T8 (cierre, principal) | ninguna |
 | 5 | T11 (orden de la CSP), T12 (integración y redespliegue, principal) | ninguna |
+| 6 | T13 (reloj fijo en los tests de límites), T14 (integración, principal) | ninguna |
 
 ## Subtareas
 
@@ -408,6 +410,39 @@ Estado en `main` f1cdc1b: sitio solo (`apps/web` + `config/`), 98 tests, verific
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test --keepdb`
   - `[cmd]` `git fetch -q origin && git merge-base --is-ancestor "$(git log --format=%H --grep='^T12: ' -1 plan/puesta-en-produccion)" origin/main`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 30 --subtarea T12`
+
+### T13 — Reloj fijo en los tests de los cupos del login
+
+- **Ola**: 6
+- **Depende de**: T12
+- **Puede tocar**: `config/tests/test_limites.py`, `config/tests/test_limites_admin.py`
+- **No puede tocar**: `docs/planes/`, `config/limites.py`, `config/red.py`, `config/settings/**`, `apps/**`, `templates/**`, `static/**`, `docs/**`, `.claude/**`
+- **Skill a leer antes**: `.agents/skills/python-best-practices/SKILL.md` (tests)
+- **Worktree**: sí (`worktrees/puesta-en-produccion-T13`)
+- **Ruta**: delegada (`implementador`)
+- **Presupuesto**: 120 líneas agregadas
+- **Qué hacer**:
+  1. Las clases de test que hacen login contra `/admin/login/` y cuentan fallos fijan `config.limites.time.time` en mitad de una ventana (por ejemplo `900 * 2_000_000 + 450`, que también cae a mitad de la ventana de 60 min) con un `mock.patch` iniciado en `setUp` y detenido con `addCleanup`. Los tests que ya parchean el reloj por su cuenta siguen igual.
+  2. Un test nuevo comprueba que, dentro de esas clases, el reloj del módulo queda fijo y lejos de los bordes de las dos ventanas.
+  3. El docstring del módulo deja de decir "ventana deslizante" y dice "ventana fija" (P-puesta-en-produccion-5).
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites.LimitesAdminTests.test_reloj_fijo_lejos_de_los_bordes_de_ventana --keepdb`
+  - `[grep-1]` `grep -n 'mock.patch("config.limites.time.time"' config/tests/test_limites.py`
+  - `[grep-0]` `grep -n "ventana deslizante" config/tests/test_limites.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 120 --subtarea T13`
+
+### T14 — Integración de T13 (principal)
+
+- **Ola**: 6 (después de verificar T13)
+- **Depende de**: T13
+- **Pasos**:
+  1. Revisar `cambios.sh` de T13 e integrarla con `worktree-integrar.sh puesta-en-produccion T13 plan/puesta-en-produccion config/tests/test_limites.py config/tests/test_limites_admin.py`.
+  2. `verificador` y `verificador-b` sobre T13 y T14; verificación `TODO`; merge en `main` y push a `origin`.
+- **Presupuesto**: no aplica (solo merges y commits `registro:`)
+- **Criterios**:
+  - `[cmd]` `git log --oneline plan/puesta-en-produccion | grep -q "T13: integra puesta-en-produccion-T13"`
+  - `[cmd]` `test -z "$(git worktree list | grep puesta-en-produccion-T)"`
 
 ## Criterios de cierre global
 
