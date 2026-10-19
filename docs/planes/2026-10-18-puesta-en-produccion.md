@@ -496,6 +496,7 @@ commit_base: a5d491f
 | 2026-10-18 | T11 (verificador, verificador-b) | 98bf72a | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad: 0 bloqueantes, 3 menores (P-24), observaciones; integrada 2b81816, 142 tests |
 | 2026-10-19 | TODO T1–T12 + cierre global (verificador, verificador-b) | 3d20bb3 | verificador: FALLA 1/116 (congelado.sh); verificador-b: FALLA 2/117 (congelado.sh y `test config` intermitente: test_variantes_unicode_del_usuario_comparten_cupo 302≠429 por cruce de ventana) | auditor-seguridad T12: sin hallazgos; → T13/T14 (contrato modificado) |
 | 2026-10-19 | T13 (verificador, verificador-b) | 2c400a3 | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | defecto reproducido con reloj 60 s antes del borde; integrada en T14 |
+| 2026-10-19 | TODO T1–T14 + cierre global (verificador, verificador-b) | 6028fb8 | 123/124 PASA en ambos; única FALLA: congelado.sh (CONTRATO MODIFICADO por f0328b8, 27c79a1 y 3a57995, aprobados por el usuario) | suite completa 6 veces y `test config` 4 veces sin intermitencias |
 
 ## Pendientes que deja este plan
 
