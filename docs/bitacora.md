@@ -8,7 +8,7 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | plan | rama | ola actual | pendiente inmediato | sesión |
 |---|---|---|---|---|
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
-| puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 4: T7 desplegado, T8 cierre | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
+| puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 6: T1–T14 hechas, desplegado | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
@@ -21,6 +21,7 @@ Hecho:
 - Ola 2: T5 (prod.py endurecido, `DatabaseCache`, versiones exactas, `railway.json`). Verificación T1–T6: PASA 72/72.
 - Ola 3 (contrato modificado f0328b8, opción a del usuario para P-7): T9/T10 toman la IP del cliente de `X-Real-IP` (`IP_CLIENTE_CABECERA=HTTP_X_REAL_IP`); 15/15 criterios.
 - T7: `origin` renombrado a `detach`; `origin` → GitHub nuevo; merge en `main` y push. Prueba de `X-Real-IP` con control positivo (429 al sexto fallo con IP falsas) y negativo (otra red, sin 429). El `preDeployCommand` no corrió: migraciones, `createcachetable` y `loaddata contenido_inicial` por `railway ssh`.
+- Verificación TODO: el criterio de CSP falló porque django-csp ordena las directivas con un `set()`; T11/T12 (contrato modificado) agregan `CSPMiddlewareOrdenado` y redespliegan. Un test de límites falló al azar por cruzar una ventana de 15 min; T13/T14 fijan el reloj en esos tests.
 Pendiente: el usuario crea el superusuario (`! railway ssh -- python manage.py createsuperuser`); P-puesta-en-produccion-18 (preDeployCommand) y los datos e imágenes de la empresa (P-web-independiente-15 y -16).
 
 ### 2026-10-18 — Fusión de `web-independiente` en `main` y plan `puesta-en-produccion`
