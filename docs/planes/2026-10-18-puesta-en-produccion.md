@@ -439,8 +439,8 @@ commit_base: a5d491f
 | T10 | hecha |
 | T7 | hecha |
 | T8 | hecha |
-| T11 | pendiente |
-| T12 | pendiente |
+| T11 | hecha |
+| T12 | hecha |
 
 ### Corridas
 
