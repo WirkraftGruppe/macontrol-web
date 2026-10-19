@@ -1,4 +1,4 @@
-"""Límites de fallos de ingreso al admin (ventana deslizante)."""
+"""Límites de fallos de ingreso al admin (ventana fija)."""
 
 from datetime import UTC, datetime
 from unittest import mock
@@ -9,10 +9,13 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import RequestFactory, TestCase, override_settings
 
+from config import limites
 from config.limites import registrar_fallo
 
 CLAVE = "clave-segura-123"
 IP = "203.0.113.5"
+# Mitad de una ventana de 15 min y de la de 60 min: ningún test cruza un borde.
+RELOJ_FIJO = 900 * 2_000_000 + 450
 User = get_user_model()
 
 
@@ -20,7 +23,17 @@ class LimitesAdminTests(TestCase):
     def setUp(self):
         cache.clear()
         self.addCleanup(cache.clear)
+        reloj = mock.patch("config.limites.time.time", return_value=RELOJ_FIJO)
+        reloj.start()
+        self.addCleanup(reloj.stop)
         self.admin = User.objects.create_superuser("adm", password=CLAVE)
+
+    def test_reloj_fijo_lejos_de_los_bordes_de_ventana(self):
+        self.assertEqual(limites.time.time(), RELOJ_FIJO)
+        for ventana in (900, 3600):
+            resto = limites.time.time() % ventana
+            self.assertGreater(resto, 60)
+            self.assertLess(resto, ventana - 60)
 
     def _ingresar(self, usuario, clave, ip=IP, url="/admin/login/"):
         return self.client.post(
