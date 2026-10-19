@@ -476,6 +476,8 @@ commit_base: a5d491f
 | T8 | hecha |
 | T11 | hecha |
 | T12 | hecha |
+| T13 | pendiente |
+| T14 | pendiente |
 
 ### Corridas
 
@@ -492,6 +494,7 @@ commit_base: a5d491f
 | 2026-10-18 | T9 + T10 (verificador, verificador-b) | 28e2ffb | 15/15 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad T10: 0 bloqueantes, 1 importante (P-15), 2 menores (P-14, P-16), 2 observaciones (P-17) |
 | 2026-10-18 | TODO T1–T10 + cierre global (verificador, verificador-b) | 5353b19 | FALLA 2/105: CSP de T7 (orden de directivas de django-csp) y congelado.sh (CONTRATO MODIFICADO) | auditor-seguridad final: 0 bloqueantes, 2 menores (P-22, P-23), 1 observación; → T11/T12 (contrato modificado) |
 | 2026-10-18 | T11 (verificador, verificador-b) | 98bf72a | 5/5 criterios PASA; veredicto FALLA solo por CONTRATO MODIFICADO | auditor-seguridad: 0 bloqueantes, 3 menores (P-24), observaciones; integrada 2b81816, 142 tests |
+| 2026-10-19 | TODO T1–T12 + cierre global (verificador, verificador-b) | 3d20bb3 | verificador: FALLA 1/116 (congelado.sh); verificador-b: FALLA 2/117 (congelado.sh y `test config` intermitente: test_variantes_unicode_del_usuario_comparten_cupo 302≠429 por cruce de ventana) | auditor-seguridad T12: sin hallazgos; → T13/T14 (contrato modificado) |
 
 ## Pendientes que deja este plan
 
