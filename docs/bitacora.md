@@ -14,6 +14,12 @@ Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los decla
 
 ## Entradas (la más reciente arriba)
 
+### 2026-10-22 — Protocolo de decisiones aplicado (desde plague-control-panel), fusionado en `main`
+Hecho:
+- `docs/protocolo-decisiones.md` (copia idéntica), regla 1 de CLAUDE.md como referencia (con los escalables propios: modelos con datos publicados y URL públicas) y regla 8 borrada; plantilla con `### Decisiones del plan` y el estado «pendiente de decisión»; implementador remite al protocolo; `docs/ARRANQUE.md` embebe el protocolo.
+- Comprobado en el worktree: los 13 criterios del plan de origen (adaptados) y `pytest .claude/hooks` (109 passed, 17 skipped).
+Pendiente: sin cambios en el estado de `puesta-en-produccion`.
+
 ### 2026-10-18 — Plan `puesta-en-produccion`: el sitio público publicado en Railway
 Hecho:
 - URL pública: https://web-production-0c499.up.railway.app (proyecto Railway `macontrol-web`: servicio `web` desde `WirkraftGruppe/macontrol-web`, rama `main`; Postgres; volumen `web-media` en `/data`).
