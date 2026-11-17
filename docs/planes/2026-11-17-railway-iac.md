@@ -207,7 +207,7 @@ commit_base: 1c896e8
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
+| T5 | en curso |
 | T6 | pendiente |
 
 ### Corridas
@@ -218,6 +218,7 @@ commit_base: 1c896e8
 | 2026-11-17 | T1, T2, T3 (verificador-b) | ídem | FALLA solo por CONTRATO MODIFICADO; 38/38 criterios en PASA | |
 | 2026-11-17 | T2 (auditor-seguridad) | b2d49fe | sin bloqueantes ni importantes; 4 observaciones | plan real: 0 to add, 2 to change, 0 to destroy |
 | 2026-11-17 | T4 (principal) | c889dbb | 3 integraciones con `worktree-integrar.sh` (exit 0, 188 tests); `npm ci --prefix .railway`; `config plan` desde la raíz igual al ensayo | |
+| 2026-11-17 | TODO previa al despliegue (T1–T4 + cierre global; verificador) | d270f3a | FALLA 49/50: solo `congelado.sh` por CONTRATO MODIFICADO (efd9737, aprobado por el usuario) | 188 tests OK, ruff OK |
 
 ### Decisiones del plan
 
