@@ -1,7 +1,7 @@
 # Bitácora del sitio público de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-10-18-puesta-en-produccion.md
+Plan activo: docs/planes/2026-11-17-retoques-sitio.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
@@ -9,10 +9,21 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 |---|---|---|---|---|
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
 | puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 6: T1–T14 hechas, desplegado | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
+| retoques-sitio | plan/retoques-sitio (fusionada en main e18410c) | 3: T1–T10 hechas, desplegado | el usuario cambia `SITE_URL` a https://www.macontrol.com.ar; P-retoques-sitio-10 (railway.json obsoleto el 2026-12-01) y -12 (preDeployCommand) | sesión 2026-11-17, commit_base d3390df, contrato modificado cdacc66 |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-11-17 — Plan `retoques-sitio`: datos reales, identidad y ajustes visuales, desplegado
+Hecho:
+- Datos del Adjunto A en `Configuracion` (campos nuevos: CUIT, teléfonos internacionales, segundo teléfono, 24 h; migraciones 0002 y 0003), fixture y docs; formulario del admin con `provincia` opcional (T10, contrato modificado cdacc66).
+- Favicon "MC", iconos 180/192/512, `favicon.ico`, imagen OG 1200×630 (T2); rutas `/favicon.ico`, `/apple-touch-icon.png`, `/site.webmanifest`, og/twitter y JSON-LD `LocalBusiness` en el inicio (T6).
+- Barra con página actual y desplegable de servicios, móvil sin desborde (logo 3,96:1), WhatsApp flotante, pie con CUIT y redes, tarjetas con iconos, franjas de sectores y clientes, portada 16/9 (T5, T6); `herramientas/medir_movil.py` con Playwright.
+- Verificación TODO: 85/86 (solo `congelado.sh` por el contrato modificado aprobado). Auditoría de seguridad de T1, T6 y T10 sin bloqueantes.
+- Despliegue e18410c: el `preDeployCommand` no corrió y el sitio dio 500 unos minutos; migraciones aplicadas a mano por `railway ssh` tras respaldar con `dumpdata`. Comprobado en producción: 8/8 criterios de T8, CSP sin cambios.
+- La CLI de Railway de esta carpeta estaba vinculada a TerritoryOS; el usuario la volvió a vincular a `macontrol-web`.
+Pendiente: `SITE_URL` en Railway y redirección a `www` (usuario); P-retoques-sitio-10 (migrar `railway.json` antes del 2026-12-01) y -12 (migraciones al desplegar); P-retoques-sitio-1 (mayúscula en el resumen de MIPU en producción).
 
 ### 2026-10-22 — Protocolo de decisiones aplicado (desde plague-control-panel), fusionado en `main`
 Hecho:
