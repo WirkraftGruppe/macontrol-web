@@ -45,8 +45,11 @@ class ConfiguracionTests(TestCase):
         self.assertEqual(
             config.direcciones,
             [
-                {"localidad": "Castelli", "direccion": "Ricardo Naveiro 7"},
-                {"localidad": "Chascomús", "direccion": "Presidente Perón 427"},
+                {
+                    "localidad": "Castelli",
+                    "direccion": "Saavedra 555",
+                    "provincia": "Buenos Aires",
+                },
             ],
         )
         # save() fuerza pk=1: no se crea una segunda fila.
@@ -64,16 +67,72 @@ class ConfiguracionTests(TestCase):
         Configuracion(razon_social="Guardada").save()
         self.assertEqual(Configuracion.obtener().razon_social, "Guardada")
 
-    def test_whatsapp_y_horario_vacios_y_href_de_telefono(self):
-        call_command("loaddata", "contenido_inicial", verbosity=0)
-        config = Configuracion.obtener()
-        self.assertEqual(config.whatsapp, "")
-        self.assertEqual(config.horario, "")
-        self.assertEqual(config.redes, [])
+    def test_whatsapp_vacio_y_href_sin_internacional(self):
+        config = Configuracion(telefono="02241 49 6047")
         self.assertEqual(config.telefono_href, "tel:+542241496047")
         self.assertEqual(config.whatsapp_href, "")
         config.whatsapp = "02241 15 55 1234"
         self.assertEqual(config.whatsapp_href, "https://wa.me/54224115551234")
+
+
+class ConfiguracionTelefonosTests(TestCase):
+    def test_telefono_href_usa_numero_internacional(self):
+        config = Configuracion(
+            telefono="02241 15-546232", telefono_internacional="+5492241546232"
+        )
+        self.assertEqual(config.telefono_href, "tel:+5492241546232")
+
+    def test_telefono_2_href(self):
+        self.assertEqual(Configuracion().telefono_2_href, "")
+        config = Configuracion(
+            telefono_2="02241 15-496047", telefono_2_internacional="+5492241496047"
+        )
+        self.assertEqual(config.telefono_2_href, "tel:+5492241496047")
+
+    def test_whatsapp_del_fixture_es_el_real(self):
+        call_command("loaddata", "contenido_inicial", verbosity=0)
+        config = Configuracion.obtener()
+        self.assertEqual(config.whatsapp_href, "https://wa.me/5492241546232")
+        self.assertEqual(config.telefono_href, "tel:+5492241546232")
+        self.assertEqual(config.telefono_2_href, "tel:+5492241496047")
+
+    def test_internacional_rechaza_formato_invalido(self):
+        for malo in (
+            "2241546232",
+            "+542241546232",
+            "+5492241546232 ",
+            "+54922415462a2",
+        ):
+            config = Configuracion(telefono_internacional=malo)
+            with self.assertRaises(ValidationError, msg=malo):
+                config.full_clean()
+        Configuracion(telefono_internacional="+5492241546232").full_clean()
+
+
+class ConfiguracionMapaTests(TestCase):
+    def test_direccion_enlaza_a_google_maps(self):
+        config = Configuracion(
+            direcciones=[
+                {
+                    "localidad": "Castelli",
+                    "direccion": "Saavedra 555",
+                    "provincia": "Buenos Aires",
+                },
+                {"localidad": "Chascomús", "direccion": "Calle 1"},
+            ]
+        )
+        base = "https://www.google.com/maps/search/?api=1&query="
+        primera, segunda = config.direcciones_con_mapa
+        self.assertEqual(
+            primera["mapa_href"],
+            base + "Saavedra+555%2C+Castelli%2C+Buenos+Aires%2C+Argentina",
+        )
+        self.assertEqual(primera["localidad"], "Castelli")
+        self.assertEqual(
+            segunda["mapa_href"], base + "Calle+1%2C+Chascom%C3%BAs%2C+Argentina"
+        )
+        self.assertEqual(segunda["provincia"], "")
+        self.assertEqual(Configuracion().direcciones_con_mapa, [])
 
 
 @override_settings(ROOT_URLCONF=__name__)
