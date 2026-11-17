@@ -321,12 +321,12 @@ commit_base: d3390df
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
-| T6 | pendiente |
-| T7 | pendiente |
+| T5 | hecha |
+| T6 | hecha |
+| T7 | hecha |
 | T8 | pendiente |
 | T9 | pendiente |
-| T10 | pendiente |
+| T10 | hecha |
 
 ### Corridas
 
@@ -336,14 +336,19 @@ commit_base: d3390df
 | 2026-11-17 | T2 | 170c146 | PASA 10/10 (verificador y verificador-b) | favicon y OG revisados a ojo por el principal |
 | 2026-11-17 | T3 | 70e75e1 | PASA 6/6 (verificador y verificador-b) | el principal corrigió playwright a 1.64.1 (regla de dos semanas) y commiteó T3 |
 | 2026-11-17 | T4 | dffa6e6 | criterios corridos por el principal: 3 integraciones y makemigrations --check en verde | worktree-integrar: 158 tests OK |
-| | T5 | | | |
-| | T6 | | | |
+| 2026-11-17 | T5 | 9f90f3e | 14/14 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10) | |
+| 2026-11-17 | T6 | bb85dfb | 16/16 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10) | auditor-seguridad: sin hallazgos; 2 observaciones |
 | 2026-11-17 | T10 | fa64ca2 | 6/6 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10, aprobado por el usuario) | auditor-seguridad: sin bloqueantes ni importantes; 2 menores en tests → P-retoques-sitio-6 |
-| | T7 | | | |
+| 2026-11-17 | T7 | (este registro) | criterios corridos por el principal: 3 integraciones, medir_movil 0 (portada 188 px, logo 158,45×40, scrollWidth 375), humo 0, CSP sin cambios, grep-0 | 2 commits T7 de ajuste (13 líneas): test de T5 admite el JSON-LD de T6; teléfono del contacto en una línea a 375 px; 180 tests OK |
 | | TODO | | | |
 | | T8 | | | |
 
 ### Decisiones del plan
+
+- T5 — color del botón flotante de WhatsApp — `--brand` / verde `--ok` — verde `--ok` con icono de burbuja propio (no el logo oficial de WhatsApp) — se reconoce como WhatsApp sin salir de los tokens ni usar marcas de terceros — autónoma — cambiar el color en `.whatsapp-flotante` — decidida por Claude, revisable
+- T5 — pie — 3 columnas / 4 columnas (marca, direcciones, contacto, servicios) — 4 columnas, 1 en móvil — el logo y las redes necesitan columna propia — autónoma — volver a 3 — decidida por Claude, revisable
+- T6 — título del bloque de contacto — en `_contacto.html` / en cada página — en cada página ("Contacto directo" en `inicio.html` y `contacto.html`) — evita el doble título que pedía quitar el Adjunto D — autónoma — reponer el título en el parcial — decidida por Claude, revisable
+- T7 — tamaño del teléfono en móvil — 40 px (dos líneas) / `clamp(26px, 8vw, 40px)` sin corte — sin corte — con dos números de 15 caracteres el número se partía a la mitad en 375 px — autónoma — revertir el commit T7 — decidida por Claude, revisable
 
 - T1 — la 0003 sin fila de Configuracion — crear / no crear — no crea fila — producción ya la tiene y crearla inventaría datos — autónoma — cambiar la migración — decidida por Claude, revisable
 - T1 — lógica de los href de teléfono — duplicada / helper común `_href_telefono` — helper común — misma regla para los dos números — autónoma — inlinear — decidida por Claude, revisable
@@ -364,6 +369,9 @@ commit_base: d3390df
 - P-retoques-sitio-4 [observación] La 0003 pisa sin condiciones 15 campos de Configuracion y su reverso es noop: respaldar antes del despliegue con `python manage.py dumpdata web.configuracion web.servicio --indent 2` en producción (auditor-seguridad T1).
 - P-retoques-sitio-5 [observación] `docs/00-contenido-fuente.md:87-88` y `docs/01-modelo-y-arquitectura.md:93-95` siguen listando como pendientes datos que el Adjunto A ya resolvió (Instagram, segundo teléfono, WhatsApp, horario, director técnico) (auditor-seguridad T1).
 - P-retoques-sitio-6 [menor] `test_telefono_internacional_invalido_se_rechaza` no comprueba el error concreto del campo (un 200 por otro error también pasa), y no hay tests de `provincia` vacía o no textual en `ListaDeObjetosField` (auditor-seguridad T10).
+- P-retoques-sitio-7 [observación] `apps/web/seo.py` no escapa U+2028/U+2029 (sin efecto en un bloque de datos; `json_script` tampoco) y `/site.webmanifest` sale sin `Cache-Control` (auditor-seguridad T6).
+- P-retoques-sitio-8 [observación] Si `config.habilitacion` está vacía, `_respaldos.html` deja el título "Habilitación oficial" sin texto; `web.css` conserva `.logos-clientes`/`.logo-cliente`, que ya no se usan (T6).
+- P-retoques-sitio-9 [observación] `herramientas/medir_movil.py` importa `_NO_HEREDADAS` (privado) de `humo_web.py`; conviene un módulo común para el entorno de las herramientas (T5).
 
 ### Decisiones
 
