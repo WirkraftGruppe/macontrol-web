@@ -291,9 +291,9 @@ commit_base: d3390df
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | en curso |
+| T2 | en curso |
+| T3 | en curso |
 | T4 | pendiente |
 | T5 | pendiente |
 | T6 | pendiente |
