@@ -317,10 +317,10 @@ commit_base: d3390df
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
-| T2 | en curso |
-| T3 | en curso |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -332,10 +332,10 @@ commit_base: d3390df
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
-| | T1 | | | |
+| 2026-11-17 | T1 | 85a6ec0 | 17/17 PASA (verificador y verificador-b); veredicto formal FALLA solo por contrato modificado (T10, aprobado por el usuario) | auditor-seguridad: sin bloqueantes ni importantes; 1 menor y 4 observaciones → pendientes |
 | 2026-11-17 | T2 | 170c146 | PASA 10/10 (verificador y verificador-b) | favicon y OG revisados a ojo por el principal |
 | 2026-11-17 | T3 | 70e75e1 | PASA 6/6 (verificador y verificador-b) | el principal corrigió playwright a 1.64.1 (regla de dos semanas) y commiteó T3 |
-| | T4 | | | |
+| 2026-11-17 | T4 | dffa6e6 | criterios corridos por el principal: 3 integraciones y makemigrations --check en verde | worktree-integrar: 158 tests OK |
 | | T5 | | | |
 | | T6 | | | |
 | | T10 | | | |
@@ -345,6 +345,10 @@ commit_base: d3390df
 
 ### Decisiones del plan
 
+- T1 — la 0003 sin fila de Configuracion — crear / no crear — no crea fila — producción ya la tiene y crearla inventaría datos — autónoma — cambiar la migración — decidida por Claude, revisable
+- T1 — lógica de los href de teléfono — duplicada / helper común `_href_telefono` — helper común — misma regla para los dos números — autónoma — inlinear — decidida por Claude, revisable
+- T1 — claves de `direcciones_con_mapa` — solo las presentes / siempre `localidad`, `direccion`, `provincia` y `mapa_href` — siempre todas — el contrato T5/T6 las espera — autónoma — filtrar — decidida por Claude, revisable
+
 - T6 — icono de respaldo para servicios sin icono asignado — círculo con marca / escudo / sin icono — dibujo propio simple (círculo con marca de verificación) en `ICONO_GENERICO` — el Adjunto C no trae uno y el pedido exige respaldo — autónoma — cambiar la constante — decidida por Claude, revisable
 - T3 — cómo medir el viewport de 375 px — Playwright con el Chrome del sistema / Selenium / solo criterios de CSS — Playwright (solo `requirements-dev.txt`, `channel="chrome"`) — los criterios de 375 px y de la portada son de layout y solo un navegador los decide; licencia Apache 2.0, sin costo, no llega a producción — autónoma — quitar la línea y el script — decidida por Claude, revisable
 - T6 — servir `/favicon.ico` y `/apple-touch-icon.png` — vista propia / `WHITENOISE_ROOT` en settings — vista propia con nombres fijos — no toca `config/settings` (CSP y settings sin cambios) y es testeable con el cliente de Django — autónoma — volver a quitar las dos rutas — decidida por Claude, revisable
@@ -353,6 +357,13 @@ commit_base: d3390df
 ## Pendientes que deja este plan
 
 ### Problemas
+
+- P-retoques-sitio-1 [menor] La 0003 antepone "Manejo Integral de Plagas Urbanas (MIPU): " al resumen de MIPU de producción, que empieza con mayúscula ("Programa de monitoreo…"); el fixture dice "programa". Bajar la inicial en la migración y ajustar `test_migraciones.py:69-72` (auditor-seguridad T1).
+- P-retoques-sitio-2 [observación] `validar_internacional` (`apps/web/models.py:50`) usa `$`, que acepta un `
+` final; el admin lo recorta (`strip=True`). Endurecer con `\Z` (auditor-seguridad T1).
+- P-retoques-sitio-3 [observación] Si `presentacion` de producción fue editada, el reemplazo de "más de diez años" de la 0003 no aplica y no avisa. Comprobar tras el despliegue: `python manage.py shell -c "from apps.web.models import Configuracion as C; p=C.objects.get(pk=1).presentacion; print('15 años' in p, 'diez años' in p)"` → `True False` (auditor-seguridad T1).
+- P-retoques-sitio-4 [observación] La 0003 pisa sin condiciones 15 campos de Configuracion y su reverso es noop: respaldar antes del despliegue con `python manage.py dumpdata web.configuracion web.servicio --indent 2` en producción (auditor-seguridad T1).
+- P-retoques-sitio-5 [observación] `docs/00-contenido-fuente.md:87-88` y `docs/01-modelo-y-arquitectura.md:93-95` siguen listando como pendientes datos que el Adjunto A ya resolvió (Instagram, segundo teléfono, WhatsApp, horario, director técnico) (auditor-seguridad T1).
 
 ### Decisiones
 
