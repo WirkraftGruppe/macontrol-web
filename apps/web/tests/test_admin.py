@@ -286,6 +286,55 @@ class AdminConfiguracionTests(AdminBase):
             self.assertContains(r, "debe ser una dirección https válida")
         self.assertEqual(Configuracion.obtener().redes, [])
 
+    def test_guarda_configuracion_del_adjunto_a(self):
+        Configuracion().save()
+        direcciones = json.dumps(
+            [
+                {
+                    "localidad": "Castelli",
+                    "direccion": "Calle 1 N° 100",
+                    "provincia": "Buenos Aires",
+                }
+            ]
+        )
+        datos = self.datos(
+            cuit="30-12345678-9",
+            telefono="02245 46-1234",
+            telefono_internacional="+5492245461234",
+            telefono_2="02241 54-6232",
+            telefono_2_internacional="+5492241546232",
+            atiende_24_horas="on",
+            direcciones=direcciones,
+        )
+        r = self.client.post("/admin/web/configuracion/1/change/", datos)
+        self.assertEqual(r.status_code, 302)
+        config = Configuracion.obtener()
+        self.assertEqual(config.telefono_internacional, "+5492245461234")
+        self.assertEqual(config.telefono_2_internacional, "+5492241546232")
+        self.assertTrue(config.atiende_24_horas)
+        self.assertEqual(config.direcciones[0]["provincia"], "Buenos Aires")
+
+    def test_direccion_con_clave_desconocida_se_rechaza(self):
+        Configuracion().save()
+        direcciones = json.dumps(
+            [{"localidad": "Castelli", "direccion": "Calle 1", "barrio": "Centro"}]
+        )
+        r = self.client.post(
+            "/admin/web/configuracion/1/change/", self.datos(direcciones=direcciones)
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "debe tener las claves")
+        self.assertEqual(Configuracion.obtener().direcciones, [])
+
+    def test_telefono_internacional_invalido_se_rechaza(self):
+        Configuracion().save()
+        r = self.client.post(
+            "/admin/web/configuracion/1/change/",
+            self.datos(telefono_internacional="2245461234"),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Configuracion.obtener().telefono_internacional, "")
+
     def test_datos_legales_se_editan(self):
         Configuracion().save()
         datos = self.datos(
