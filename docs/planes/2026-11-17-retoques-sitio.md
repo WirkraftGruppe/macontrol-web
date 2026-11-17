@@ -306,8 +306,8 @@ commit_base: d3390df
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
 | | T1 | | | |
-| | T2 | | | |
-| | T3 | | | |
+| 2026-11-17 | T2 | 170c146 | PASA 10/10 (verificador y verificador-b) | favicon y OG revisados a ojo por el principal |
+| 2026-11-17 | T3 | 70e75e1 | PASA 6/6 (verificador y verificador-b) | el principal corrigió playwright a 1.64.1 (regla de dos semanas) y commiteó T3 |
 | | T4 | | | |
 | | T5 | | | |
 | | T6 | | | |
