@@ -197,15 +197,15 @@ el sondeo que cuenta se lanza justo antes del push y el del apply va aparte. -->
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: 1c896e8
 
 ### Estado de subtareas
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
+| T1 | en curso |
+| T2 | en curso |
+| T3 | en curso |
 | T4 | pendiente |
 | T5 | pendiente |
 | T6 | pendiente |
