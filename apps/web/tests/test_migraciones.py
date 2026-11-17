@@ -80,3 +80,37 @@ class MigracionDatosTests(TransactionTestCase):
         self._migrar(self.antes)
         apps = self._migrar(self.despues)
         self.assertEqual(apps.get_model("web", "Configuracion").objects.count(), 0)
+
+
+class PruebaDespliegueTests(TransactionTestCase):
+    antes = [("web", "0003_datos_adjunto_a")]
+    despues = [("web", "0004_prueba_despliegue")]
+
+    def tearDown(self):
+        self._migrar(self.despues)
+
+    def _migrar(self, destino):
+        ejecutor = MigrationExecutor(connection)
+        ejecutor.migrate(destino)
+        return ejecutor.loader.project_state(destino).apps
+
+    def test_0004_es_reversible(self):
+        self._migrar(self.antes)
+        self._migrar(self.despues)
+
+    def test_0004_no_cambia_filas(self):
+        apps = self._migrar(self.antes)
+        apps.get_model("web", "Configuracion").objects.create(pk=1, telefono="1")
+        apps.get_model("web", "Servicio").objects.create(
+            slug="s", nombre="S", titulo_seo="t", resumen="r", problema="p"
+        )
+        ClienteDestacado = apps.get_model("web", "ClienteDestacado")
+        ClienteDestacado.objects.create(nombre="C")
+        modelos = ("Configuracion", "Servicio", "ClienteDestacado")
+
+        def contar(apps):
+            return [apps.get_model("web", m).objects.count() for m in modelos]
+
+        antes = contar(apps)
+        self.assertEqual(antes, [1, 1, 1])
+        self.assertEqual(contar(self._migrar(self.despues)), antes)
