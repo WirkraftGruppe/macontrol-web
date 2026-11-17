@@ -54,4 +54,4 @@ class PaginasPublicasTests(TestCase):
         )
         respuesta = self.client.get("/empresa/")
         self.assertNotContains(respuesta, "<li></li>")
-        self.assertContains(respuesta, "<li>Director técnico: Miguel Canale</li>")
+        self.assertContains(respuesta, "<li>Director técnico matriculado</li>")
