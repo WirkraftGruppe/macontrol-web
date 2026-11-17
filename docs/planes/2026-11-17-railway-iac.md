@@ -203,10 +203,10 @@ commit_base: 1c896e8
 
 | Tarea | Estado |
 |---|---|
-| T1 | en curso |
-| T2 | en curso |
-| T3 | en curso |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 
@@ -214,6 +214,10 @@ commit_base: 1c896e8
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-11-17 | T1, T2, T3 (verificador) | raíz efd9737; T1 e302018, T2 b2d49fe, T3 176b824 | FALLA solo por CONTRATO MODIFICADO (efd9737, aprobado por el usuario); 41/41 criterios en PASA | criterios corridos en cada worktree |
+| 2026-11-17 | T1, T2, T3 (verificador-b) | ídem | FALLA solo por CONTRATO MODIFICADO; 38/38 criterios en PASA | |
+| 2026-11-17 | T2 (auditor-seguridad) | b2d49fe | sin bloqueantes ni importantes; 4 observaciones | plan real: 0 to add, 2 to change, 0 to destroy |
+| 2026-11-17 | T4 (principal) | c889dbb | 3 integraciones con `worktree-integrar.sh` (exit 0, 188 tests); `npm ci --prefix .railway`; `config plan` desde la raíz igual al ensayo | |
 
 ### Decisiones del plan
 
@@ -225,6 +229,10 @@ commit_base: 1c896e8
 ## Pendientes que deja este plan
 
 ### Problemas
+
+- P-railway-iac-1 [observación] Si un despliegue trae varias migraciones y falla una intermedia, las anteriores quedan aplicadas (una transacción por migración en Postgres) y el código viejo sigue sirviendo sobre ese esquema; lo mismo si `migrate` sale bien y falla `createcachetable`. Documentarlo en `docs/despliegue.md` y preferir migraciones compatibles con el código anterior (auditor-seguridad T2, O2).
+- P-railway-iac-2 [observación] `domains: ["www.macontrol.com.ar"]` (`.railway/railway.ts`) hace al archivo dueño del dominio: quitarlo o cambiarlo y aplicar borraría el dominio personalizado. Revisar siempre que el plan diga 0 to destroy (auditor-seguridad T2, O3).
+- P-railway-iac-3 [observación] El comentario de `config/settings/prod.py:82` dice que `cache_sitio` se crea "en el preDeployCommand"; desde este plan es el `preDeploy` de `.railway/railway.ts` (auditor-seguridad T2).
 
 ### Decisiones
 
