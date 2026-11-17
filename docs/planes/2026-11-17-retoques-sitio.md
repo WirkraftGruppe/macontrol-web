@@ -340,7 +340,7 @@ commit_base: d3390df
 | 2026-11-17 | T6 | bb85dfb | 16/16 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10) | auditor-seguridad: sin hallazgos; 2 observaciones |
 | 2026-11-17 | T10 | fa64ca2 | 6/6 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10, aprobado por el usuario) | auditor-seguridad: sin bloqueantes ni importantes; 2 menores en tests → P-retoques-sitio-6 |
 | 2026-11-17 | T7 | (este registro) | criterios corridos por el principal: 3 integraciones, medir_movil 0 (portada 188 px, logo 158,45×40, scrollWidth 375), humo 0, CSP sin cambios, grep-0 | 2 commits T7 de ajuste (13 líneas): test de T5 admite el JSON-LD de T6; teléfono del contacto en una línea a 375 px; 180 tests OK |
-| | TODO | | | |
+| 2026-11-17 | TODO (sin T8/T9) | 96d6c31 | 85/86 PASA (verificador y verificador-b); único FALLA: congelado.sh por el contrato modificado cdacc66 (T10, aprobado por el usuario) | presupuesto de T7 (fuera del bloque Criterios): 13/80, corrido por el principal |
 | | T8 | | | |
 
 ### Decisiones del plan
