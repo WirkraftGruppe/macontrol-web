@@ -221,6 +221,7 @@ commit_base: 1c896e8
 | 2026-11-17 | TODO previa al despliegue (T1–T4 + cierre global; verificador) | d270f3a | FALLA 49/50: solo `congelado.sh` por CONTRATO MODIFICADO (efd9737, aprobado por el usuario) | 188 tests OK, ruff OK |
 | 2026-11-17 | T5 (verificador) | d6d2e37 | FALLA solo por CONTRATO MODIFICADO (efd9737, 31e3c0c, aprobados); 13/13 criterios en PASA | apply sin destruir; despliegue 9fa65c0d aplicó la 0004 en el preDeploy; sondeos sin 5xx (un 000 en el traspaso) |
 | 2026-11-17 | T5 (verificador-b) | d6d2e37 | FALLA 12/13: el `ssh` de `/proc/mounts` no llegó a correr ("Railway can't verify your SSH key right now… temporary service issue") | el mismo criterio pasó en el verificador sobre el mismo HEAD |
+| 2026-11-17 | TODO (verificador) | 783c9be | FALLA 65/66: solo `congelado.sh` por CONTRATO MODIFICADO (efd9737, 31e3c0c, aprobados por el usuario) | 188 tests OK; producción comprobada (ssh, curl, config plan al día) |
 
 ### Decisiones del plan
 
