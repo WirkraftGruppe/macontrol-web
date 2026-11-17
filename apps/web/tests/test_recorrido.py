@@ -35,7 +35,7 @@ class RecorridoPublicoTests(TestCase):
         self.assertContains(empresa, "Bioseguridad")
         contacto = self.client.get(enlace_contacto[0])
         self.assertEqual(contacto.status_code, 200)
-        self.assertContains(contacto, "tel:+542241496047")
+        self.assertContains(contacto, "tel:+5492241546232")
         qr = self.client.get(f"/q/{uuid.uuid4()}/")
         self.assertEqual(qr.status_code, 200)
         self.assertContains(qr, "use la app")

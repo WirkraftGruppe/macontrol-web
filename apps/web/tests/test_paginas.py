@@ -55,8 +55,7 @@ class HomeTests(ConContenido):
             "La Zona",
         ):
             self.assertContains(respuesta, nombre)
-        self.assertContains(respuesta, 'href="tel:+542241496047"')
-        self.assertNotIn("wa.me", html)
+        self.assertContains(respuesta, 'href="tel:+5492241546232"')
 
 
 class ServicioTests(ConContenido):
@@ -92,11 +91,14 @@ class ContactoTests(ConContenido):
     def test_telefono_principal_y_whatsapp_solo_si_esta_configurado(self):
         respuesta = self.client.get("/contacto/")
         self.assertContains(
-            respuesta, 'class="contacto-telefono" href="tel:+542241496047"'
+            respuesta, 'class="contacto-telefono" href="tel:+5492241546232"'
         )
         self.assertContains(respuesta, "Llamar ahora")
-        self.assertNotContains(respuesta, "wa.me")
+        self.assertContains(respuesta, 'href="https://wa.me/5492241546232"')
         self.assertNotContains(respuesta, "<form")
+        Configuracion.objects.filter(pk=1).update(whatsapp="")
+        respuesta = self.client.get("/contacto/")
+        self.assertNotContains(respuesta, "wa.me")
         Configuracion.objects.filter(pk=1).update(whatsapp="02241 15 55 1234")
         respuesta = self.client.get("/contacto/")
         self.assertContains(respuesta, 'href="https://wa.me/54224115551234"')

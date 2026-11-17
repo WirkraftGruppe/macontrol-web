@@ -18,7 +18,10 @@ class DisenoWebTests(TestCase):
             html, r"https?://(?!www\.w3\.org)[^\"'\s]*\.(css|js|woff2?)"
         )
         self.assertNotIn("fonts.googleapis", html)
-        self.assertNotIn("<script", html)
+        self.assertEqual(
+            re.findall(r"<script\b[^>]*>", html),
+            ['<script type="application/ld+json">'],
+        )
         self.assertNotIn("style=", html)
         for url in re.findall(r'(?:src|href)="(https?://[^"]+)"', html):
             self.assertNotIn("/static/", url)

@@ -29,10 +29,11 @@ class PaginasPublicasTests(TestCase):
 
     def test_empresa_muestra_datos_legales_de_configuracion(self):
         respuesta = self.client.get("/empresa/")
-        self.assertContains(respuesta, "<li>Director técnico matriculado</li>")
+        self.assertContains(respuesta, "<li>Director técnico: Miguel Canale</li>")
         self.assertContains(
             respuesta,
-            "<li>Empresa inscripta y habilitada — Ministerio de Agroindustria</li>",
+            "<li>Empresa inscripta y habilitada — "
+            "Ministerio de Desarrollo Agrario</li>",
         )
         self.assertContains(respuesta, "Ley de Agroquímicos 10.699/88</li>")
         Configuracion.objects.filter(pk=1).update(
@@ -43,6 +44,9 @@ class PaginasPublicasTests(TestCase):
         self.assertContains(respuesta, "<li>Habilitación X</li>")
         self.assertContains(respuesta, "<li>Ley Y</li>")
         self.assertNotContains(respuesta, "Director técnico matriculado")
+        Configuracion.objects.filter(pk=1).update(director_tecnico="")
+        respuesta = self.client.get("/empresa/")
+        self.assertContains(respuesta, "<li>Director técnico matriculado</li>")
 
     def test_empresa_sin_datos_legales_no_deja_items_vacios(self):
         Configuracion.objects.filter(pk=1).update(
