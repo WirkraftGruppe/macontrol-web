@@ -324,8 +324,8 @@ commit_base: d3390df
 | T5 | hecha |
 | T6 | hecha |
 | T7 | hecha |
-| T8 | pendiente |
-| T9 | pendiente |
+| T8 | hecha |
+| T9 | hecha |
 | T10 | hecha |
 
 ### Corridas
@@ -341,7 +341,7 @@ commit_base: d3390df
 | 2026-11-17 | T10 | fa64ca2 | 6/6 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10, aprobado por el usuario) | auditor-seguridad: sin bloqueantes ni importantes; 2 menores en tests → P-retoques-sitio-6 |
 | 2026-11-17 | T7 | (este registro) | criterios corridos por el principal: 3 integraciones, medir_movil 0 (portada 188 px, logo 158,45×40, scrollWidth 375), humo 0, CSP sin cambios, grep-0 | 2 commits T7 de ajuste (13 líneas): test de T5 admite el JSON-LD de T6; teléfono del contacto en una línea a 375 px; 180 tests OK |
 | 2026-11-17 | TODO (sin T8/T9) | 96d6c31 | 85/86 PASA (verificador y verificador-b); único FALLA: congelado.sh por el contrato modificado cdacc66 (T10, aprobado por el usuario) | presupuesto de T7 (fuera del bloque Criterios): 13/80, corrido por el principal |
-| | T8 | | | |
+| 2026-11-17 | T8 | e18410c (main) | 8/8 PASA tras migrar a mano; antes 500 en todo el sitio público | el preDeployCommand no corrió (UndefinedColumn web_configuracion.cuit); migrate por `railway ssh` con autorización del usuario: 0002 y 0003 OK; caída de pocos minutos; respaldo previo `respaldo-pre-0003.json` (10 objetos) |
 
 ### Decisiones del plan
 
@@ -373,11 +373,17 @@ commit_base: d3390df
 - P-retoques-sitio-8 [observación] Si `config.habilitacion` está vacía, `_respaldos.html` deja el título "Habilitación oficial" sin texto; `web.css` conserva `.logos-clientes`/`.logo-cliente`, que ya no se usan (T6).
 - P-retoques-sitio-9 [observación] `herramientas/medir_movil.py` importa `_NO_HEREDADAS` (privado) de `humo_web.py`; conviene un módulo común para el entorno de las herramientas (T5).
 
+- P-retoques-sitio-12 [importante] El `preDeployCommand` tampoco corrió con una sola cadena (despliegue e18410c, 2026-11-17): el código nuevo llegó sin migraciones y todo el sitio dio 500 hasta correr `migrate` a mano por `railway ssh`. P-puesta-en-produccion-18 sigue abierto. Mover `migrate --noinput && createcachetable` al `startCommand` o a la configuración nueva de Railway (ver P-retoques-sitio-10) y comprobarlo en un despliegue con una migración trivial.
+- P-retoques-sitio-13 [observación] `og:image`, `og:url` y el JSON-LD salen con `https://web-production-0c499.up.railway.app` porque `SITE_URL` de Railway no apunta a `https://www.macontrol.com.ar` (lo cambia el usuario); falta además la redirección de `macontrol.com.ar` a `www` y subir HSTS (P-puesta-en-produccion-21).
+- P-retoques-sitio-10 [importante] Railway marca Config as Code (`railway.json`) como obsoleto: "Existing files keep working until 2026-12-01". Después de esa fecha el `preDeployCommand` (migraciones automáticas) y el `startCommand` pueden dejar de aplicarse. Migrar a `.railway/railway.ts` (`railway config migrate`) en un plan propio antes del 2026-12-01.
+- P-retoques-sitio-11 [menor] `docs/despliegue.md` no dice cómo correr comandos en producción: confirmar antes con `railway status` que la CLI apunte a `macontrol-web` (el 2026-11-17 estaba vinculada a TerritoryOS y un `dumpdata` corrió allí, sin efectos); el intérprete es `/app/.venv/bin/python` (`cd /app`); en Git Bash hace falta `MSYS_NO_PATHCONV=1`, en PowerShell no.
+
 ### Decisiones
 
 - 2026-11-17 — Los datos de la empresa del Adjunto A (CUIT 30-71834106-6, director técnico Miguel Canale, dirección única Saavedra 555 de Castelli, teléfonos 02241 15-546232 —principal y WhatsApp— y 02241 15-496047, atención 24 horas, habilitación del Ministerio de Desarrollo Agrario, 15 años de trayectoria, Instagram y Facebook) reemplazan a los publicados — entregados por el usuario — reemplaza a: 2026-10-18 (los datos de la empresa los entrega el cliente más adelante)
 - 2026-11-17 — `Configuracion` guarda el número internacional de cada teléfono en un campo aparte (`telefono_internacional`, `telefono_2_internacional`), sin deducirlo del texto visible — decisión del usuario — reemplaza a: (nada)
 - 2026-11-17 — Los datos nuevos llegan a producción con una migración de datos (0003), y el `preDeployCommand` pasa a un solo comando para que `migrate` corra en cada despliegue — decisión del usuario — reemplaza a: 2026-10-18 (migraciones del primer despliegue por `railway ssh`)
+- 2026-11-17 — Las migraciones 0002 y 0003 se aplicaron en producción a mano por `railway ssh` porque el `preDeployCommand` no corrió; antes se respaldaron Configuracion y Servicio con `dumpdata` — autorizado por el usuario ante el 500 — reemplaza a: (nada)
 - 2026-11-17 — El dominio `www.macontrol.com.ar` ya está conectado (hecho a mano, fuera de un plan) — informado por el usuario — reemplaza a: 2026-10-18 (el sitio sale primero con `*.up.railway.app`)
 
 ### Cierra
