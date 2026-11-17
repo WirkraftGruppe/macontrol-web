@@ -204,6 +204,7 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .contacto-telefono {
   display: block; color: var(--text);
   font-family: var(--fuente-display); font-size: 52px; font-weight: 800; line-height: 1;
+  white-space: nowrap;
 }
 .contacto-telefono:hover { color: var(--brand); text-decoration: none; }
 .contacto-acciones { display: flex; flex-direction: column; gap: 10px; }
@@ -313,5 +314,6 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
   .paso { grid-template-columns: 48px minmax(0, 1fr); gap: 16px; }
   .paso::before { font-size: 34px; }
   .servicio-lateral { position: static; }
-  .contacto-telefono { font-size: 40px; }
+  /* Con dos teléfonos de 15 caracteres, a 375 px el número no entra en una línea a 40 px. */
+  .contacto-telefono { font-size: clamp(26px, 8vw, 40px); }
 }
