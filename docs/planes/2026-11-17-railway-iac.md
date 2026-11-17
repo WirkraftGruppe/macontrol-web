@@ -89,7 +89,7 @@ el sondeo que cuenta se lanza justo antes del push y el del apply va aparte. -->
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_despliegue.RailwayTests.test_predeploy_declarado_en_iac --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_despliegue.RailwayTests.test_volumen_montado_en_data --keepdb`
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_despliegue.RailwayTests.test_railway_json_retirado --keepdb`
-  - `[grep-0]` `grep -n "railway.json" config/tests/test_despliegue.py`
+  - `[grep-0]` `grep -n "railway\.json" config/tests/test_despliegue.py`
   - `[existe]` `.railway/railway.ts`
   - `[existe]` `.railway/package-lock.json`
   - `[existe]` `.railway/README.md`
@@ -227,5 +227,7 @@ commit_base: 1c896e8
 ### Problemas
 
 ### Decisiones
+
+- 2026-11-17 — El `[grep-0]` de T2 sobre `config/tests/test_despliegue.py` escapa el punto (`railway\.json`): con `.` sin escapar coincidía con el nombre `test_railway_json_retirado` que exige el propio contrato — decisión del usuario ante la contradicción informada por el implementador de T2 — reemplaza a: (nada)
 
 ### Cierra
