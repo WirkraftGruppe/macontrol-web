@@ -285,7 +285,7 @@ Propiedades del modelo que define T1 y consumen T5 y T6: `Configuracion.cuit`, `
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): retoques-sitio>
+commit_base: d3390df
 
 ### Estado de subtareas
 
