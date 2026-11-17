@@ -55,6 +55,14 @@ Escala (px):
 - **Tarjeta**: fondo `--surface`, borde `--border`, radio 6, padding 22–24 px; número o etiqueta en `--brand` arriba, título 19 px 600, descripción 14 px `--text-muted`.
 - **Tarjeta invertida** (bloque amarillo, solo web): fondo `--brand`, tarjetas hijas fondo `--bg`.
 - **Formulario**: etiqueta 13 px uppercase tracking 0.08em `--text-muted`; input alto 46–48 px, fondo `--bg`, borde `--border-strong`, radio 4, foco con borde `--brand`.
+- **Barra de navegación**: la página actual lleva `aria-current="page"` y `.nav-actual` (texto y subrayado `--brand`); en `/servicio/…` se marca "Servicios". "Servicios" abre `.nav-desplegable-panel` con `:hover` y `:focus-within`, solo HTML y CSS. `section[id]` usa `scroll-margin-top: 100px` por la barra fija.
+- **Barra móvil (≤ 900 px)**: logo de 40 px de alto con `width: auto` y `flex-shrink: 0` (proporción 3,96:1); teléfono como `.nav-telefono-icono` de 44×44 con `aria-label="Llamar al …"`; el menú desplegable ocupa todo el ancho del viewport.
+- **Botón flotante `.whatsapp-flotante`**: círculo de 56 px fijo abajo a la derecha; solo existe si hay número de WhatsApp. En móvil el pie deja 96 px de margen inferior para que no lo tape.
+- **Pie**: `.pie-marca` (logo, eslogan y redes), direcciones con enlace a Google Maps (`rel="noopener"`), dos teléfonos, WhatsApp, correo, horario y línea legal con CUIT, habilitación, director técnico y `© año MAControl S.A.`.
+- **Tarjeta de servicio** (`.tarjeta-servicio`): altura igual por fila, `.tarjeta-icono` de 48×48 (borde `--on-brand-muted`, fondo `--brand-tint`, ícono `--brand`) y `.tarjeta-ver` "Ver servicio →" al pie.
+- **Franja de sectores** (`.franja-sectores`): título a la izquierda y `.lista-sectores` a la derecha, 3 columnas con filete superior (2 en móvil).
+- **Franja de clientes** (`.franja-clientes`): `.cliente-nombre` en Barlow Condensed 700, mayúsculas, con rombo `--brand` delante; salto de línea natural.
+- **Portada de servicio** (`.campo-imagen-portada`): `aspect-ratio: 16 / 9`, imagen con `object-fit: cover`.
 - **Bloque de contacto (web)**: teléfono en Barlow Condensed 800 56 px como elemento principal; botones "Llamar ahora" (primario) y "WhatsApp" (secundario). Sin formularios.
 
 ## Estructura de páginas (web)
