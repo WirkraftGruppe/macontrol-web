@@ -207,8 +207,8 @@ commit_base: 1c896e8
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | en curso |
-| T6 | pendiente |
+| T5 | hecha |
+| T6 | hecha |
 
 ### Corridas
 
@@ -219,6 +219,8 @@ commit_base: 1c896e8
 | 2026-11-17 | T2 (auditor-seguridad) | b2d49fe | sin bloqueantes ni importantes; 4 observaciones | plan real: 0 to add, 2 to change, 0 to destroy |
 | 2026-11-17 | T4 (principal) | c889dbb | 3 integraciones con `worktree-integrar.sh` (exit 0, 188 tests); `npm ci --prefix .railway`; `config plan` desde la raíz igual al ensayo | |
 | 2026-11-17 | TODO previa al despliegue (T1–T4 + cierre global; verificador) | d270f3a | FALLA 49/50: solo `congelado.sh` por CONTRATO MODIFICADO (efd9737, aprobado por el usuario) | 188 tests OK, ruff OK |
+| 2026-11-17 | T5 (verificador) | d6d2e37 | FALLA solo por CONTRATO MODIFICADO (efd9737, 31e3c0c, aprobados); 13/13 criterios en PASA | apply sin destruir; despliegue 9fa65c0d aplicó la 0004 en el preDeploy; sondeos sin 5xx (un 000 en el traspaso) |
+| 2026-11-17 | T5 (verificador-b) | d6d2e37 | FALLA 12/13: el `ssh` de `/proc/mounts` no llegó a correr ("Railway can't verify your SSH key right now… temporary service issue") | el mismo criterio pasó en el verificador sobre el mismo HEAD |
 
 ### Decisiones del plan
 
@@ -238,7 +240,14 @@ commit_base: 1c896e8
 
 ### Decisiones
 
+- 2026-11-17 — La configuración del servicio `web` vive en `.railway/railway.ts` (Infrastructure as Code en TypeScript, partial `web`, variables no gestionadas, volumen `web-media` declarado en `/data`) y se aplica con `railway config plan` → revisión → `railway config apply`; `railway.json` se retira y `migrate --noinput && createcachetable` corre como `preDeploy` del servicio — el `preDeployCommand` de `railway.json` nunca se aplicó (el servicio no leía Config as Code) y Railway deja de leer ese archivo el 2026-12-01 — reemplaza a: 2026-11-17 (el `preDeployCommand` pasa a un solo comando)
 - 2026-11-17 — Los criterios del sondeo de T5 exigen ningún 5xx en lugar de todo 200, como el criterio de aceptación del pedido: con el volumen `web-media` montado Railway no superpone despliegues y hay unos segundos sin respuesta en cada traspaso (un `000` de 10,5 s a las 17:25:44 en el despliegue 9fa65c0d), que un healthcheck no evita — decisión del usuario ante la FALLA del sondeo — reemplaza a: (nada)
 - 2026-11-17 — El `[grep-0]` de T2 sobre `config/tests/test_despliegue.py` escapa el punto (`railway\.json`): con `.` sin escapar coincidía con el nombre `test_railway_json_retirado` que exige el propio contrato — decisión del usuario ante la contradicción informada por el implementador de T2 — reemplaza a: (nada)
 
 ### Cierra
+
+- cierra: P-puesta-en-produccion-18 — el comando previo vive en `.railway/railway.ts` y corrió en los despliegues 7794f003 y 9fa65c0d (este aplicó `web.0004_prueba_despliegue` sin intervención)
+- cierra: P-retoques-sitio-12 — ídem; comprobado con la migración trivial 0004 (T5)
+- cierra: P-retoques-sitio-10 — `railway.json` retirado de `main` (75cea6a); `railway config migrate status`: ningún servicio lee Config as Code
+- cierra: P-retoques-sitio-11 — `docs/despliegue.md` § comandos en producción: `railway status` primero, `/app/.venv/bin/python`, `MSYS_NO_PATHCONV=1` en Git Bash
+- cierra: P-puesta-en-produccion-16 — `docs/despliegue.md` describe `NUM_PROXIES=0` como exigida por `prod.py` pero sin uso con `IP_CLIENTE_CABECERA`

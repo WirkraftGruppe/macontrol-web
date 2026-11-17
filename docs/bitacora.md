@@ -1,7 +1,7 @@
 # Bitácora del sitio público de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-11-17-retoques-sitio.md
+Plan activo: docs/planes/2026-11-17-railway-iac.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
@@ -9,11 +9,20 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 |---|---|---|---|---|
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
 | puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 6: T1–T14 hechas, desplegado | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
-| retoques-sitio | plan/retoques-sitio (fusionada en main e18410c) | 3: T1–T10 hechas, desplegado | el usuario cambia `SITE_URL` a https://www.macontrol.com.ar; P-retoques-sitio-10 (railway.json obsoleto el 2026-12-01) y -12 (preDeployCommand) | sesión 2026-11-17, commit_base d3390df, contrato modificado cdacc66 |
+| retoques-sitio | plan/retoques-sitio (fusionada en main e18410c) | 3: T1–T10 hechas, desplegado | el usuario cambia `SITE_URL` a https://www.macontrol.com.ar | sesión 2026-11-17, commit_base d3390df, contrato modificado cdacc66 |
+| railway-iac | plan/railway-iac (fusionada en main 75cea6a) | 3: T1–T6 hechas, desplegado | P-railway-iac-4 (corte de unos segundos por despliegue con el volumen) | sesión 2026-11-17, commit_base 1c896e8, contrato modificado efd9737 y 31e3c0c |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-11-17 — Plan `railway-iac`: configuración en `.railway/railway.ts` y migraciones automáticas al desplegar
+Hecho:
+- Diagnóstico (CLI de Railway actualizada de 5.45.2 a 5.74.1): el servicio `web` no leía Config as Code (`config migrate status`); el build tomaba `buildCommand`/`startCommand` de `railway.json`, pero la sección `deploy` (el `preDeployCommand`) nunca se aplicó. Documentado en `docs/despliegue.md` § Historia.
+- T2: `.railway/railway.ts` (TypeScript, `railway` 3.17.0, partial `web`, variables no gestionadas, volumen declarado: sin él el plan desmontaba `/data`); `railway.json` retirado; T3: migración 0004 sin efecto y `herramientas/sondear.py`; T1: `docs/despliegue.md` reescrito.
+- T5: respaldo `dumpdata` en `~/respaldos/macontrol-web/`; `railway config apply` (0 a destruir) y merge 75cea6a: el despliegue 9fa65c0d aplicó `web.0004_prueba_despliegue` en el preDeploy, sin intervención. Rutas 200, CSP igual, `/data` montado. Sondeos sin 5xx; un `000` de 10 s en el traspaso (volumen, P-railway-iac-4).
+- Dos contratos modificados por decisión del usuario (efd9737, 31e3c0c). El push lo hizo el usuario: `git-credential-manager` se colgó desde la sesión.
+Pendiente: P-railway-iac-4 (media a un bucket y healthcheck); P-railway-iac-1 a -3 (observaciones).
 
 ### 2026-11-17 — Plan `retoques-sitio`: datos reales, identidad y ajustes visuales, desplegado
 Hecho:
