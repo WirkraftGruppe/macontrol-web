@@ -1,0 +1,14 @@
+Starting Container
+  Applying web.0004_prueba_despliegue... OK
+Cache table 'cache_sitio' already exists.
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, sessions, web
+Running migrations:
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/d44461e6-a302-4070-93fc-87f53b4af2f4/vol_6xub0fk7m31i3rgl
+Starting Container
+[2026-11-17 20:25:39 +0000] [1] [INFO] Starting gunicorn 26.2.0
+[2026-11-17 20:25:39 +0000] [1] [INFO] Listening at: http://0.0.0.0:8080 (1)
+[2026-11-17 20:25:39 +0000] [1] [INFO] Using worker: sync
+[2026-11-17 20:25:39 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-17 20:25:39 +0000] [3] [INFO] Booting worker with pid: 3
+[2026-11-17 20:25:39 +0000] [1] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
