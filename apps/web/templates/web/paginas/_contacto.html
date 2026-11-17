@@ -1,13 +1,11 @@
 <div class="contacto">
   <div class="contacto-info">
-    <span class="eyebrow">Contacto directo</span>
-    <h3 class="contacto-titulo">Hablemos por teléfono</h3>
     <p class="texto-suave contacto-texto">Las cotizaciones y la coordinación de visitas se hacen por contacto directo con la empresa. Un responsable técnico atiende su consulta.</p>
     <dl class="contacto-datos">
-      {% for d in config.direcciones %}
+      {% for d in config.direcciones_con_mapa %}
       <div class="contacto-dato">
         <dt>{{ d.localidad }}</dt>
-        <dd>{{ d.direccion }}</dd>
+        <dd><a class="enlace" href="{{ d.mapa_href }}" target="_blank" rel="noopener noreferrer">{{ d.direccion }}{% if d.provincia %}, {{ d.provincia }}{% endif %}</a></dd>
       </div>
       {% endfor %}
       {% if config.horario %}
@@ -27,6 +25,7 @@
   <div class="contacto-llamar">
     <span class="eyebrow">Teléfono</span>
     {% if config.telefono_href %}<a class="contacto-telefono" href="{{ config.telefono_href }}">{{ config.telefono }}</a>{% endif %}
+    {% if config.telefono_2_href %}<a class="contacto-telefono" href="{{ config.telefono_2_href }}">{{ config.telefono_2 }}</a>{% endif %}
     <div class="contacto-acciones">
       {% if config.telefono_href %}<a class="btn btn-primario" href="{{ config.telefono_href }}">Llamar ahora</a>{% endif %}
       {% if config.whatsapp_href %}<a class="btn btn-secundario" href="{{ config.whatsapp_href }}">Escribir por WhatsApp</a>{% endif %}

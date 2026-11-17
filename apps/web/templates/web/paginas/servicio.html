@@ -15,7 +15,7 @@
         <p>{% for sector in sectores %}<span class="etiqueta">{{ sector }}</span> {% endfor %}</p>
         {% endif %}
       </header>
-      <div class="campo-imagen">
+      <div class="campo-imagen campo-imagen-portada">
         <img src="{{ portada.url }}" width="{{ portada.ancho }}" height="{{ portada.alto }}" alt="{{ pagina.nombre }}">
       </div>
       <section id="problema">
@@ -52,7 +52,7 @@
     </article>
     <aside class="servicio-lateral" aria-label="Contacto y servicios relacionados">
       {% include "web/paginas/_contacto_compacto.html" %}
-      <div class="aviso"><span class="eyebrow">Respaldo</span><p>Empresa habilitada por el Ministerio de Agroindustria · Certificada según Ley 10.699/88 · Director técnico matriculado · Seguro de trabajo</p></div>
+      <div class="aviso"><span class="eyebrow">Respaldo</span><p>{% if config.habilitacion %}{{ config.habilitacion }} · {% endif %}Certificada según Ley 10.699/88 · Director técnico matriculado · Seguro de trabajo</p></div>
       {% if relacionados %}
       <div>
         <h2 class="pie-titulo">Otros servicios</h2>

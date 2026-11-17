@@ -4,13 +4,16 @@ import mimetypes
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.staticfiles import finders
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.templatetags.static import static
 from django.urls import reverse
 from django.views.decorators.http import require_safe
 
+from .iconos import icono_de
 from .models import ClienteDestacado, Configuracion, Sector, Servicio
+from .seo import datos_estructurados, json_ld
 
 # Imagen estática, con su tamaño real, para las páginas sin portada cargada.
 IMAGENES = {
@@ -19,6 +22,7 @@ IMAGENES = {
     "mantenimiento": ("img/mantenimiento-fachada-andamio.webp", 1201, 1600),
     "fumigacion": ("img/fumigacion-termonebulizacion-cocina.webp", 768, 1365),
     "flota": ("img/flota-vehiculos-industria.webp", 1365, 768),
+    "og": ("img/og-macontrol.png", 1200, 630),
 }
 PORTADA_POR_SLUG = {
     "desinfeccion-sanitizacion-desodorizacion": "fumigacion",
@@ -36,9 +40,21 @@ def _imagen(clave):
     return {"url": static(ruta), "ancho": ancho, "alto": alto}
 
 
-def _pagina(request, plantilla, *, titulo, descripcion, ruta, og_imagen=None, **extra):
+def _pagina(
+    request,
+    plantilla,
+    *,
+    titulo,
+    descripcion,
+    ruta,
+    og_imagen=None,
+    og_ancho=1200,
+    og_alto=630,
+    **extra,
+):
     """Renderiza una página pública con `config`, `paginas_nav` y los metadatos."""
-    og_imagen = og_imagen or _imagen("hero")["url"]
+    config = Configuracion.obtener()
+    og_imagen = og_imagen or _imagen("og")["url"]
     seo = {
         "titulo": titulo,
         "descripcion": descripcion,
@@ -46,9 +62,12 @@ def _pagina(request, plantilla, *, titulo, descripcion, ruta, og_imagen=None, **
         "imagen": settings.SITE_URL + og_imagen
         if og_imagen.startswith("/")
         else og_imagen,
+        "imagen_ancho": og_ancho,
+        "imagen_alto": og_alto,
+        "sitio": config.razon_social,
     }
     contexto = {
-        "config": Configuracion.obtener(),
+        "config": config,
         "paginas_nav": Servicio.objects.publicados(),
         "seo": seo,
         **extra,
@@ -58,15 +77,20 @@ def _pagina(request, plantilla, *, titulo, descripcion, ruta, og_imagen=None, **
 
 def inicio(request):
     config = Configuracion.obtener()
+    servicios = [
+        {"pagina": s, "icono": icono_de(s.slug)} for s in Servicio.objects.publicados()
+    ]
     return _pagina(
         request,
         "web/paginas/inicio.html",
         titulo=f"{config.razon_social} · {config.eslogan}",
         descripcion=config.eslogan,
         ruta=reverse("web:inicio"),
+        datos_ld=json_ld(datos_estructurados(config)),
         hero=_imagen("hero"),
         empresa_foto=_imagen("empresa"),
         edilicia=_imagen("mantenimiento"),
+        servicios=servicios,
         sectores=Sector.choices,
         clientes=ClienteDestacado.objects.activos(),
     )
@@ -83,6 +107,8 @@ def contexto_servicio(servicio):
         "descripcion": servicio.resumen,
         "ruta": servicio.get_absolute_url(),
         "og_imagen": portada["url"],
+        "og_ancho": portada["ancho"],
+        "og_alto": portada["alto"],
         "pagina": servicio,
         "portada": portada,
         "sectores": [
@@ -106,6 +132,8 @@ def empresa(request):
         descripcion=config.presentacion[:160] or config.eslogan,
         ruta=reverse("web:empresa"),
         og_imagen=_imagen("empresa")["url"],
+        og_ancho=_imagen("empresa")["ancho"],
+        og_alto=_imagen("empresa")["alto"],
         foto=_imagen("empresa"),
     )
 
@@ -169,3 +197,30 @@ def media_publica(request, ruta):
     respuesta["X-Content-Type-Options"] = "nosniff"
     respuesta["Cache-Control"] = "public, max-age=86400"
     return respuesta
+
+
+# Archivos de la raíz con nombre fijo: nada de la URL llega al sistema de archivos.
+ARCHIVOS_RAIZ = {
+    "favicon.ico": ("favicon.ico", "image/x-icon"),
+    "apple-touch-icon.png": ("img/apple-touch-icon.png", "image/png"),
+}
+
+
+@require_safe
+def archivo_raiz(request, nombre):
+    """Sirve el favicon y el icono de Apple desde `static/`, por nombre fijo."""
+    ruta, tipo = ARCHIVOS_RAIZ[nombre]
+    archivo = finders.find(ruta)
+    if not archivo:
+        raise Http404
+    respuesta = FileResponse(open(archivo, "rb"), content_type=tipo)
+    respuesta["X-Content-Type-Options"] = "nosniff"
+    respuesta["Cache-Control"] = "public, max-age=86400"
+    return respuesta
+
+
+@require_safe
+def manifiesto(request):
+    return render(
+        request, "web/site.webmanifest", content_type="application/manifest+json"
+    )

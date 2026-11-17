@@ -28,11 +28,13 @@
       <h2>Qué hacemos</h2>
     </div>
     <div class="grilla grilla-3">
-      {% for pagina in paginas_nav %}
-      <a class="tarjeta-enlace" href="{{ pagina.get_absolute_url }}">
-        <div class="tarjeta">
-          <h3 class="tarjeta-titulo">{{ pagina.nombre }}</h3>
-          <p class="tarjeta-texto">{{ pagina.resumen }}</p>
+      {% for item in servicios %}
+      <a class="tarjeta-enlace" href="{{ item.pagina.get_absolute_url }}">
+        <div class="tarjeta tarjeta-servicio">
+          <span class="tarjeta-icono"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ item.icono }}"/></svg></span>
+          <h3 class="tarjeta-titulo">{{ item.pagina.nombre }}</h3>
+          <p class="tarjeta-texto">{{ item.pagina.resumen }}</p>
+          <span class="tarjeta-ver">Ver servicio <span aria-hidden="true">→</span></span>
         </div>
       </a>
       {% endfor %}
@@ -45,7 +47,7 @@
     <div>
       <span class="eyebrow">Mantenimiento edilicio</span>
       <h2>Espacios recuperados</h2>
-      <p class="texto-suave">MAControl S.A. cuenta además con un equipo de profesionales calificados en el área de mantenimiento edilicio: recuperamos y mantenemos en condiciones espacios/sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.</p>
+      <p class="texto-suave">MAControl S.A. cuenta además con un equipo de profesionales calificados en el área de mantenimiento edilicio: recuperamos y mantenemos en condiciones espacios y sectores dañados o deteriorados por uso, paso del tiempo y plagas, otorgando valor agregado a clientes y sus inmuebles.</p>
       {% for pagina in paginas_nav %}{% if pagina.slug == "mantenimiento-edilicio" %}<a class="btn btn-secundario" href="{{ pagina.get_absolute_url }}">Ver mantenimiento edilicio</a>{% endif %}{% endfor %}
     </div>
     <div class="banda-edilicia-imagen">
@@ -56,14 +58,16 @@
 
 <section class="seccion seccion-amarilla" id="sectores">
   <div class="contenedor">
-    <div class="seccion-titulo">
-      <span class="eyebrow">Sector público y privado</span>
-      <h2>¿Dónde trabajamos?</h2>
-    </div>
-    <div class="grilla grilla-4">
-      {% for valor, etiqueta in sectores %}
-      <div class="tarjeta"><h3 class="tarjeta-titulo">{{ etiqueta }}</h3></div>
-      {% endfor %}
+    <div class="franja-sectores">
+      <div class="seccion-titulo">
+        <span class="eyebrow">Sector público y privado</span>
+        <h2>¿Dónde trabajamos?</h2>
+      </div>
+      <ul class="lista-sectores">
+        {% for valor, etiqueta in sectores %}
+        <li>{{ etiqueta }}</li>
+        {% endfor %}
+      </ul>
     </div>
   </div>
 </section>
@@ -134,9 +138,9 @@
       <span class="eyebrow">Clientes</span>
       <h2>Quienes confían en nosotros</h2>
     </div>
-    <ul class="logos-clientes">
+    <ul class="franja-clientes">
       {% for cliente in clientes %}
-      <li class="logo-cliente">{% if cliente.logo %}<img src="{{ cliente.logo.url }}" width="160" height="56" alt="{{ cliente.nombre }}" loading="lazy">{% else %}{{ cliente.nombre }}{% endif %}</li>
+      <li class="cliente-nombre">{% if cliente.logo %}<img src="{{ cliente.logo.url }}" width="160" height="56" alt="{{ cliente.nombre }}" loading="lazy">{% else %}{{ cliente.nombre }}{% endif %}</li>
       {% endfor %}
     </ul>
   </div>
@@ -146,7 +150,7 @@
   <div class="contenedor">
     <div class="seccion-titulo">
       <span class="eyebrow">Contacto</span>
-      <h2>Hablemos</h2>
+      <h2>Contacto directo</h2>
     </div>
     {% include "web/paginas/_contacto.html" %}
   </div>
