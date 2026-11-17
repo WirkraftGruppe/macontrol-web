@@ -80,7 +80,7 @@ Reemplazan a los datos anteriores de esta carta (producción y fixture los carga
 - Trayectoria: 15 años (reemplaza a "más de diez años").
 - Sector "Vehículos de transporte" (antes "... de personas, mercaderías, inmuebles y bienes").
 - Servicios: "Control de mosquitos vectores", "Manejo integral de plagas en edificios y departamentos" y "Servicio MIPU" (resumen: "Manejo Integral de Plagas Urbanas (MIPU): ...").
-- Redes: Instagram y Facebook; las URL no figuran en el contrato del plan y quedan por cargar desde el admin.
+- Redes: Instagram https://www.instagram.com/macontrol_s.a/ y Facebook https://www.facebook.com/share/19pND5YUct/.
 
 ## Pendientes a confirmar con la empresa
 1. Marca: "MAControl S.A." vs "MAControl Group".

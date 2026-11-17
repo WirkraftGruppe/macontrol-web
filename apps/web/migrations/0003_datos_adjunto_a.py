@@ -28,6 +28,10 @@ CONFIGURACION = {
     "horario": "Atención las 24 horas, todos los días",
     "atiende_24_horas": True,
     "habilitacion": "Empresa inscripta y habilitada — Ministerio de Desarrollo Agrario",
+    "redes": [
+        {"nombre": "Instagram", "url": "https://www.instagram.com/macontrol_s.a/"},
+        {"nombre": "Facebook", "url": "https://www.facebook.com/share/19pND5YUct/"},
+    ],
 }
 
 NOMBRES = {

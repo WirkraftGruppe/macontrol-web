@@ -63,6 +63,19 @@ class FixtureTests(TestCase):
                 }
             ],
         )
+        self.assertEqual(
+            config.redes,
+            [
+                {
+                    "nombre": "Instagram",
+                    "url": "https://www.instagram.com/macontrol_s.a/",
+                },
+                {
+                    "nombre": "Facebook",
+                    "url": "https://www.facebook.com/share/19pND5YUct/",
+                },
+            ],
+        )
         self.assertIn("15 años", config.presentacion)
         self.assertNotIn("más de diez años", config.presentacion)
         nombres = dict(Servicio.objects.values_list("slug", "nombre"))

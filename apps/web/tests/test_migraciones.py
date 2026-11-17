@@ -48,6 +48,19 @@ class MigracionDatosTests(TransactionTestCase):
         self.assertTrue(config.atiende_24_horas)
         self.assertEqual(config.direcciones[0]["direccion"], "Saavedra 555")
         self.assertEqual(len(config.direcciones), 1)
+        self.assertEqual(
+            config.redes,
+            [
+                {
+                    "nombre": "Instagram",
+                    "url": "https://www.instagram.com/macontrol_s.a/",
+                },
+                {
+                    "nombre": "Facebook",
+                    "url": "https://www.facebook.com/share/19pND5YUct/",
+                },
+            ],
+        )
         self.assertIn("15 años", config.presentacion)
         self.assertNotIn("más de diez años", config.presentacion)
         Servicio = apps.get_model("web", "Servicio")

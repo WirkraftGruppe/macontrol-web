@@ -22,7 +22,16 @@
           "provincia": "Buenos Aires"
         }
       ],
-      "redes": [],
+      "redes": [
+        {
+          "nombre": "Instagram",
+          "url": "https://www.instagram.com/macontrol_s.a/"
+        },
+        {
+          "nombre": "Facebook",
+          "url": "https://www.facebook.com/share/19pND5YUct/"
+        }
+      ],
       "habilitacion": "Empresa inscripta y habilitada — Ministerio de Desarrollo Agrario",
       "ley": "Empresa certificada según art. 4º del Decreto Reglamentario 499/91 de la Ley de Agroquímicos 10.699/88",
       "director_tecnico": "Miguel Canale"
