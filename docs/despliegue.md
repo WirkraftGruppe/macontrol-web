@@ -54,7 +54,7 @@ Los logos de clientes y las fotos de servicios se guardan en disco (`MEDIA_ROOT`
 `/media/` lo sirve la propia aplicación (`apps.web`) desde `MEDIA_ROOT`; no hace falta otro servidor. Sin volumen, las imágenes subidas desaparecen en el siguiente despliegue. Los respaldos del volumen y de Postgres son responsabilidad del usuario.
 
 ## 5. Primer despliegue: base nueva
-El sitio arranca con una base nueva, sin datos de otro sistema. En el primer despliegue del 2026-10-18 el `preDeployCommand` de `railway.json` (array de dos comandos) **no se ejecutó**: no hubo tablas y `/` dio 500 hasta correr `migrate` y `createcachetable` a mano por `railway ssh` (P-puesta-en-produccion-9). Hasta corregirlo, después de un despliegue con migraciones nuevas hay que correrlas así. El resto se hace una vez desde la consola del servicio (`railway ssh` o la pestaña de comandos):
+El sitio arranca con una base nueva, sin datos de otro sistema. El `preDeployCommand` de `railway.json` es una sola cadena (`python manage.py migrate --noinput && python manage.py createcachetable`): Railway no ejecutó el formato anterior, un array de dos comandos, y en el primer despliegue del 2026-10-18 hubo que correr `migrate` y `createcachetable` a mano por `railway ssh`. El formato nuevo se comprueba en el próximo despliegue; mientras tanto, si faltan tablas, correrlos a mano. El resto se hace una vez desde la consola del servicio (`railway ssh` o la pestaña de comandos):
 ```bash
 python manage.py migrate --noinput
 python manage.py loaddata contenido_inicial
@@ -73,4 +73,4 @@ py -3 .claude/hooks/pendientes.py
 
 Los de más peso antes de abrir la instancia al público:
 - IP del cliente en Railway: resuelta con `IP_CLIENTE_CABECERA=HTTP_X_REAL_IP` y comprobada el 2026-10-18 (ver arriba).
-- `preDeployCommand` que no se ejecuta en Railway (P-puesta-en-produccion-9). La caché compartida (`DatabaseCache`, tabla `cache_sitio`) y el tope de 3 MB del cuerpo (`LimiteCuerpoMiddleware`) ya están configurados.
+- `preDeployCommand` en formato de una cadena, a comprobar en el próximo despliegue. La caché compartida (`DatabaseCache`, tabla `cache_sitio`) y el tope de 3 MB del cuerpo (`LimiteCuerpoMiddleware`) ya están configurados.
