@@ -27,7 +27,7 @@ class ReprocesaImagenesMixin:
 
 
 class ListaDeObjetosField(forms.JSONField):
-    """JSON: lista de dicts con todas las `claves` y, a lo sumo, las `opcionales`, no vacías."""
+    """JSON: lista de dicts con las `claves` y a lo sumo las `opcionales`, no vacías."""
 
     def __init__(self, *, claves, opcionales=(), **kwargs):
         self.claves = tuple(claves)
@@ -53,7 +53,8 @@ class ListaDeObjetosField(forms.JSONField):
                 not isinstance(elemento, dict)
                 or not set(self.claves) <= set(elemento) <= permitidas
             ):
-                texto = f"El elemento {numero} debe tener las claves: {', '.join(self.claves)}"
+                claves = ", ".join(self.claves)
+                texto = f"El elemento {numero} debe tener las claves: {claves}"
                 if self.opcionales:
                     texto += f" (opcionales: {', '.join(self.opcionales)})"
                 raise forms.ValidationError(texto + ".")
