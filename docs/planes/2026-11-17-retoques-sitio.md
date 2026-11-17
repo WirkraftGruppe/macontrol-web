@@ -338,7 +338,7 @@ commit_base: d3390df
 | 2026-11-17 | T4 | dffa6e6 | criterios corridos por el principal: 3 integraciones y makemigrations --check en verde | worktree-integrar: 158 tests OK |
 | | T5 | | | |
 | | T6 | | | |
-| | T10 | | | |
+| 2026-11-17 | T10 | fa64ca2 | 6/6 PASA (verificador y verificador-b); contrato MODIFICADO por cdacc66 (T10, aprobado por el usuario) | auditor-seguridad: sin bloqueantes ni importantes; 2 menores en tests → P-retoques-sitio-6 |
 | | T7 | | | |
 | | TODO | | | |
 | | T8 | | | |
@@ -359,11 +359,11 @@ commit_base: d3390df
 ### Problemas
 
 - P-retoques-sitio-1 [menor] La 0003 antepone "Manejo Integral de Plagas Urbanas (MIPU): " al resumen de MIPU de producción, que empieza con mayúscula ("Programa de monitoreo…"); el fixture dice "programa". Bajar la inicial en la migración y ajustar `test_migraciones.py:69-72` (auditor-seguridad T1).
-- P-retoques-sitio-2 [observación] `validar_internacional` (`apps/web/models.py:50`) usa `$`, que acepta un `
-` final; el admin lo recorta (`strip=True`). Endurecer con `\Z` (auditor-seguridad T1).
+- P-retoques-sitio-2 [observación] `validar_internacional` (`apps/web/models.py:50`) usa `$`, que acepta un salto de línea final; el admin lo recorta (`strip=True`). Endurecer con `\Z` (auditor-seguridad T1).
 - P-retoques-sitio-3 [observación] Si `presentacion` de producción fue editada, el reemplazo de "más de diez años" de la 0003 no aplica y no avisa. Comprobar tras el despliegue: `python manage.py shell -c "from apps.web.models import Configuracion as C; p=C.objects.get(pk=1).presentacion; print('15 años' in p, 'diez años' in p)"` → `True False` (auditor-seguridad T1).
 - P-retoques-sitio-4 [observación] La 0003 pisa sin condiciones 15 campos de Configuracion y su reverso es noop: respaldar antes del despliegue con `python manage.py dumpdata web.configuracion web.servicio --indent 2` en producción (auditor-seguridad T1).
 - P-retoques-sitio-5 [observación] `docs/00-contenido-fuente.md:87-88` y `docs/01-modelo-y-arquitectura.md:93-95` siguen listando como pendientes datos que el Adjunto A ya resolvió (Instagram, segundo teléfono, WhatsApp, horario, director técnico) (auditor-seguridad T1).
+- P-retoques-sitio-6 [menor] `test_telefono_internacional_invalido_se_rechaza` no comprueba el error concreto del campo (un 200 por otro error también pasa), y no hay tests de `provincia` vacía o no textual en `ListaDeObjetosField` (auditor-seguridad T10).
 
 ### Decisiones
 

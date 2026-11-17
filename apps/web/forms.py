@@ -27,10 +27,11 @@ class ReprocesaImagenesMixin:
 
 
 class ListaDeObjetosField(forms.JSONField):
-    """JSON que debe ser una lista de dicts con exactamente `claves`, no vacías."""
+    """JSON: lista de dicts con las `claves` y a lo sumo las `opcionales`, no vacías."""
 
-    def __init__(self, *, claves, **kwargs):
+    def __init__(self, *, claves, opcionales=(), **kwargs):
         self.claves = tuple(claves)
+        self.opcionales = tuple(opcionales)
         kwargs.setdefault("required", False)
         kwargs.setdefault("widget", forms.Textarea(attrs={"rows": 8}))
         super().__init__(**kwargs)
@@ -47,11 +48,16 @@ class ListaDeObjetosField(forms.JSONField):
         if not isinstance(lista, list):
             raise forms.ValidationError("Debe ser una lista de objetos JSON.")
         for numero, elemento in enumerate(lista, start=1):
-            if not isinstance(elemento, dict) or set(elemento) != set(self.claves):
-                raise forms.ValidationError(
-                    f"El elemento {numero} debe tener exactamente las claves: "
-                    f"{', '.join(self.claves)}."
-                )
+            permitidas = set(self.claves) | set(self.opcionales)
+            if (
+                not isinstance(elemento, dict)
+                or not set(self.claves) <= set(elemento) <= permitidas
+            ):
+                claves = ", ".join(self.claves)
+                texto = f"El elemento {numero} debe tener las claves: {claves}"
+                if self.opcionales:
+                    texto += f" (opcionales: {', '.join(self.opcionales)})"
+                raise forms.ValidationError(texto + ".")
             if not all(isinstance(v, str) and v.strip() for v in elemento.values()):
                 raise forms.ValidationError(
                     f"El elemento {numero} tiene valores vacíos o que no son texto."
@@ -61,7 +67,9 @@ class ListaDeObjetosField(forms.JSONField):
 
 class ConfiguracionForm(forms.ModelForm):
     direcciones = ListaDeObjetosField(
-        claves=("localidad", "direccion"), label="Direcciones"
+        claves=("localidad", "direccion"),
+        opcionales=("provincia",),
+        label="Direcciones",
     )
     redes = ListaDeObjetosField(claves=("nombre", "url"), label="Redes sociales")
 
@@ -86,10 +94,15 @@ class ConfiguracionForm(forms.ModelForm):
             "razon_social",
             "eslogan",
             "presentacion",
+            "cuit",
             "telefono",
+            "telefono_internacional",
+            "telefono_2",
+            "telefono_2_internacional",
             "whatsapp",
             "correo",
             "horario",
+            "atiende_24_horas",
             "habilitacion",
             "ley",
             "director_tecnico",
