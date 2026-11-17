@@ -70,6 +70,18 @@ Centros de salud · Establecimientos educativos · Fábricas de productos alimen
 ## Quienes confían en nosotros (logos en la carta)
 ESAB · Nutrisur · Villa del Sur · Danone · Howard Johnson · Banco Nación · Banco Provincia · YPF Agro · YPF / Casa Rucery [?] · Día · Open Sports · Super Beef · La Zona
 
+## Adjunto A — datos entregados el 2026-11-17
+Reemplazan a los datos anteriores de esta carta (producción y fixture los cargan de acá):
+- Razón social MAControl S.A. · CUIT 30-71834106-6 · Director técnico: Miguel Canale.
+- Dirección única: Saavedra 555, Castelli, Buenos Aires (reemplaza a Ricardo Naveiro 7 y Presidente Perón 427).
+- Teléfonos: 02241 15-546232 (principal y WhatsApp, +5492241546232) y 02241 15-496047 (+5492241496047); reemplazan a 02241 49 6047.
+- Atención las 24 horas, todos los días · correo administracion@macontrol.com.ar.
+- Habilitación: Empresa inscripta y habilitada — Ministerio de Desarrollo Agrario (reemplaza a Ministerio de Agroindustria).
+- Trayectoria: 15 años (reemplaza a "más de diez años").
+- Sector "Vehículos de transporte" (antes "... de personas, mercaderías, inmuebles y bienes").
+- Servicios: "Control de mosquitos vectores", "Manejo integral de plagas en edificios y departamentos" y "Servicio MIPU" (resumen: "Manejo Integral de Plagas Urbanas (MIPU): ...").
+- Redes: Instagram y Facebook; las URL no figuran en el contrato del plan y quedan por cargar desde el admin.
+
 ## Pendientes a confirmar con la empresa
 1. Marca: "MAControl S.A." vs "MAControl Group".
 2. Handle real de Instagram.

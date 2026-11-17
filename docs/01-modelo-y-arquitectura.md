@@ -32,7 +32,7 @@ Una página de servicio (`/servicio/<slug>/`). Campos: `nombre`, `slug` (único)
 Un logotipo de la franja de clientes. Campos: `nombre`, `logo`, `orden` y `activo`. Solo se publican los logos que la empresa entrega.
 
 ### Configuracion
-Datos de la empresa, en una sola fila (pk=1). Campos: `razon_social`, `eslogan`, `presentacion`, `telefono`, `whatsapp`, `correo`, `horario`, `direcciones` (JSON: localidad + dirección), `redes` (JSON: nombre + url), y los datos legales de `/empresa/`: `habilitacion`, `ley` y `director_tecnico`. Si `director_tecnico` está vacío, la página muestra "Director técnico matriculado" (la Carta no da nombre).
+Datos de la empresa, en una sola fila (pk=1). Campos: `razon_social`, `eslogan`, `presentacion`, `cuit`, `telefono` y `telefono_2` (texto visible), `telefono_internacional` y `telefono_2_internacional` (`+549` y 10 dígitos, para los enlaces `tel:`), `whatsapp`, `correo`, `horario`, `atiende_24_horas`, `direcciones` (JSON: localidad + dirección + provincia; `direcciones_con_mapa` agrega el enlace a Google Maps), `redes` (JSON: nombre + url), y los datos legales de `/empresa/`: `habilitacion`, `ley` y `director_tecnico`. Si `director_tecnico` está vacío, la página muestra "Director técnico matriculado" (la Carta no da nombre).
 
 ### Sector
 `TextChoices` con los 12 sectores donde trabaja la empresa (Carta de Servicios). No es una tabla: `Servicio.sectores` guarda los valores aplicables a cada servicio.

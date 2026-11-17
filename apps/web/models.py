@@ -3,7 +3,9 @@
 import os
 import re
 import uuid
+from urllib.parse import quote_plus
 
+from django.core.validators import RegexValidator
 from django.db import models
 from django.urls import reverse
 
@@ -39,9 +41,14 @@ class Sector(models.TextChoices):
     VIVIENDAS = "casas-departamentos-oficinas", "Casas, departamentos y oficinas"
     TRANSPORTE = (
         "vehiculos-de-transporte",
-        "Vehículos de transporte de personas, mercaderías, inmuebles y bienes",
+        "Vehículos de transporte",
     )
     AVICOLA = "avicolas-y-feedlot", "Establecimientos avícolas y feedlot"
+
+
+validar_internacional = RegexValidator(
+    r"^\+549\d{10}$", "Use el formato internacional, por ejemplo +5492241546232."
+)
 
 
 class Configuracion(models.Model):
@@ -50,15 +57,33 @@ class Configuracion(models.Model):
     razon_social = models.CharField("razón social", max_length=120, blank=True)
     eslogan = models.CharField("eslogan", max_length=160, blank=True)
     presentacion = models.TextField("presentación", blank=True)
+    cuit = models.CharField("CUIT", max_length=13, blank=True)
     telefono = models.CharField("teléfono", max_length=40, blank=True)
+    telefono_internacional = models.CharField(
+        "teléfono en formato internacional",
+        max_length=16,
+        blank=True,
+        validators=[validar_internacional],
+        help_text="Para el enlace de llamada, por ejemplo +5492241546232.",
+    )
+    telefono_2 = models.CharField("segundo teléfono", max_length=40, blank=True)
+    telefono_2_internacional = models.CharField(
+        "segundo teléfono en formato internacional",
+        max_length=16,
+        blank=True,
+        validators=[validar_internacional],
+    )
     whatsapp = models.CharField("WhatsApp", max_length=40, blank=True)
     correo = models.EmailField("correo", blank=True)
     horario = models.CharField("horario de atención", max_length=160, blank=True)
+    atiende_24_horas = models.BooleanField("atiende las 24 horas", default=False)
     direcciones = models.JSONField(
         "direcciones",
         default=list,
         blank=True,
-        help_text='Lista de {"localidad": "...", "direccion": "..."}.',
+        help_text=(
+            'Lista de {"localidad": "...", "direccion": "...", "provincia": "..."}.'
+        ),
     )
     redes = models.JSONField(
         "redes sociales",
@@ -94,11 +119,43 @@ class Configuracion(models.Model):
     def _digitos(texto):
         return re.sub(r"\D", "", texto or "").lstrip("0")
 
+    @classmethod
+    def _href_telefono(cls, internacional, visible):
+        if internacional:
+            return f"tel:{internacional}"
+        digitos = cls._digitos(visible)
+        return f"tel:+54{digitos}" if digitos else ""
+
     @property
     def telefono_href(self):
-        """Enlace `tel:` con prefijo de país y sin el 0 inicial."""
-        digitos = self._digitos(self.telefono)
-        return f"tel:+54{digitos}" if digitos else ""
+        """Enlace `tel:` con el número internacional, o con +54 y sin el 0 inicial."""
+        return self._href_telefono(self.telefono_internacional, self.telefono)
+
+    @property
+    def telefono_2_href(self):
+        """Enlace `tel:` del segundo teléfono, o cadena vacía si no hay."""
+        return self._href_telefono(self.telefono_2_internacional, self.telefono_2)
+
+    @property
+    def direcciones_con_mapa(self):
+        """Las direcciones con `mapa_href`, un enlace de búsqueda en Google Maps."""
+        resultado = []
+        for direccion in self.direcciones:
+            partes = [
+                direccion.get(clave, "")
+                for clave in ("direccion", "localidad", "provincia")
+            ]
+            consulta = ", ".join([p for p in partes if p] + ["Argentina"])
+            resultado.append(
+                {
+                    "localidad": direccion.get("localidad", ""),
+                    "direccion": direccion.get("direccion", ""),
+                    "provincia": direccion.get("provincia", ""),
+                    "mapa_href": "https://www.google.com/maps/search/?api=1&query="
+                    + quote_plus(consulta),
+                }
+            )
+        return resultado
 
     @property
     def whatsapp_href(self):
