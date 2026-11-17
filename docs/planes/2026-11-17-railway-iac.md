@@ -168,8 +168,8 @@ el sondeo que cuenta se lanza justo antes del push y el del apply va aparte. -->
   - `[grep-1]` `grep -n "Applying web.0004_prueba_despliegue" docs/evidencia/2026-11-17-railway-iac/despliegue.log`
   - `[cmd]` `MSYS_NO_PATHCONV=1 railway ssh -s web -- sh -c 'cd /app && /app/.venv/bin/python manage.py showmigrations web' 2>&1 | grep -q "\[X\] 0004_prueba_despliegue"`
   - `[cmd]` `test "$(grep -cE '^[^ ]+ 200 [0-9]+$' docs/evidencia/2026-11-17-railway-iac/sondeo.txt)" -ge 60`
-  - `[grep-0]` `grep -nvE '^[^ ]+ 200 [0-9]+$' docs/evidencia/2026-11-17-railway-iac/sondeo.txt`
-  - `[grep-0]` `grep -nvE '^[^ ]+ 200 [0-9]+$' docs/evidencia/2026-11-17-railway-iac/sondeo-apply.txt`
+  - `[grep-0]` `grep -nE '^[^ ]+ 5[0-9]{2} ' docs/evidencia/2026-11-17-railway-iac/sondeo.txt`
+  - `[grep-0]` `grep -nE '^[^ ]+ 5[0-9]{2} ' docs/evidencia/2026-11-17-railway-iac/sondeo-apply.txt`
   - `[cmd]` `for p in / /empresa/ /contacto/ /servicio/control-murcielagos/ /favicon.ico /admin/login/; do test "$(curl -sS -o /dev/null -w '%{http_code}' "https://www.macontrol.com.ar$p")" = 200 || exit 1; done`
   - `[cmd]` `curl -fsSI https://www.macontrol.com.ar/ | tr -d '\r' | grep -qx "content-security-policy: default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"`
   - `[cmd]` `MSYS_NO_PATHCONV=1 railway ssh -s web -- sh -c 'grep -q " /data " /proc/mounts && test -d /data/lost+found'`
@@ -233,10 +233,12 @@ commit_base: 1c896e8
 
 - P-railway-iac-1 [observación] Si un despliegue trae varias migraciones y falla una intermedia, las anteriores quedan aplicadas (una transacción por migración en Postgres) y el código viejo sigue sirviendo sobre ese esquema; lo mismo si `migrate` sale bien y falla `createcachetable`. Documentarlo en `docs/despliegue.md` y preferir migraciones compatibles con el código anterior (auditor-seguridad T2, O2).
 - P-railway-iac-2 [observación] `domains: ["www.macontrol.com.ar"]` (`.railway/railway.ts`) hace al archivo dueño del dominio: quitarlo o cambiarlo y aplicar borraría el dominio personalizado. Revisar siempre que el plan diga 0 to destroy (auditor-seguridad T2, O3).
+- P-railway-iac-4 [importante] Cada despliegue deja `/` sin responder unos segundos: con un volumen montado Railway no superpone despliegues (https://docs.railway.com/reference/healthchecks), y el servicio no tiene healthcheck. Plan propio: llevar media a un bucket (el volumen `web-media` está vacío al 2026-11-17) y agregar `healthcheck: "/"` con `healthcheck.railway.app` en `ALLOWED_HOSTS`.
 - P-railway-iac-3 [observación] El comentario de `config/settings/prod.py:82` dice que `cache_sitio` se crea "en el preDeployCommand"; desde este plan es el `preDeploy` de `.railway/railway.ts` (auditor-seguridad T2).
 
 ### Decisiones
 
+- 2026-11-17 — Los criterios del sondeo de T5 exigen ningún 5xx en lugar de todo 200, como el criterio de aceptación del pedido: con el volumen `web-media` montado Railway no superpone despliegues y hay unos segundos sin respuesta en cada traspaso (un `000` de 10,5 s a las 17:25:44 en el despliegue 9fa65c0d), que un healthcheck no evita — decisión del usuario ante la FALLA del sondeo — reemplaza a: (nada)
 - 2026-11-17 — El `[grep-0]` de T2 sobre `config/tests/test_despliegue.py` escapa el punto (`railway\.json`): con `.` sin escapar coincidía con el nombre `test_railway_json_retirado` que exige el propio contrato — decisión del usuario ante la contradicción informada por el implementador de T2 — reemplaza a: (nada)
 
 ### Cierra
