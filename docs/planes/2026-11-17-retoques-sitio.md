@@ -55,7 +55,7 @@ Propiedades del modelo que define T1 y consumen T5 y T6: `Configuracion.cuit`, `
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
 | 1 | T1 (datos), T2 (identidad), T3 (despliegue y Playwright), T4 (integración) | web (solo T1: 0002 esquema y 0003 datos) |
-| 2 | T5 (diseño), T6 (páginas, metadatos, JSON-LD), T7 (integración) | ninguna |
+| 2 | T5 (diseño), T6 (páginas, metadatos, JSON-LD), T10 (formulario de Configuración), T7 (integración) | ninguna |
 | 3 | T8 (despliegue y comprobación en producción, principal), T9 (cierre, principal) | ninguna |
 
 ## Subtareas
@@ -227,10 +227,35 @@ Propiedades del modelo que define T1 y consumen T5 y T6: `Configuracion.cuit`, `
   - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 600 --subtarea T6`
 
+### T10 — Permitir guardar desde el admin la Configuración con los datos nuevos
+
+<!-- Agregada por contrato modificado (2026-11-17, decisión del usuario): T1 mostró que `ConfiguracionForm`
+exige exactamente `localidad` y `direccion` en cada dirección, así que con `provincia` el admin no guarda. -->
+
+- **Ola**: 2
+- **Depende de**: T4
+- **Puede tocar**: `apps/web/forms.py`, `apps/web/tests/test_admin.py`
+- **No puede tocar**: `docs/planes/`, `config/`, `templates/`, `static/`, `apps/web/models.py`, `apps/web/admin.py`, `apps/web/migrations/`, `apps/web/views.py`, `apps/web/templates/`, los demás tests
+- **Skill a leer antes**: `.agents/skills/django-conventions/SKILL.md` § Forms; `.claude/skills/convenciones-proyecto/SKILL.md` § Prohibiciones
+- **Worktree**: sí
+- **Ruta**: delegada · Evidencia: … · Commit: …
+- **Presupuesto**: 120 líneas agregadas
+- **Qué hacer**:
+  - `ListaDeObjetosField` acepta claves opcionales (`opcionales=(...)`): cada elemento tiene todas las `claves` obligatorias, puede tener las opcionales y nada más; las presentes no pueden estar vacías. `direcciones` usa `claves=("localidad", "direccion")` y `opcionales=("provincia",)`.
+  - `ConfiguracionForm.Meta.fields` suma `cuit`, `telefono_internacional`, `telefono_2`, `telefono_2_internacional` y `atiende_24_horas`.
+  - Tests en `AdminConfiguracionTests`: guardar por POST la Configuración del Adjunto A (con `provincia` y los dos números internacionales) da 302 y queda guardada; una dirección con una clave desconocida se rechaza; un número internacional mal formado se rechaza.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_admin.AdminConfiguracionTests.test_guarda_configuracion_del_adjunto_a --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_admin.AdminConfiguracionTests.test_direccion_con_clave_desconocida_se_rechaza --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_admin.AdminConfiguracionTests.test_telefono_internacional_invalido_se_rechaza --keepdb`
+  - `[grep-1]` `grep -n '"telefono_2_internacional"' apps/web/forms.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web --keepdb`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 120 --subtarea T10`
+
 ### T7 — Integración de la ola 2 (principal)
 
-- **Ola**: 2 (después de verificar T5 y T6)
-- **Depende de**: T5, T6
+- **Ola**: 2 (después de verificar T5, T6 y T10)
+- **Depende de**: T5, T6, T10
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . plan/retoques-sitio` de T5 y T6, no los informes.
   2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh retoques-sitio T5 plan/retoques-sitio <ruta>...` y lo mismo para T6.
@@ -239,6 +264,7 @@ Propiedades del modelo que define T1 y consumen T5 y T6: `Configuracion.cuit`, `
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/retoques-sitio | grep -q "T5: integra retoques-sitio-T5"`
   - `[cmd]` `git log --oneline plan/retoques-sitio | grep -q "T6: integra retoques-sitio-T6"`
+  - `[cmd]` `git log --oneline plan/retoques-sitio | grep -q "T10: integra retoques-sitio-T10"`
   - `[cmd]` `./venv/Scripts/python.exe herramientas/medir_movil.py`
   - `[cmd]` `./venv/Scripts/python.exe herramientas/humo_web.py`
   - `[cmd]` `test -z "$(git log --oneline main..HEAD -- config/settings config/csp.py)"`
@@ -300,6 +326,7 @@ commit_base: d3390df
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
+| T10 | pendiente |
 
 ### Corridas
 
@@ -311,6 +338,7 @@ commit_base: d3390df
 | | T4 | | | |
 | | T5 | | | |
 | | T6 | | | |
+| | T10 | | | |
 | | T7 | | | |
 | | TODO | | | |
 | | T8 | | | |
