@@ -233,7 +233,7 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): portada-video>
+commit_base: f8d5cf1
 
 ### Estado de subtareas
 
