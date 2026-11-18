@@ -14,7 +14,7 @@ export default defineRailway(() => {
   const web = service("web", {
     source: github("WirkraftGruppe/macontrol-web", { branch: "main", checkSuites: false }),
     build: { buildCommand: "python manage.py collectstatic --noinput", buildEnvironment: "V3", builder: "RAILPACK" },
-    start: "gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --timeout 60",
+    start: "gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --worker-class gthread --threads 8 --timeout 60",
     // Un solo comando previo: migra la base y crea la tabla de caché.
     preDeploy: "python manage.py migrate --noinput && python manage.py createcachetable",
     replicas: { "us-east4-eqdc4a": 1 },

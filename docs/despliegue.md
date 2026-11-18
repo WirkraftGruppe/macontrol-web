@@ -12,7 +12,8 @@ Guía para alojar el sitio público de MAControl. Nada de esto se ejecuta solo: 
 3. La configuración del servicio `web` está en `.railway/railway.ts` (TypeScript; paquete npm `railway` en versión exacta, fijada en `.railway/package.json`). La primera vez, instalar las dependencias con `npm ci --prefix .railway`. **Railway no lee `.railway/` al desplegar**: el archivo se aplica con la CLI (punto 4). Declara:
    - Build con Railpack: `python manage.py collectstatic --noinput`. Corre con `DJANGO_ENV=production`, así que necesita en el entorno de build las variables que exige `prod.py` (punto 3, marcadas "build"). Railway entrega las variables del servicio a la etapa de build; si falta alguna, el build falla con `ImproperlyConfigured`.
    - Comando previo (`preDeployCommand`): `python manage.py migrate --noinput && python manage.py createcachetable` (`cache_sitio` es la tabla de la caché compartida; el comando es idempotente).
-   - Arranque: `gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --timeout 60`.
+   - Arranque: `gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --worker-class gthread --threads 8 --timeout 60`.
+     Se usa `gthread` porque las descargas lentas de video servidas por WhiteNoise ocupan un hilo y no un worker entero: con workers sincrónicos, dos descargas lentas bloquearían todo el sitio. Con `gthread`, `--timeout` vigila el latido del worker (lo emite el hilo principal), no la duración de una petición: una descarga de 12,3 MB a 100 KB/s (unos 123 s) no se corta. `CONN_MAX_AGE` no está definido en settings (vale 0), así que cada petición abre y cierra su conexión a Postgres; el máximo simultáneo es 2 × 8 = 16 conexiones.
    - Volumen `web-media` montado en `/data`.
    - Las variables **no** las gestiona (`variables: { managed: false }`): siguen en Railway y se editan allí.
    - Política de reinicio: la de la plataforma (`ON_FAILURE`, 10 reintentos); no se declara.
