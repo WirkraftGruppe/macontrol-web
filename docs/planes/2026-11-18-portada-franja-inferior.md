@@ -96,13 +96,14 @@ commit_base: eb669b9
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-11-18 | T1 (autoverificación + spot check del principal), T2 | 6e5f7cf (T1), 33a499b (integración) | criterios PASA; rojo previo de los dos tests nuevos confirmado; `medir_portada.py` PASA 87 | nivel Chico: sin verificador, como en `texto-boton-video` |
 
 ### Decisiones del plan
 
@@ -110,6 +111,10 @@ commit_base: eb669b9
 
 ### Problemas
 
+- P-portada-franja-inferior-1 [observación] Entre 901 y 1100 px los botones van siempre debajo del texto (media query fija) y el `h1` puede partirse; no se midió si a 1100 px entrarían junto a los botones. El contraste no se mide en la toma final del bucle (11 a 15 s), que es la que motivó el cambio: `SEGUNDOS` sigue en 0, 3 y 7.
+
 ### Decisiones
+
+- 2026-11-18 — En escritorio (> 900 px) el texto y los botones de la portada van en una franja al pie, con velo vertical que deja sin oscurecer la mitad superior del video y `h1` de la portada en `clamp(56px, 5.2vw, 84px)` — que el texto no tape al operario de la toma final — decisión del usuario — reemplaza a: (nada)
 
 ### Cierra
