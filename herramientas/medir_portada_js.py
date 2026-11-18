@@ -40,12 +40,16 @@ def evaluar_observaciones(obs):
 
 
 def _esperar(pagina, expresion):
-    """True si la expresión se cumple antes de 8 s; el tiempo agotado es False."""
-    try:
-        pagina.wait_for_function(expresion, timeout=8000)
-        return True
-    except Exception:  # noqa: BLE001 - tiempo agotado = la condición no se cumplió
-        return False
+    """True si la expresión se cumple antes de 8 s.
+
+    Sondea con `evaluate` y no con `wait_for_function`: esa ruta usa `eval`, que la
+    CSP del sitio bloquea (y no se usa `bypass_csp` para medir con la CSP real).
+    """
+    for _ in range(80):
+        if pagina.evaluate(expresion):
+            return True
+        pagina.wait_for_timeout(100)
+    return False
 
 
 def observar_con_js(navegador, base):
