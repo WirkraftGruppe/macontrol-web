@@ -328,7 +328,7 @@ commit_base: f8d5cf1
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T7 | pendiente |
+| T7 | hecha |
 | T8 | pendiente |
 | T9 | hecha |
 | T10 | hecha |
@@ -354,6 +354,7 @@ commit_base: f8d5cf1
 | 2026-11-18 | TODO previo al despliegue, 2.ª (verificador) | 37a988d | 88/89 PASA; única FALLA `congelado.sh` (4bb14f4, 130340a, 77e9697) | 223 tests OK; PASA 58 mediciones |
 | 2026-11-18 | TODO previo al despliegue, 2.ª (verificador-b) | 37a988d | 117/118 PASA; única FALLA `congelado.sh` | la 1.ª corrida de verificador-b (f60db7e→37a988d) se descarta: el HEAD cambió durante la corrida |
 | 2026-11-18 | T11 (auditor-seguridad) | 37a988d | H1, H2, H3 cerrados; sin hallazgos nuevos ni bloqueantes | H1 reproducido de nuevo: 302 desde otra IP. Pide en T7: `check --deploy` y `IP_CLIENTE_CABECERA` en Railway |
+| 2026-11-18 | T7 (principal, en producción) | 73258b9 | todos los criterios PASA | apply 0164a368 (gthread), merge f8ff6c9 → d9113f24; `showmigrations` de la 0005 lo corrió el usuario (`railway ssh` bloqueado por permisos): `[X] 0005_contadoringreso` |
 
 ### Decisiones del plan
 
