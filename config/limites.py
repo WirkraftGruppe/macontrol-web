@@ -7,9 +7,10 @@
 
 Cada balde es una fila de `ContadorIngreso` por ventana fija. Cada POST reserva su
 intento antes de evaluar la contraseña: suma 1 con un `UPDATE ... SET cuenta =
-cuenta + 1` (atómico en la base, también con peticiones simultáneas) y, si algún
-balde queda por encima de su máximo, responde 429 sin evaluar la contraseña, así el
-bloqueo no sirve de oráculo. Un ingreso correcto borra el balde (usuario, IP) y
+cuenta + 1` (atómico en la base, también con peticiones simultáneas), en orden (IP,
+usuario e IP, usuario). Si un balde queda por encima de su máximo, devuelve lo
+reservado en esa llamada, no toca los siguientes y responde 429 sin evaluar la
+contraseña, así el bloqueo no sirve de oráculo y no cuenta como intento. Un ingreso correcto borra el balde (usuario, IP) y
 devuelve la reserva de los baldes por IP y por usuario, de modo que solo cuentan los
 fallos. Las filas vencidas se borran al reservar. Los valores se leen de los
 settings en cada uso.
@@ -130,27 +131,38 @@ def reservar_intento(request, usuario, solo_usuario=False):
     baldes = (
         _baldes(request, usuario)[1:] if solo_usuario else _baldes(request, usuario)
     )
-    # Se suman todos los baldes (sin cortar en el primero lleno) para que cada
-    # reserva quede contada, también la bloqueada.
-    cuentas = [
-        (_sumar_reserva(clave, ventana, ahora), maximo)
-        for clave, maximo, ventana in baldes
-    ]
-    return all(cuenta <= maximo for cuenta, maximo in cuentas)
+    # El instante queda en el request: la devolución resta en la misma ventana.
+    request._ahora_limites = ahora
+    # Se reserva en orden y se corta en el primer balde lleno: se devuelve lo
+    # reservado en esta llamada y no se tocan los siguientes, así cuentan solo los
+    # intentos que se evalúan y una IP bloqueada no crea filas de usuario.
+    reservados = []
+    for clave, maximo, ventana in baldes:
+        reservados.append((clave, ventana))
+        if _sumar_reserva(clave, ventana, ahora) > maximo:
+            for clave_r, ventana_r in reservados:
+                _restar_reserva(clave_r, ventana_r, ahora)
+            return False
+    return True
+
+
+def _restar_reserva(clave, ventana, ahora):
+    """Resta 1 al balde de la ventana indicada, sin bajar de 0."""
+    ContadorIngreso.objects.filter(
+        clave=_clave_de_ventana(clave, ventana, ahora), cuenta__gt=0
+    ).update(cuenta=F("cuenta") - 1)
 
 
 def devolver_reserva(request, usuario):
     """Tras un ingreso correcto: borra el balde (usuario, IP) y libera los otros dos."""
-    ahora = time.time()
+    ahora = getattr(request, "_ahora_limites", None) or time.time()
     baldes = _baldes(request, usuario)
     clave, _maximo, ventana = baldes[1]
     ContadorIngreso.objects.filter(
         clave=_clave_de_ventana(clave, ventana, ahora)
     ).delete()
     for clave, _maximo, ventana in (baldes[0], baldes[2]):
-        ContadorIngreso.objects.filter(
-            clave=_clave_de_ventana(clave, ventana, ahora), cuenta__gt=0
-        ).update(cuenta=F("cuenta") - 1)
+        _restar_reserva(clave, ventana, ahora)
 
 
 class LimiteIngresoMixin:
