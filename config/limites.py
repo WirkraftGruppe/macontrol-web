@@ -154,7 +154,7 @@ def devolver_reserva(request, usuario):
 
 
 class LimiteIngresoMixin:
-    """Mixin para `LoginView`: reserva el intento en los tres baldes antes de evaluar."""
+    """Mixin para `LoginView`: reserva el intento antes de evaluar la contraseña."""
 
     def _usuario_enviado(self):
         return normalizar_usuario(self.request.POST.get("username", ""))

@@ -1,4 +1,4 @@
-"""El intento de ingreso se reserva antes de evaluar la contraseña (contador atómico)."""
+"""El intento de ingreso se reserva antes de evaluar la contraseña (atómico)."""
 
 from datetime import UTC, datetime
 from unittest import mock
