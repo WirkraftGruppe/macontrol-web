@@ -65,7 +65,7 @@ Escala (px):
 - **Portada con video** (`.hero`, solo en el inicio): `<video>` de fondo a todo el ancho (`muted loop playsinline autoplay`, `aria-hidden="true"`, `poster` = `portada-poster.webp`) con dos fuentes MP4: 480 p para `max-width: 900px` y 720 p para el resto. El poster se precarga con `fetchpriority="high"`.
   - **Velo** (`.hero-velo`): degradado de `--bg` de izquierda a derecha (0,94 → 0,86 → 0,35) con el texto a la izquierda; en móvil (≤ 900 px) el degradado va de arriba hacia abajo, el texto queda abajo y los botones ocupan todo el ancho. El contraste AA de título, párrafo y botones sobre todo el bucle se mide en el navegador (T5), no se asume.
   - **Pausa** (`.hero-pausa`): botón de 44×44 arriba a la derecha, con `hidden` en el HTML; el JS lo muestra y alterna `aria-pressed` y `aria-label`. El video se pausa solo cuando la portada sale del viewport y mientras el diálogo está abierto; se reanuda después, salvo que el usuario lo haya pausado.
-  - **Diálogo** (`.video-dialogo`): "Ver video · 1 min" es un enlace al MP4 institucional; con JS abre un `<dialog>` modal con `<video controls preload="none">` y un botón de cerrar de 44×44. Cerrar (botón, Escape o clic en el fondo) pausa el institucional.
+  - **Diálogo** (`.video-dialogo`): "Video" es un enlace al MP4 institucional; con JS abre un `<dialog>` modal con `<video controls preload="none">` y un botón de cerrar de 44×44. Cerrar (botón, Escape o clic en el fondo) pausa el institucional.
   - **Movimiento reducido**: con `prefers-reduced-motion: reduce` el JS pausa el fondo y lo vuelve al poster; el botón queda disponible para reanudarlo.
   - Sin JS, el fondo se reproduce solo y el enlace descarga el video institucional. Una sola excepción a "sin JavaScript": `static/js/portada.js`, sin dependencias, cargado solo por el inicio.
 - **Portada de servicio** (`.campo-imagen-portada`): `aspect-ratio: 16 / 9`, imagen con `object-fit: cover`.
@@ -73,7 +73,7 @@ Escala (px):
 
 ## Estructura de páginas (web)
 
-Home: barra de navegación → portada con video de fondo (título, primera oración de la presentación, botones "Llamar ahora", "Ver video · 1 min" y "Ver servicios", botón de pausa) → barra de cuatro respaldos (habilitación, Ley 10.699/88, director técnico, certificado) → servicios (grilla 3 columnas, 9 tarjetas numeradas, una por servicio) → franja "Mantenimiento edilicio" → sectores sobre fondo amarillo (8 tarjetas; los sectores de la Carta son 12) → cómo trabajamos (texto + 4 pasos) → empresa (valores en tres círculos) → clientes (logotipos) → contacto → pie.
+Home: barra de navegación → portada con video de fondo (título, primera oración de la presentación, botones "Llamar ahora", "Video" y "Ver servicios", botón de pausa) → barra de cuatro respaldos (habilitación, Ley 10.699/88, director técnico, certificado) → servicios (grilla 3 columnas, 9 tarjetas numeradas, una por servicio) → franja "Mantenimiento edilicio" → sectores sobre fondo amarillo (8 tarjetas; los sectores de la Carta son 12) → cómo trabajamos (texto + 4 pasos) → empresa (valores en tres círculos) → clientes (logotipos) → contacto → pie.
 
 Página de servicio: migas → título con etiqueta de categoría y sectores aplicables → imagen ancha → "El problema" / "Cómo lo resolvemos" (tarjetas de métodos) → servicio adicional → preguntas frecuentes → lateral fijo: bloque de contacto, respaldo legal, servicios relacionados.
 
