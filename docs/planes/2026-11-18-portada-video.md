@@ -329,7 +329,7 @@ commit_base: f8d5cf1
 | T5 | hecha |
 | T6 | hecha |
 | T7 | hecha |
-| T8 | pendiente |
+| T8 | hecha |
 | T9 | hecha |
 | T10 | hecha |
 | T11 | hecha |
