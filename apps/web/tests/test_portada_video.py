@@ -61,9 +61,7 @@ class PortadaVideoTests(TestCase):
     def test_video_de_fondo_con_atributos_y_fuentes(self):
         html = self._inicio()
         self.assertIn('<section class="hero" id="hero">', html)
-        fondo = next(
-            e for e in self._por_nombre("video", html) if "poster" in e[1]
-        )
+        fondo = next(e for e in self._por_nombre("video", html) if "poster" in e[1])
         atributos = fondo[1]
         for atributo in ("muted", "loop", "playsinline", "autoplay"):
             self.assertIn(atributo, atributos)
@@ -109,9 +107,7 @@ class PortadaVideoTests(TestCase):
 
     def test_enlace_de_respaldo_al_video_institucional(self):
         enlaces = [
-            e[1]
-            for e in self._por_nombre("a")
-            if INSTITUCIONAL in e[1].get("href", "")
+            e[1] for e in self._por_nombre("a") if INSTITUCIONAL in e[1].get("href", "")
         ]
         self.assertEqual(len(enlaces), 1)
         self.assertEqual(enlaces[0]["href"], f"/static/video/{INSTITUCIONAL}")
@@ -164,9 +160,9 @@ class PortadaVideoTests(TestCase):
         self.assertTrue(completo.startswith(esperado))
         self.assertLess(len(esperado), len(completo))
         html = self._inicio()
-        texto = re.search(
-            r'<div class="hero-texto">.*?<p>(.*?)</p>', html, re.S
-        ).group(1)
+        texto = re.search(r'<div class="hero-texto">.*?<p>(.*?)</p>', html, re.S).group(
+            1
+        )
         self.assertEqual(texto, esperado)
         self.assertEqual(esperado.count(". "), 0)
         self.assertTrue(esperado.endswith("."))

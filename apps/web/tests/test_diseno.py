@@ -18,7 +18,7 @@ class DisenoWebTests(TestCase):
             html, r"https?://(?!www\.w3\.org)[^\"'\s]*\.(css|js|woff2?)"
         )
         self.assertNotIn("fonts.googleapis", html)
-        # Un único script externo (la portada) y el bloque de datos JSON-LD, que no se ejecuta.
+        # Un único script externo (la portada) y el bloque JSON-LD, que no se ejecuta.
         scripts = re.findall(r"<script\b[^>]*>", html)
         self.assertEqual(
             [s for s in scripts if "src=" in s],

@@ -77,7 +77,7 @@ def _pagina(
 
 
 def primera_oracion(texto):
-    """Primera oración de `texto`; el texto completo sigue en la página de la empresa."""
+    """Primera oración de `texto`; el texto completo sigue en /empresa/."""
     texto = texto.strip()
     return re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡])", texto, maxsplit=1)[0]
 

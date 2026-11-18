@@ -75,7 +75,7 @@ class BaseWebTests(TestCase):
         ).group(1)
         self.assertIn('href="/servicio/servicio-prueba/"', panel)
         # El desplegable es solo HTML y CSS: los únicos <script> admitidos son el de la
-        # portada (por `src`) y el bloque de datos JSON-LD del inicio, que no se ejecuta.
+        # portada (por `src`) y el bloque de datos JSON-LD del inicio (no se ejecuta).
         self.assertEqual(
             [
                 s
