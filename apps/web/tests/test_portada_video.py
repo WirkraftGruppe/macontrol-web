@@ -111,7 +111,12 @@ class PortadaVideoTests(TestCase):
         ]
         self.assertEqual(len(enlaces), 1)
         self.assertEqual(enlaces[0]["href"], f"/static/video/{INSTITUCIONAL}")
-        self.assertIn("Ver video · 1 min", self._inicio())
+        self.assertIn(">Video</a>", self._inicio())
+
+    def test_boton_del_video_institucional_dice_video(self):
+        html = self._inicio()
+        patron = rf'<a[^>]*href="[^"]*{re.escape(INSTITUCIONAL)}"[^>]*>([^<]*)</a>'
+        self.assertEqual(re.findall(patron, html), ["Video"])
 
     def test_video_institucional_solo_con_preload_none(self):
         apariciones = 0
