@@ -70,7 +70,7 @@ Pedido del usuario del 2026-11-18: cambiar "Ver video · 1 min" por "Video". -->
 
 ## Registro de verificación
 
-commit_base: <hash del commit docs(plan): texto-boton-video>
+commit_base: 3c708ee
 
 ### Estado de subtareas
 
