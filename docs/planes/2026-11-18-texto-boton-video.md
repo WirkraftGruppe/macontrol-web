@@ -76,13 +76,14 @@ commit_base: 3c708ee
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
 
 ### Corridas
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-11-18 | T1 (autoverificación + spot check del principal) | texto-boton-video-T1 | criterios PASA; rojo previo del test nuevo confirmado | nivel Chico: sin verificador, por decisión del usuario y la tabla de niveles |
 
 ### Decisiones del plan
 
