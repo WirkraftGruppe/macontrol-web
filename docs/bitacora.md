@@ -1,7 +1,7 @@
 # Bitácora del sitio público de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-11-18-texto-boton-video.md
+Plan activo: docs/planes/2026-11-18-portada-franja-inferior.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
@@ -12,7 +12,8 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | retoques-sitio | plan/retoques-sitio (fusionada en main e18410c) | 3: T1–T10 hechas, desplegado | el usuario cambia `SITE_URL` a https://www.macontrol.com.ar | sesión 2026-11-17, commit_base d3390df, contrato modificado cdacc66 |
 | railway-iac | plan/railway-iac (fusionada en main 51268a1) | 3: T1–T6 hechas, desplegado | P-railway-iac-4 (corte de unos segundos por despliegue con el volumen) | sesión 2026-11-17, commit_base 1c896e8, contrato modificado efd9737 y 31e3c0c |
 | portada-video | plan/portada-video (fusionada en main 436e3dc, desplegado d9113f24) | cerrado, T1–T11 hechas | P-portada-video-1 (caché sin uso) | sesión 2026-11-18, commit_base f8d5cf1, contrato modificado 4bb14f4, 130340a y 77e9697 |
-| texto-boton-video | plan/texto-boton-video | 1: T1–T2 hechas | merge en `main` y push (despliegue), con autorización del usuario | sesión 2026-11-18, commit_base 3c708ee |
+| texto-boton-video | plan/texto-boton-video (fusionada en main 54475f9 y publicada, por el usuario) | cerrado, T1–T2 hechas | — | sesión 2026-11-18, commit_base 3c708ee |
+| portada-franja-inferior | plan/portada-franja-inferior | 1: T1 en curso | T1 (franja inferior en escritorio) | sesión 2026-11-18, commit_base eb669b9 |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 

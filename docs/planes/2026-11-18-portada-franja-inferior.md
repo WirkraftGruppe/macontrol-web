@@ -90,7 +90,7 @@ Pedido del usuario del 2026-11-18: que el texto y los botones de la portada no t
 
 ## Registro de verificación
 
-commit_base: (pendiente)
+commit_base: eb669b9
 
 ### Estado de subtareas
 
