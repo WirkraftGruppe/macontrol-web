@@ -252,3 +252,23 @@ class ClienteDestacado(models.Model):
 
     def __str__(self):
         return self.nombre
+
+
+class ContadorIngreso(models.Model):
+    """Contador de intentos de ingreso al admin para una ventana fija.
+
+    La fila de la ventana en curso se suma con un `UPDATE` atómico
+    (`cuenta = cuenta + 1`). Las filas vencidas se borran al reservar un intento.
+    No es contenido publicado y no se muestra en el admin.
+    """
+
+    clave = models.CharField("clave", max_length=200, primary_key=True)
+    cuenta = models.PositiveIntegerField("cuenta", default=0)
+    vence = models.DateTimeField("vence", db_index=True)
+
+    class Meta:
+        verbose_name = "contador de ingreso"
+        verbose_name_plural = "contadores de ingreso"
+
+    def __str__(self):
+        return f"{self.clave}: {self.cuenta}"

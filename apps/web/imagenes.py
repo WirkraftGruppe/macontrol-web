@@ -1,6 +1,5 @@
 """Reprocesado de imágenes subidas al sitio: formato real, sin metadatos."""
 
-import warnings
 from io import BytesIO
 
 from django.core.exceptions import ValidationError
@@ -23,24 +22,27 @@ def reprocesar_imagen(archivo, *, formato_salida: str) -> ContentFile:
     if tamano is not None and tamano > TAMANO_MAXIMO_IMAGEN:
         raise ValidationError("La imagen no puede pesar más de 2 MB.")
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(archivo, formats=FORMATOS_PERMITIDOS) as original:
-                original.load()
-                try:
-                    ImageOps.exif_transpose(original, in_place=True)
-                except Exception:  # noqa: BLE001
-                    # La rotación es cosmética y el EXIF se descarta igual.
-                    pass
-                if formato_salida == "PNG":
-                    tiene_alfa = "A" in original.mode or "transparency" in original.info
-                    imagen = original.convert("RGBA" if tiene_alfa else "RGB")
-                else:
-                    imagen = original.convert("RGB")
-                imagen.info = {}
-                salida = BytesIO()
-                imagen.save(salida, format=formato_salida)
-    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
+        with Image.open(archivo, formats=FORMATOS_PERMITIDOS) as original:
+            # Tope de píxeles leído de la cabecera, antes de decodificar: no usa los
+            # filtros de `warnings`, que son estado global y no seguro entre hilos.
+            limite = Image.MAX_IMAGE_PIXELS
+            if limite is not None and original.width * original.height > limite:
+                raise Image.DecompressionBombError("Demasiados píxeles")
+            original.load()
+            try:
+                ImageOps.exif_transpose(original, in_place=True)
+            except Exception:  # noqa: BLE001
+                # La rotación es cosmética y el EXIF se descarta igual.
+                pass
+            if formato_salida == "PNG":
+                tiene_alfa = "A" in original.mode or "transparency" in original.info
+                imagen = original.convert("RGBA" if tiene_alfa else "RGB")
+            else:
+                imagen = original.convert("RGB")
+            imagen.info = {}
+            salida = BytesIO()
+            imagen.save(salida, format=formato_salida)
+    except Image.DecompressionBombError as error:
         raise ValidationError(
             "La imagen tiene una resolución demasiado alta; use una más chica."
         ) from error
