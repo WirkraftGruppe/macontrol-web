@@ -4,7 +4,6 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.cache import cache
 from django.test import TestCase
 
 CLAVE = "clave-segura-123"
@@ -15,8 +14,6 @@ RELOJ_FIJO = 900 * 2_000_000 + 450
 
 class LimiteLoginAdminTests(TestCase):
     def setUp(self):
-        cache.clear()
-        self.addCleanup(cache.clear)
         reloj = mock.patch("config.limites.time.time", return_value=RELOJ_FIJO)
         reloj.start()
         self.addCleanup(reloj.stop)
