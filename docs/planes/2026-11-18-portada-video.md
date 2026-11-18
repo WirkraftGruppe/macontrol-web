@@ -239,10 +239,10 @@ commit_base: f8d5cf1
 
 | Tarea | Estado |
 |---|---|
-| T1 | pendiente |
-| T2 | pendiente |
-| T3 | pendiente |
-| T4 | pendiente |
+| T1 | hecha |
+| T2 | hecha |
+| T3 | hecha |
+| T4 | hecha |
 | T5 | pendiente |
 | T6 | pendiente |
 | T7 | pendiente |
@@ -252,6 +252,13 @@ commit_base: f8d5cf1
 
 | Fecha/hora | Alcance | HEAD verificado | Veredicto | Notas |
 |---|---|---|---|---|
+| 2026-11-18 | T1 (verificador) | 829b416 | PASA 8/8 | contrato intacto |
+| 2026-11-18 | T2 (verificador) | 80eb487 | PASA 9/9 | obs.: `medir_descargas.py:75` silencia errores de red (la descarga igual queda incompleta → FALLA) |
+| 2026-11-18 | T1, T2 (verificador-b) | 829b416, 80eb487 | PASA 17/17 | — |
+| 2026-11-18 | T3 (verificador) | c363e4b | PASA 25/25 | — |
+| 2026-11-18 | T3 (verificador-b) | c363e4b | PASA 25/25 | — |
+| 2026-11-18 | T1 (auditor-seguridad) | 829b416 | sin bloqueantes; 1 importante, 1 menor | límite de login no atómico (agravado ×8 por gthread) y `catch_warnings` no seguro entre hilos → T9 por decisión del usuario |
+| 2026-11-18 | T4 (integración) | 4c94f03 | 207 tests OK en cada `worktree-integrar.sh` | originales movidos a `~/respaldos/macontrol-web/portada-video-originales/` tras comparar sha256 |
 
 ### Decisiones del plan
 
