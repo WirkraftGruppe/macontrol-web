@@ -10,7 +10,8 @@ intento antes de evaluar la contraseña: suma 1 con un `UPDATE ... SET cuenta =
 cuenta + 1` (atómico en la base, también con peticiones simultáneas), en orden (IP,
 usuario e IP, usuario). Si un balde queda por encima de su máximo, devuelve lo
 reservado en esa llamada, no toca los siguientes y responde 429 sin evaluar la
-contraseña, así el bloqueo no sirve de oráculo y no cuenta como intento. Un ingreso correcto borra el balde (usuario, IP) y
+contraseña, así el bloqueo no sirve de oráculo y no cuenta como intento.
+Un ingreso correcto borra el balde (usuario, IP) y
 devuelve la reserva de los baldes por IP y por usuario, de modo que solo cuentan los
 fallos. Las filas vencidas se borran al reservar. Los valores se leen de los
 settings en cada uso.
