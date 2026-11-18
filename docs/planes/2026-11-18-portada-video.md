@@ -35,7 +35,7 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
 | 1 | T1 (gunicorn gthread), T2 (script de descargas), T3 (portada con video), T4 (integración) | ninguna |
-| 2 | T5 (script de medición de la portada), T9 (contador atómico del login e imágenes seguras entre hilos), T6 (integración y verificación `TODO` previa al despliegue) | web (solo T9: 0005) |
+| 2 | T5 (script de medición de la portada), T10 (comportamiento del JS, en el worktree de T5), T9 (contador atómico del login e imágenes seguras entre hilos), T6 (integración y verificación `TODO` previa al despliegue) | web (solo T9: 0005) |
 | 3 | T7 (aplicar gunicorn, desplegar y medir en producción, principal) | ninguna |
 | 4 | T8 (cierre, principal) | ninguna |
 
@@ -157,8 +157,8 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
 - **Qué hacer**: script con Playwright (`channel="chrome"`, `bypass_csp=True` solo para ocultar texto durante la medición). Sin `--url`, arranca la base temporal y `loaddata contenido_inicial` reutilizando `humo_web` (como `medir_movil.py`), y sirve con un servidor WSGI con hilos de la biblioteca estándar que envuelve la aplicación Django en `whitenoise.WhiteNoise(…, root=static/, prefix="static/")`, para que el video admita `Range` y búsquedas. Con `--url` mide ese sitio. Comprueba e imprime una línea por medición y al final `PASA …` o `FALLA …` (exit 0 solo con todo en PASA):
   - Contraste: en 1280×800 y en 375×812, con el fondo pausado en los segundos 0, 3 y 7, contraste ≥ 4,5:1 del color calculado de `h1`, del párrafo y de cada botón de la portada contra el píxel de mayor luminancia bajo su caja, con el texto oculto.
   - En 375×812, los dos botones ("Llamar ahora", "Ver video") con su borde inferior ≤ 812 sin desplazarse.
-  - Botones de la portada, de pausa y de cerrar el diálogo de al menos 44×44 px.
-  - Comportamiento: el fondo se reproduce; con `reduced_motion="reduce"` queda pausado; se pausa al desplazar la portada fuera del viewport y al abrir el diálogo; al cerrarlo, el institucional queda pausado; el botón de pausa alterna `aria-pressed`. Sin JavaScript (`java_script_enabled=False`), "Ver video" es un enlace al mp4 y el título y "Llamar ahora" se ven.
+  - Botones de la portada y de pausa de al menos 44×44 px (el de cerrar el diálogo lo mide T10).
+  - Comportamiento del JS y página sin JavaScript: pasan a T10 (contrato modificado por presupuesto).
   - Las funciones puras (luminancia relativa, contraste, evaluación de una medición) se testean sin navegador.
 - **Criterios**:
   - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_medir_portada.MedirPortadaTests.test_contraste_blanco_sobre_negro_es_21 --keepdb`
@@ -168,6 +168,29 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
   - `[cmd]` `PYTHONIOENCODING=utf-8 ./venv/Scripts/python.exe herramientas/medir_movil.py`   (el desborde horizontal de `/` en 375×812 lo mide la herramienta existente)
   - `[cmd]` `./venv/Scripts/python.exe -m ruff check herramientas/medir_portada.py apps/web/tests/test_medir_portada.py`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 350 --subtarea T5`
+
+### T10 — Medición del comportamiento del JS de la portada (`herramientas/medir_portada_js.py`)
+
+<!-- Agregada por contrato modificado (decisión del usuario, 2026-11-18): T5 agregó 422 líneas
+contra 350; el presupuesto no se sube y lo que no entra va acá. -->
+
+- **Ola**: 2
+- **Depende de**: T5
+- **Puede tocar**: `herramientas/medir_portada_js.py`, `herramientas/medir_portada.py` (solo para importar y llamar a la medición nueva), `apps/web/tests/test_medir_portada_js.py`
+- **No puede tocar**: lo mismo que T5
+- **Skill a leer antes**: lo mismo que T5
+- **Worktree**: el de T5 (rama `portada-video-T5`), en commits `T10:` posteriores a los `T5:`; se integra junto con T5
+- **Ruta**: delegada
+- **Presupuesto**: 200 líneas agregadas
+- **Qué hacer**: en `herramientas/medir_portada_js.py`, con el mismo navegador y la misma URL que `medir_portada.py`, y con el mismo formato de líneas: el fondo se reproduce; con `reduced_motion="reduce"` queda pausado; se pausa al desplazar la portada fuera del viewport y al abrir el diálogo; al cerrarlo, el institucional queda pausado; el botón de pausa alterna `aria-pressed`; el botón de cerrar del diálogo mide al menos 44×44 px. Sin JavaScript (`java_script_enabled=False`), "Ver video" es un enlace al mp4 y el título y "Llamar ahora" se ven. `medir_portada.py` la llama y suma sus resultados al `PASA`/`FALLA` final. La evaluación de las observaciones es una función pura testeada sin navegador.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_medir_portada_js.MedirPortadaJsTests.test_falla_si_el_fondo_no_se_pausa_con_el_dialogo --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_medir_portada_js.MedirPortadaJsTests.test_falla_si_sin_js_ver_video_no_es_enlace_al_mp4 --keepdb`
+  - `[existe]` `herramientas/medir_portada_js.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 ./venv/Scripts/python.exe herramientas/medir_portada.py | grep -q 'movimiento reducido'`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 ./venv/Scripts/python.exe herramientas/medir_portada.py`
+  - `[cmd]` `./venv/Scripts/python.exe -m ruff check herramientas/medir_portada_js.py herramientas/medir_portada.py apps/web/tests/test_medir_portada_js.py`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 200 --subtarea T10`
 
 ### T9 — Contador atómico del límite de ingreso al admin e imágenes seguras entre hilos
 
@@ -204,11 +227,11 @@ con gthread hay 16 peticiones simultáneas por réplica y dos defectos dejan de 
 
 ### T6 — Integración de la ola 2 (principal)
 
-- **Ola**: 2 (después de verificar T5 y T9)
-- **Depende de**: T5, T9
+- **Ola**: 2 (después de verificar T5, T10 y T9)
+- **Depende de**: T5, T10, T9
 - **Pasos**:
   1. Revisar `bash .claude/hooks/cambios.sh . plan/portada-video`, no los informes.
-  2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh portada-video T5 plan/portada-video herramientas/medir_portada.py apps/web/tests/test_medir_portada.py` y `bash .claude/hooks/worktree-integrar.sh portada-video T9 plan/portada-video <rutas de su Puede tocar>`.
+  2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh portada-video T5 plan/portada-video herramientas/medir_portada.py herramientas/medir_portada_js.py apps/web/tests/test_medir_portada.py apps/web/tests/test_medir_portada_js.py` (lleva T5 y T10) y `bash .claude/hooks/worktree-integrar.sh portada-video T9 plan/portada-video <rutas de su Puede tocar>`.
   3. Con todo integrado: cierre global, `verificador` y `verificador-b` sobre `TODO` (salvo T7 y T8) y `auditor-seguridad` sobre el plan entero (incluido T9: autenticación del admin e imágenes), antes de T7.
 - **Presupuesto**: no aplica (solo merges y commits `registro:`)
 - **Criterios**:
@@ -283,6 +306,7 @@ commit_base: f8d5cf1
 | T7 | pendiente |
 | T8 | pendiente |
 | T9 | pendiente |
+| T10 | pendiente |
 
 ### Corridas
 
