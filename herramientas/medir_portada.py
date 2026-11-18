@@ -31,7 +31,7 @@ ELEMENTOS_TEXTO = {
     "h1": "#hero h1",
     "párrafo": "#hero .hero-texto p",
     "Llamar ahora": "#hero .btn-primario",
-    "Ver video": "#hero #ver-video",
+    "Video": "#hero #ver-video",
     "Ver servicios": "#hero .hero-botones a[href='#servicios']",
 }
 OCULTAR_TEXTO = (
@@ -199,7 +199,7 @@ def medir_botones_y_objetivos(pagina, etiqueta, alto):
                 f"objetivo {etiqueta} {nombre} alto", c["h"], minimo=OBJETIVO_MINIMO
             )
         )
-        if etiqueta == "móvil" and nombre in ("Llamar ahora", "Ver video · 1 min"):
+        if etiqueta == "móvil" and nombre in ("Llamar ahora", "Video"):
             resultado.append(
                 evaluar(f"borde inferior {etiqueta} {nombre}", c["b"], maximo=alto)
             )
