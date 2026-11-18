@@ -1,0 +1,14 @@
+Starting Container
+Operations to perform:
+  Apply all migrations: admin, auth, contenttypes, sessions, web
+Running migrations:
+  No migrations to apply.
+Cache table 'cache_sitio' already exists.
+Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/402dcb08-3e0c-4ab8-9b46-f44ba2af9566/vol_6xub0fk7m31i3rgl
+Starting Container
+[2026-11-18 20:12:57 +0000] [1] [INFO] Starting gunicorn 26.2.0
+[2026-11-18 20:12:57 +0000] [1] [INFO] Listening at: http://0.0.0.0:8080 (1)
+[2026-11-18 20:12:57 +0000] [1] [INFO] Using worker: gthread
+[2026-11-18 20:12:57 +0000] [2] [INFO] Booting worker with pid: 2
+[2026-11-18 20:12:57 +0000] [3] [INFO] Booting worker with pid: 3
+[2026-11-18 20:12:57 +0000] [1] [INFO] Control socket listening at /root/.gunicorn/gunicorn.ctl
