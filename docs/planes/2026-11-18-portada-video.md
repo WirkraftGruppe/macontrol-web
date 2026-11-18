@@ -351,6 +351,9 @@ commit_base: f8d5cf1
 | 2026-11-18 | TODO previo al despliegue (verificador) | f60db7e | 82/83 PASA; única FALLA `congelado.sh` por contrato modificado (4bb14f4, 130340a) | 220 tests OK |
 | 2026-11-18 | plan entero (auditor-seguridad) | f60db7e | sin bloqueantes; H1 importante confirmado, H2 menor, H3 obs., H4 menor | H1–H3 → T11 por decisión del usuario; H4 queda como pendiente |
 | 2026-11-18 | T11 (verificador, verificador-b) | 51fa853 | 6/6 criterios PASA; veredicto FALLA solo por contrato modificado (4bb14f4, 130340a, 77e9697) | rojo previo de los 3 tests confirmado por el implementador; integrada con 223 tests OK |
+| 2026-11-18 | TODO previo al despliegue, 2.ª (verificador) | 37a988d | 88/89 PASA; única FALLA `congelado.sh` (4bb14f4, 130340a, 77e9697) | 223 tests OK; PASA 58 mediciones |
+| 2026-11-18 | TODO previo al despliegue, 2.ª (verificador-b) | 37a988d | 117/118 PASA; única FALLA `congelado.sh` | la 1.ª corrida de verificador-b (f60db7e→37a988d) se descarta: el HEAD cambió durante la corrida |
+| 2026-11-18 | T11 (auditor-seguridad) | 37a988d | H1, H2, H3 cerrados; sin hallazgos nuevos ni bloqueantes | H1 reproducido de nuevo: 302 desde otra IP. Pide en T7: `check --deploy` y `IP_CLIENTE_CABECERA` en Railway |
 
 ### Decisiones del plan
 
