@@ -328,8 +328,8 @@ commit_base: f8d5cf1
 | T4 | hecha |
 | T5 | hecha |
 | T6 | hecha |
-| T7 | pendiente |
-| T8 | pendiente |
+| T7 | hecha |
+| T8 | hecha |
 | T9 | hecha |
 | T10 | hecha |
 | T11 | hecha |
@@ -354,6 +354,9 @@ commit_base: f8d5cf1
 | 2026-11-18 | TODO previo al despliegue, 2.ª (verificador) | 37a988d | 88/89 PASA; única FALLA `congelado.sh` (4bb14f4, 130340a, 77e9697) | 223 tests OK; PASA 58 mediciones |
 | 2026-11-18 | TODO previo al despliegue, 2.ª (verificador-b) | 37a988d | 117/118 PASA; única FALLA `congelado.sh` | la 1.ª corrida de verificador-b (f60db7e→37a988d) se descarta: el HEAD cambió durante la corrida |
 | 2026-11-18 | T11 (auditor-seguridad) | 37a988d | H1, H2, H3 cerrados; sin hallazgos nuevos ni bloqueantes | H1 reproducido de nuevo: 302 desde otra IP. Pide en T7: `check --deploy` y `IP_CLIENTE_CABECERA` en Railway |
+| 2026-11-18 | T7 (principal, en producción) | 73258b9 | todos los criterios PASA | apply 0164a368 (gthread), merge f8ff6c9 → d9113f24; `showmigrations` de la 0005 lo corrió el usuario (`railway ssh` bloqueado por permisos): `[X] 0005_contadoringreso` |
+| 2026-11-18 | TODO final (verificador) | 4360785 | 106/107 PASA + 1 no ejecutado (`railway ssh`, prohibido en el prompt); única FALLA `congelado.sh` (4bb14f4, 130340a, 77e9697) | el `showmigrations` lo corrió el usuario: `[X] 0005_contadoringreso` |
+| 2026-11-18 | TODO final (verificador-b) | 4360785 | 107/108 PASA; única FALLA `congelado.sh` | ejecutó el `railway ssh` de T7 (solo lectura): `[X] 0005_contadoringreso` |
 
 ### Decisiones del plan
 
@@ -367,6 +370,23 @@ commit_base: f8d5cf1
 
 ### Problemas
 
+- P-portada-video-1 [menor] Ningún código usa ya la caché `cache_sitio` para el login: los contadores pasaron a `ContadorIngreso` (T9). Pero `config/settings/prod.py:81-82` dice que "los contadores del login del admin viven acá", y `docs/despliegue.md:14` y el `createcachetable` de `.railway/railway.ts` siguen asumiendo la caché. Corregir el comentario y decidir si se retiran `CACHES` y `createcachetable`; esto último toca el `preDeploy` (auditor-seguridad, H4).
+- P-portada-video-2 [observación] `herramientas/medir_descargas.py:75` silencia los errores de red de una descarga. En la 1.ª corrida en producción (`docs/evidencia/2026-11-18-portada-video/descargas-1.txt`) una descarga se cortó a los 26 s con 2,6 MB y no quedó registrado por qué; la 2.ª corrida pasó completa. Imprimir la excepción.
+- P-portada-video-3 [observación] Dos fallas aisladas en producción, sin rastro en los logs de gunicorn ni reinicio de workers: un `000` del sondeo a las 17:29:16 (`sondeo.txt`), mientras `medir_descargas.py` recibía 200 en menos de 1,7 s, y la descarga cortada de P-portada-video-2. Vigilar si se repiten.
+- P-portada-video-4 [observación] Con gthread, después del primer byte el socket queda bloqueante y sin tiempo límite (`gunicorn/workers/gthread.py:492`); `--timeout` no lo corta. 16 conexiones lentas ocupan todos los hilos de la réplica hasta que corte el borde de Railway (≈15 min, no verificado). `docs/despliegue.md:16` debería aclarar que "no se corta" también vale para un cliente malicioso (auditor-seguridad, T1).
+- P-portada-video-5 [observación] El balde global por usuario se llena desde 10 grupos de IP (antes de T9/T11: 3), y con IPv6 agrupado por /64 un /56 da 256 grupos. Las filas de `ContadorIngreso` solo se limpian al reservar. La atomicidad de la reserva en Postgres se comprobó razonando, no con tráfico real: probar con N≥10 POST simultáneos sobre un balde en máximo − 1 (auditor-seguridad, T11).
+- P-portada-video-6 [observación] `primera_oracion` (`apps/web/views.py`) corta en `.`, `!` o `?` seguido de mayúscula: si el cliente edita `presentacion` con "S.A. Somos…", la portada muestra solo hasta "S.A." (T3).
+- P-portada-video-7 [observación] `devolver_reserva` depende de `request._ahora_limites`, un atributo privado que pone `reservar_intento` en el `request`. Ese acoplamiento no se ve en el código y solo lo cubre el flujo del mixin del login (T11).
+
 ### Decisiones
 
+- 2026-11-18 — gunicorn pasa a `--worker-class gthread --threads 8` con 2 workers y `--timeout 60`, aplicado con `railway config apply` antes del código del video; como `CONN_MAX_AGE` vale 0, hay como máximo 2 × 8 = 16 conexiones a Postgres — con workers síncronos, una descarga lenta de video servida por WhiteNoise ocupaba un worker entero — decisión del usuario — reemplaza a: (nada)
+- 2026-11-18 — La concurrencia con descargas de video se mide en producción con `herramientas/medir_descargas.py` (4 descargas a 100 KB/s, `/` en 200 por debajo de 2 s, descargas completas) — gunicorn no corre en Windows — decisión del usuario — reemplaza a: (nada)
+- 2026-11-18 — La portada del inicio es un video de fondo con poster precargado con `fetchpriority="high"`, y `static/js/portada.js` se carga solo en `inicio.html` (bloques `precargas` y `scripts` de `base_web.html`); la CSP no cambia — decisión del usuario — reemplaza a: (nada)
+- 2026-11-18 — El límite de ingreso al admin deja la caché por `ContadorIngreso` en Postgres: reserva atómica antes de evaluar la contraseña y corte en el primer balde lleno (T9 y T11, migración 0005) — con gthread la caché perdía sumas y una sola IP podía bloquear al superusuario — decisión del usuario tras dos auditorías — reemplaza a: (nada)
+- 2026-11-18 — T5 se partió en T5 y T10 por exceder el presupuesto (422 de 350 líneas) en lugar de subirlo — CLAUDE.md § 4 — decisión del usuario — reemplaza a: (nada)
+
 ### Cierra
+
+- cierra: P-puesta-en-produccion-3 — T9 y T11: `ContadorIngreso` con `F("cuenta") + 1`, el intento se reserva antes del hash y el docstring de `config/limites.py` describe el mecanismo nuevo.
+- cierra: P-puesta-en-produccion-8 — los contadores del login ya no viven en `DatabaseCache`, así que el cull de la caché no puede reiniciarlos.

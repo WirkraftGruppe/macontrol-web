@@ -1,0 +1,16 @@
+HTTP/1.1 200 OK
+content-security-policy: default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
+Content-Type: text/html; charset=utf-8
+cross-origin-opener-policy: same-origin
+Date: Wed, 18 Nov 2026 20:05:14 GMT
+referrer-policy: strict-origin-when-cross-origin
+Server: railway-hikari
+strict-transport-security: max-age=3600
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-railway-request-id: 9ucpQFsERbSViuCwBT7zVQ
+Content-Length: 26162
+x-hikari-trace: ams1.aydy
+x-railway-edge: ams1
+Connection: keep-alive
+

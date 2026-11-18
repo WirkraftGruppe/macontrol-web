@@ -1,7 +1,7 @@
 # Bitácora del sitio público de MAControl
 
 ## Estado actual
-Plan activo: docs/planes/2026-11-17-railway-iac.md
+Plan activo: docs/planes/2026-11-18-portada-video.md
 
 Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` de arriba es el respaldo para la raíz):
 
@@ -10,11 +10,21 @@ Planes activos (los hooks derivan el plan de la rama; la línea `Plan activo:` d
 | web-independiente | main (fusionada f1cdc1b) | cerrado, TODO en PASA | — | sesión 2026-10-18 cerrada |
 | puesta-en-produccion | plan/puesta-en-produccion (fusionada en main) | 6: T1–T14 hechas, desplegado | verificación TODO; el usuario crea el superusuario; P-puesta-en-produccion-18 (preDeployCommand) | sesión 2026-10-18, commit_base a5d491f, contrato modificado f0328b8 |
 | retoques-sitio | plan/retoques-sitio (fusionada en main e18410c) | 3: T1–T10 hechas, desplegado | el usuario cambia `SITE_URL` a https://www.macontrol.com.ar | sesión 2026-11-17, commit_base d3390df, contrato modificado cdacc66 |
-| railway-iac | plan/railway-iac (fusionada en main 75cea6a) | 3: T1–T6 hechas, desplegado | P-railway-iac-4 (corte de unos segundos por despliegue con el volumen) | sesión 2026-11-17, commit_base 1c896e8, contrato modificado efd9737 y 31e3c0c |
+| railway-iac | plan/railway-iac (fusionada en main 51268a1) | 3: T1–T6 hechas, desplegado | P-railway-iac-4 (corte de unos segundos por despliegue con el volumen) | sesión 2026-11-17, commit_base 1c896e8, contrato modificado efd9737 y 31e3c0c |
+| portada-video | plan/portada-video (fusionada en main f8ff6c9, desplegado d9113f24) | 5: T1–T11 hechas, desplegado y medido | cierre en `main` (T8); P-portada-video-1 (caché sin uso) | sesión 2026-11-18, commit_base f8d5cf1, contrato modificado 4bb14f4, 130340a y 77e9697 |
 
 Problemas abiertos: ver `py -3 .claude/hooks/pendientes.py` (cada plan los declara en `## Pendientes que deja este plan`).
 
 ## Entradas (la más reciente arriba)
+
+### 2026-11-18 — Plan `portada-video`: portada con video de fondo, video institucional y gunicorn gthread
+Hecho:
+- T3: video de fondo en bucle (480 y 720 por `<source media>`), velo, botón de pausa, diálogo con el video institucional (`preload="none"`, enlace directo sin JS), `static/js/portada.js` solo en el inicio, poster precargado; la CSP no cambia. Párrafo de portada: primera oración de `presentacion`.
+- T1: gunicorn `gthread` 2 × 8, aplicado con `railway config apply` (0164a368) antes del código. T2, T5 y T10: `herramientas/medir_descargas.py`, `medir_portada.py` y `medir_portada_js.py`.
+- T9 y T11, por dos auditorías: el límite de ingreso al admin pasa a `ContadorIngreso` (migración 0005) con reserva atómica y corte en el primer balde lleno; las imágenes subidas se rechazan por píxeles sin tocar `warnings`.
+- Producción (T7, d9113f24): 4 descargas a 100 KB/s completas en 120 s con `/` en 200 por debajo de 1,7 s; los tres videos responden 206; CSP idéntica; portada medida en producción con PASA 58 (contraste mínimo 8,08:1); sondeos sin 5xx; 0005 aplicada en el `preDeploy`.
+- Contrato modificado tres veces por decisión del usuario (T9, T10, T11). `railway ssh` lo bloquearon los permisos de la sesión: el usuario corrió `showmigrations`.
+Pendiente: P-portada-video-1 (caché sin uso); P-portada-video-2 a -7 (observaciones); P-puesta-en-produccion-19 sigue (srcset del hero en páginas de servicio).
 
 ### 2026-11-17 — Plan `railway-iac`: configuración en `.railway/railway.ts` y migraciones automáticas al desplegar
 Hecho:
