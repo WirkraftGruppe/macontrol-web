@@ -15,10 +15,10 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
   - Almacenamiento externo, CDN o incrustados de terceros; video editable desde el admin.
   - Otras páginas (las de servicio siguen con `hero-pulverizacion-quincho.webp`), `og:image` y toda imagen existente de `static/img/`.
   - `config/csp.py`, `config/settings/**` y las cabeceras de seguridad: la CSP queda idéntica.
-  - Modelos y migraciones (`config.presentacion` se recorta en la vista, no en la base).
+  - Modelos y migraciones con datos publicados (`config.presentacion` se recorta en la vista, no en la base); la única migración es `0005_contadoringreso` de T9, sin datos.
   - `.claude/hooks/**`.
 - **áreas**: web | infraestructura
-- **seguridad**: sí — cambia el arranque de producción (`start` de gunicorn en `.railway/railway.ts`, aplicado con `railway config apply`) y el servido de estáticos pesados, y agrega el primer JavaScript del sitio bajo la CSP. Corre `auditor-seguridad` sobre T1 y sobre el plan entero antes de T7, además de `verificador` y `verificador-b`.
+- **seguridad**: sí — cambia el arranque de producción (`start` de gunicorn en `.railway/railway.ts`, aplicado con `railway config apply`) y el servido de estáticos pesados, y agrega el primer JavaScript del sitio bajo la CSP; T9 cambia el límite de ingreso al admin y el reprocesado de imágenes subidas. Corre `auditor-seguridad` sobre T1 y sobre el plan entero antes de T7, además de `verificador` y `verificador-b`.
 
 ## Contexto mínimo
 
@@ -35,7 +35,7 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
 | Ola | Subtareas | Apps (migraciones) |
 |---|---|---|
 | 1 | T1 (gunicorn gthread), T2 (script de descargas), T3 (portada con video), T4 (integración) | ninguna |
-| 2 | T5 (script de medición de la portada), T6 (integración y verificación `TODO` previa al despliegue) | ninguna |
+| 2 | T5 (script de medición de la portada), T9 (contador atómico del login e imágenes seguras entre hilos), T6 (integración y verificación `TODO` previa al despliegue) | web (solo T9: 0005) |
 | 3 | T7 (aplicar gunicorn, desplegar y medir en producción, principal) | ninguna |
 | 4 | T8 (cierre, principal) | ninguna |
 
@@ -169,17 +169,51 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
   - `[cmd]` `./venv/Scripts/python.exe -m ruff check herramientas/medir_portada.py apps/web/tests/test_medir_portada.py`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 350 --subtarea T5`
 
+### T9 — Contador atómico del límite de ingreso al admin e imágenes seguras entre hilos
+
+<!-- Agregada por contrato modificado (decisión del usuario, 2026-11-18) tras la auditoría de T1:
+con gthread hay 16 peticiones simultáneas por réplica y dos defectos dejan de estar acotados. -->
+
+- **Ola**: 2
+- **Depende de**: T4
+- **Puede tocar**: `config/limites.py`, `apps/web/models.py`, `apps/web/migrations/0005_contadoringreso.py`, `apps/web/imagenes.py`, `config/tests/test_limites.py`, `config/tests/test_limites_admin.py`, `config/tests/test_limites_atomicos.py`, `apps/web/tests/test_imagenes_hilos.py`
+- **No puede tocar**: `docs/planes/`, `config/settings/`, `config/csp.py`, `config/admin.py`, `.railway/`, `templates/`, `static/`, `herramientas/`, `apps/web/views.py`, `apps/web/admin.py`, `apps/web/templates/`, toda migración existente
+- **Skill a leer antes**: `.agents/skills/django-security/SKILL.md`, `.agents/skills/django-conventions/SKILL.md` § Models, `.agents/skills/test-driven-development/SKILL.md` § Red-Green-Refactor
+- **Worktree**: sí
+- **Ruta**: delegada
+- **Presupuesto**: 400 líneas agregadas
+- **Qué hacer**:
+  - Límite de ingreso (`config/limites.py`): hoy chequea el contador antes del hash de la contraseña y suma el fallo después con `cache.incr` (get + set): con peticiones simultáneas todas pasan el chequeo y se pierden sumas. Reemplazar los baldes en caché por un modelo nuevo `ContadorIngreso` (`clave` CharField primaria, `cuenta` PositiveIntegerField, `vence` DateTimeField con índice; sin admin) en `apps/web/models.py`, migración `0005_contadoringreso` sin datos. Cada POST **reserva** el intento antes de evaluar la contraseña: por cada balde (las mismas tres claves y ventanas fijas de hoy), `get_or_create` de la fila de la ventana en curso y `filter(...).update(cuenta=F("cuenta") + 1)`; si algún balde queda por encima de su máximo, 429 sin evaluar la contraseña (sigue sin ser oráculo). Ingreso correcto: borra el balde (usuario, IP) y devuelve la reserva de los baldes por IP y por usuario (`F("cuenta") - 1`, sin bajar de 0), así siguen contando solo los fallos. Las filas vencidas se borran al reservar. El docstring del módulo describe el mecanismo nuevo (sin "atómico entre procesos" para la caché).
+  - Imágenes (`apps/web/imagenes.py`): quitar `warnings.catch_warnings`/`simplefilter` (estado global del proceso, no seguro entre hilos) y rechazar con el mismo `ValidationError` cuando `ancho × alto > Image.MAX_IMAGE_PIXELS`, leído de la cabecera antes de `load()`.
+  - Los tests existentes de límites que dependan de la caché se adaptan sin perder lo que comprueban.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_atomicos.ReservaIntentoTests.test_intento_se_reserva_antes_de_evaluar_la_contrasena --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_atomicos.ReservaIntentoTests.test_reservas_pendientes_cuentan_para_el_cupo --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_atomicos.ReservaIntentoTests.test_suma_es_un_unico_update_con_expresion --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_atomicos.ReservaIntentoTests.test_ingreso_correcto_no_consume_cupo_de_ip_ni_de_usuario --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_atomicos.ReservaIntentoTests.test_ventana_vencida_reinicia_la_cuenta --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test apps.web.tests.test_imagenes_hilos.PixelesTests.test_rechaza_exceso_de_pixeles_sin_depender_de_los_filtros_de_avisos --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites config.tests.test_limites_admin apps.web --keepdb`
+  - `[existe]` `apps/web/migrations/0005_contadoringreso.py`
+  - `[grep-0]` `grep -nE 'cache\.(incr|add|get)' config/limites.py`
+  - `[grep-0]` `grep -nE 'catch_warnings|simplefilter' apps/web/imagenes.py`
+  - `[grep-1]` `grep -nF 'F("cuenta")' config/limites.py`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py makemigrations --check --dry-run`
+  - `[cmd]` `./venv/Scripts/python.exe -m ruff check config/limites.py apps/web/models.py apps/web/imagenes.py config/tests apps/web/tests apps/web/migrations/0005_contadoringreso.py`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 400 --subtarea T9`
+
 ### T6 — Integración de la ola 2 (principal)
 
-- **Ola**: 2 (después de verificar T5)
-- **Depende de**: T5
+- **Ola**: 2 (después de verificar T5 y T9)
+- **Depende de**: T5, T9
 - **Pasos**:
-  1. Revisar `bash .claude/hooks/cambios.sh . plan/portada-video`, no el informe.
-  2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh portada-video T5 plan/portada-video herramientas/medir_portada.py apps/web/tests/test_medir_portada.py`.
-  3. Con todo integrado: cierre global, `verificador` y `verificador-b` sobre `TODO` (salvo T7 y T8) y `auditor-seguridad` sobre el plan entero, antes de T7.
+  1. Revisar `bash .claude/hooks/cambios.sh . plan/portada-video`, no los informes.
+  2. Desde la raíz, `bash .claude/hooks/worktree-integrar.sh portada-video T5 plan/portada-video herramientas/medir_portada.py apps/web/tests/test_medir_portada.py` y `bash .claude/hooks/worktree-integrar.sh portada-video T9 plan/portada-video <rutas de su Puede tocar>`.
+  3. Con todo integrado: cierre global, `verificador` y `verificador-b` sobre `TODO` (salvo T7 y T8) y `auditor-seguridad` sobre el plan entero (incluido T9: autenticación del admin e imágenes), antes de T7.
 - **Presupuesto**: no aplica (solo merges y commits `registro:`)
 - **Criterios**:
   - `[cmd]` `git log --oneline plan/portada-video | grep -q "T5: integra portada-video-T5"`
+  - `[cmd]` `git log --oneline plan/portada-video | grep -q "T9: integra portada-video-T9"`
   - `[cmd]` `git diff --exit-code 51268a1 -- config/csp.py config/settings/`
 
 ### T7 — Aplicar gunicorn, desplegar el video y medir en producción (principal)
@@ -208,6 +242,7 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
   - `[cmd]` `for v in portada-bucle-480 portada-bucle-720 video-institucional-720; do h="$(curl -sS -o /dev/null -D - -H 'Range: bytes=0-1023' "https://www.macontrol.com.ar/static/video/$v.mp4" | tr -d '\r')"; echo "$h" | head -n 1 | grep -q ' 206' && echo "$h" | grep -qi '^content-range: bytes 0-1023/' || exit 1; done`
   - `[cmd]` `test "$(grep -i '^content-security-policy:' docs/evidencia/2026-11-18-portada-video/cabeceras-antes.txt | tr -d '\r')" = "$(curl -sSI https://www.macontrol.com.ar/ | grep -i '^content-security-policy:' | tr -d '\r')"`
   - `[cmd]` `curl -fsS https://www.macontrol.com.ar/ | grep -q 'portada-bucle-720'`
+  - `[cmd]` `MSYS_NO_PATHCONV=1 railway ssh -s web -- sh -c 'cd /app && /app/.venv/bin/python manage.py showmigrations web' 2>&1 | grep -q "\[X\] 0005_contadoringreso"`
   - `[cmd]` `for p in / /empresa/ /contacto/ /servicio/control-murcielagos/ /favicon.ico /admin/login/; do test "$(curl -sS -o /dev/null -w '%{http_code}' "https://www.macontrol.com.ar$p")" = 200 || exit 1; done`
   - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 1500 --subtarea T7`
 
@@ -247,6 +282,7 @@ commit_base: f8d5cf1
 | T6 | pendiente |
 | T7 | pendiente |
 | T8 | pendiente |
+| T9 | pendiente |
 
 ### Corridas
 
