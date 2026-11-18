@@ -1,6 +1,7 @@
 """Vistas del sitio público: contenido desde la base, sin formularios."""
 
 import mimetypes
+import re
 from pathlib import Path
 
 from django.conf import settings
@@ -75,6 +76,12 @@ def _pagina(
     return render(request, plantilla, contexto)
 
 
+def primera_oracion(texto):
+    """Primera oración de `texto`; el texto completo sigue en /empresa/."""
+    texto = texto.strip()
+    return re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿¡])", texto, maxsplit=1)[0]
+
+
 def inicio(request):
     config = Configuracion.obtener()
     servicios = [
@@ -87,7 +94,7 @@ def inicio(request):
         descripcion=config.eslogan,
         ruta=reverse("web:inicio"),
         datos_ld=json_ld(datos_estructurados(config)),
-        hero=_imagen("hero"),
+        presentacion_corta=primera_oracion(config.presentacion),
         empresa_foto=_imagen("empresa"),
         edilicia=_imagen("mantenimiento"),
         servicios=servicios,

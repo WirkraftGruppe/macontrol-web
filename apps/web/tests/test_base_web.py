@@ -74,15 +74,15 @@ class BaseWebTests(TestCase):
             r'class="nav-desplegable-panel">(.*?)</div>', html, re.S
         ).group(1)
         self.assertIn('href="/servicio/servicio-prueba/"', panel)
-        # El desplegable es solo HTML y CSS: el único <script> admitido es el bloque
-        # de datos JSON-LD del inicio, que no se ejecuta.
+        # El desplegable es solo HTML y CSS: los únicos <script> admitidos son el de la
+        # portada (por `src`) y el bloque de datos JSON-LD del inicio (no se ejecuta).
         self.assertEqual(
             [
                 s
                 for s in re.findall(r"<script\b[^>]*>", html)
                 if s != '<script type="application/ld+json">'
             ],
-            [],
+            ['<script src="/static/js/portada.js" defer>'],
         )
 
     def test_incluye_iconos(self):

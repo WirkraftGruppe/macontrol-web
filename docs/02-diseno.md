@@ -62,12 +62,18 @@ Escala (px):
 - **Tarjeta de servicio** (`.tarjeta-servicio`): altura igual por fila, `.tarjeta-icono` de 48×48 (borde `--on-brand-muted`, fondo `--brand-tint`, ícono `--brand`) y `.tarjeta-ver` "Ver servicio →" al pie.
 - **Franja de sectores** (`.franja-sectores`): título a la izquierda y `.lista-sectores` a la derecha, 3 columnas con filete superior (2 en móvil).
 - **Franja de clientes** (`.franja-clientes`): `.cliente-nombre` en Barlow Condensed 700, mayúsculas, con rombo `--brand` delante; salto de línea natural.
+- **Portada con video** (`.hero`, solo en el inicio): `<video>` de fondo a todo el ancho (`muted loop playsinline autoplay`, `aria-hidden="true"`, `poster` = `portada-poster.webp`) con dos fuentes MP4: 480 p para `max-width: 900px` y 720 p para el resto. El poster se precarga con `fetchpriority="high"`.
+  - **Velo** (`.hero-velo`): degradado de `--bg` de izquierda a derecha (0,94 → 0,86 → 0,35) con el texto a la izquierda; en móvil (≤ 900 px) el degradado va de arriba hacia abajo, el texto queda abajo y los botones ocupan todo el ancho. El contraste AA de título, párrafo y botones sobre todo el bucle se mide en el navegador (T5), no se asume.
+  - **Pausa** (`.hero-pausa`): botón de 44×44 arriba a la derecha, con `hidden` en el HTML; el JS lo muestra y alterna `aria-pressed` y `aria-label`. El video se pausa solo cuando la portada sale del viewport y mientras el diálogo está abierto; se reanuda después, salvo que el usuario lo haya pausado.
+  - **Diálogo** (`.video-dialogo`): "Ver video · 1 min" es un enlace al MP4 institucional; con JS abre un `<dialog>` modal con `<video controls preload="none">` y un botón de cerrar de 44×44. Cerrar (botón, Escape o clic en el fondo) pausa el institucional.
+  - **Movimiento reducido**: con `prefers-reduced-motion: reduce` el JS pausa el fondo y lo vuelve al poster; el botón queda disponible para reanudarlo.
+  - Sin JS, el fondo se reproduce solo y el enlace descarga el video institucional. Una sola excepción a "sin JavaScript": `static/js/portada.js`, sin dependencias, cargado solo por el inicio.
 - **Portada de servicio** (`.campo-imagen-portada`): `aspect-ratio: 16 / 9`, imagen con `object-fit: cover`.
 - **Bloque de contacto (web)**: teléfono en Barlow Condensed 800 56 px como elemento principal; botones "Llamar ahora" (primario) y "WhatsApp" (secundario). Sin formularios.
 
 ## Estructura de páginas (web)
 
-Home: barra de navegación → hero (título, texto, dos botones, imagen con franja) → barra de cuatro respaldos (habilitación, Ley 10.699/88, director técnico, certificado) → servicios (grilla 3 columnas, 9 tarjetas numeradas, una por servicio) → franja "Mantenimiento edilicio" → sectores sobre fondo amarillo (8 tarjetas; los sectores de la Carta son 12) → cómo trabajamos (texto + 4 pasos) → empresa (valores en tres círculos) → clientes (logotipos) → contacto → pie.
+Home: barra de navegación → portada con video de fondo (título, primera oración de la presentación, botones "Llamar ahora", "Ver video · 1 min" y "Ver servicios", botón de pausa) → barra de cuatro respaldos (habilitación, Ley 10.699/88, director técnico, certificado) → servicios (grilla 3 columnas, 9 tarjetas numeradas, una por servicio) → franja "Mantenimiento edilicio" → sectores sobre fondo amarillo (8 tarjetas; los sectores de la Carta son 12) → cómo trabajamos (texto + 4 pasos) → empresa (valores en tres círculos) → clientes (logotipos) → contacto → pie.
 
 Página de servicio: migas → título con etiqueta de categoría y sectores aplicables → imagen ancha → "El problema" / "Cómo lo resolvemos" (tarjetas de métodos) → servicio adicional → preguntas frecuentes → lateral fijo: bloque de contacto, respaldo legal, servicios relacionados.
 
@@ -87,4 +93,5 @@ Responsive: a menos de 900 px las grillas pasan a 1 columna, el H1 baja a 48 px,
 | `image5.jpg` | horizontal | Camioneta y utilitario ploteados frente a contenedores | Sector Industria y puertos; respalda "logística propia" | `flota-vehiculos-industria.webp` |
 
   Faltan todavía fotos de monitoreo de estaciones cebaderas y de sellado de techos; esos marcadores se mantienen hasta que la empresa las entregue.
+- Video de la portada: `static/img/portada-poster.webp` (poster y precarga), `static/video/portada-bucle-480.mp4` y `portada-bucle-720.mp4` (bucle de fondo, sin sonido) y `static/video/video-institucional-720.mp4` (institucional de 1 min, solo se pide al abrir el diálogo). WhiteNoise los sirve con `Range` (206).
 - Logotipos de clientes: la empresa los entrega; se guardan en `media/clientes/` y se administran desde `web.ClienteDestacado`.
