@@ -36,8 +36,9 @@ solo en inicio.html, la precarga del poster reemplaza a test_hero_con_fetchprior
 |---|---|---|
 | 1 | T1 (gunicorn gthread), T2 (script de descargas), T3 (portada con video), T4 (integración) | ninguna |
 | 2 | T5 (script de medición de la portada), T10 (comportamiento del JS, en el worktree de T5), T9 (contador atómico del login e imágenes seguras entre hilos), T6 (integración y verificación `TODO` previa al despliegue) | web (solo T9: 0005) |
-| 3 | T7 (aplicar gunicorn, desplegar y medir en producción, principal) | ninguna |
-| 4 | T8 (cierre, principal) | ninguna |
+| 3 | T11 (cortar la reserva al primer balde lleno; integración y verificación `TODO` previa por el principal) | ninguna |
+| 4 | T7 (aplicar gunicorn, desplegar y medir en producción, principal) | ninguna |
+| 5 | T8 (cierre, principal) | ninguna |
 
 ## Subtareas
 
@@ -239,10 +240,33 @@ con gthread hay 16 peticiones simultáneas por réplica y dos defectos dejan de 
   - `[cmd]` `git log --oneline plan/portada-video | grep -q "T9: integra portada-video-T9"`
   - `[cmd]` `git diff --exit-code 51268a1 -- config/csp.py config/settings/`
 
-### T7 — Aplicar gunicorn, desplegar el video y medir en producción (principal)
+### T11 — Cortar la reserva al primer balde lleno (auditoría previa al despliegue)
+
+<!-- Agregada por contrato modificado (decisión del usuario, 2026-11-18): la auditoría del plan entero
+confirmó que con T9 los intentos rechazados con 429 suman en el balde global por usuario y una sola IP
+bloquea al superusuario desde cualquier IP (H1), y que la tabla crece sin tope bajo ataque (H2). -->
 
 - **Ola**: 3
-- **Depende de**: T6 y la verificación `TODO` previa en PASA
+- **Depende de**: T6
+- **Puede tocar**: `config/limites.py`, `config/tests/test_limites_atomicos.py`, `config/tests/test_limites_corte.py`
+- **No puede tocar**: `docs/planes/`, `config/settings/`, `config/csp.py`, `config/admin.py`, `apps/`, `.railway/`, `templates/`, `static/`, `herramientas/`, toda migración
+- **Skill a leer antes**: `.agents/skills/django-security/SKILL.md`, `.agents/skills/test-driven-development/SKILL.md` § Red-Green-Refactor
+- **Worktree**: sí
+- **Ruta**: delegada
+- **Presupuesto**: 200 líneas agregadas
+- **Qué hacer**: en `reservar_intento`, reservar los baldes en orden (IP, usuario e IP, usuario) y, en cuanto uno queda por encima de su máximo, devolver lo reservado en esta llamada (`F("cuenta") - 1` con `cuenta__gt=0`) y cortar sin tocar los baldes siguientes: cuentan solo los intentos que se evalúan, como antes de T9, y una IP bloqueada no crea filas de usuario. `devolver_reserva` usa el mismo instante que la reserva (guardado en el `request`), no un `time.time()` nuevo. Actualizar el comentario que dice que se suman todos los baldes.
+- **Criterios**:
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_corte.CorteDeReservaTests.test_una_ip_bloqueada_no_bloquea_al_usuario_desde_otra_ip --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_corte.CorteDeReservaTests.test_ip_bloqueada_no_crea_filas_de_usuario --keepdb`
+  - `[test]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests.test_limites_corte.CorteDeReservaTests.test_devolucion_usa_la_ventana_de_la_reserva --keepdb`
+  - `[cmd]` `PYTHONIOENCODING=utf-8 DJANGO_ENV=development ./venv/Scripts/python.exe manage.py test config.tests apps.web --keepdb`
+  - `[cmd]` `./venv/Scripts/python.exe -m ruff check config/limites.py config/tests`
+  - `[cmd]` `bash .claude/hooks/presupuesto.sh . '<commit_base>' 200 --subtarea T11`
+
+### T7 — Aplicar gunicorn, desplegar el video y medir en producción (principal)
+
+- **Ola**: 4
+- **Depende de**: T6, T11 (integrada con `worktree-integrar.sh`) y la verificación `TODO` previa en PASA
 - **Pasos** (⚠ = autorización explícita del usuario con la salida a la vista; ninguno se encadena con el siguiente sin ella):
   1. `railway status` → `macontrol-web`.
   2. `curl -sSI https://www.macontrol.com.ar/ > docs/evidencia/2026-11-18-portada-video/cabeceras-antes.txt` (CSP de `main` en producción).
@@ -264,6 +288,7 @@ con gthread hay 16 peticiones simultáneas por réplica y dos defectos dejan de 
   - `[cmd]` `test "$(tail -n 1 docs/evidencia/2026-11-18-portada-video/portada.txt | cut -d' ' -f1)" = PASA`
   - `[cmd]` `for v in portada-bucle-480 portada-bucle-720 video-institucional-720; do h="$(curl -sS -o /dev/null -D - -H 'Range: bytes=0-1023' "https://www.macontrol.com.ar/static/video/$v.mp4" | tr -d '\r')"; echo "$h" | head -n 1 | grep -q ' 206' && echo "$h" | grep -qi '^content-range: bytes 0-1023/' || exit 1; done`
   - `[cmd]` `test "$(grep -i '^content-security-policy:' docs/evidencia/2026-11-18-portada-video/cabeceras-antes.txt | tr -d '\r')" = "$(curl -sSI https://www.macontrol.com.ar/ | grep -i '^content-security-policy:' | tr -d '\r')"`
+  - `[cmd]` `git log --oneline plan/portada-video | grep -q "T11: integra portada-video-T11"`
   - `[cmd]` `curl -fsS https://www.macontrol.com.ar/ | grep -q 'portada-bucle-720'`
   - `[cmd]` `MSYS_NO_PATHCONV=1 railway ssh -s web -- sh -c 'cd /app && /app/.venv/bin/python manage.py showmigrations web' 2>&1 | grep -q "\[X\] 0005_contadoringreso"`
   - `[cmd]` `for p in / /empresa/ /contacto/ /servicio/control-murcielagos/ /favicon.ico /admin/login/; do test "$(curl -sS -o /dev/null -w '%{http_code}' "https://www.macontrol.com.ar$p")" = 200 || exit 1; done`
@@ -271,7 +296,7 @@ con gthread hay 16 peticiones simultáneas por réplica y dos defectos dejan de 
 
 ### T8 — Cierre (principal)
 
-- **Ola**: 4
+- **Ola**: 5
 - **Depende de**: T7
 - **Pasos**: bitácora ("Estado actual" y entrada), decisiones del plan copiadas a `docs/decisiones.md`, `### Cierra` y pendientes nuevos; commits `T8:` en `plan/portada-video` y merge en `main` con autorización del usuario.
 - **Presupuesto**: 120 líneas agregadas
@@ -307,6 +332,7 @@ commit_base: f8d5cf1
 | T8 | pendiente |
 | T9 | hecha |
 | T10 | hecha |
+| T11 | pendiente |
 
 ### Corridas
 
