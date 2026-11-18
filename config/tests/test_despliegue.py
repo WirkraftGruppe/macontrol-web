@@ -19,6 +19,18 @@ class RailwayTests(SimpleTestCase):
         self.assertIn("migrate --noinput", lineas[0])
         self.assertIn("createcachetable", lineas[0])
 
+    def test_start_gthread_dos_workers_ocho_hilos(self):
+        lineas = re.findall(r'^\s*start: "([^"]*)",\s*$', _leer_iac(), re.M)
+        self.assertEqual(len(lineas), 1)
+        for opcion in (
+            "--workers 2",
+            "--worker-class gthread",
+            "--threads 8",
+            "--timeout 60",
+            "--bind 0.0.0.0:$PORT",
+        ):
+            self.assertIn(opcion, lineas[0])
+
     def test_volumen_montado_en_data(self):
         self.assertRegex(_leer_iac(), r'volumeMounts: \{ "/data": \w+ \}')
 
