@@ -301,12 +301,12 @@ commit_base: f8d5cf1
 | T2 | hecha |
 | T3 | hecha |
 | T4 | hecha |
-| T5 | pendiente |
-| T6 | pendiente |
+| T5 | hecha |
+| T6 | hecha |
 | T7 | pendiente |
 | T8 | pendiente |
-| T9 | pendiente |
-| T10 | pendiente |
+| T9 | hecha |
+| T10 | hecha |
 
 ### Corridas
 
@@ -319,6 +319,9 @@ commit_base: f8d5cf1
 | 2026-11-18 | T3 (verificador-b) | c363e4b | PASA 25/25 | — |
 | 2026-11-18 | T1 (auditor-seguridad) | 829b416 | sin bloqueantes; 1 importante, 1 menor | límite de login no atómico (agravado ×8 por gthread) y `catch_warnings` no seguro entre hilos → T9 por decisión del usuario |
 | 2026-11-18 | T4 (integración) | 4c94f03 | 207 tests OK en cada `worktree-integrar.sh` | originales movidos a `~/respaldos/macontrol-web/portada-video-originales/` tras comparar sha256 |
+| 2026-11-18 | T9 (verificador, verificador-b) | d867c82 | 14/14 criterios PASA; veredicto FALLA solo por contrato modificado (4bb14f4, decisión del usuario) | alcance: 8 archivos, todos en su Puede tocar |
+| 2026-11-18 | T5, T10 (verificador, verificador-b) | 5bce088 | 14/14 criterios PASA; veredicto FALLA solo por contrato modificado (4bb14f4, 130340a, decisiones del usuario) | `medir_portada.py`: PASA 58 mediciones; contraste mínimo 8,08:1 |
+| 2026-11-18 | T6 (integración) | 86869bb | 214 y 220 tests OK en `worktree-integrar.sh`; criterios de T6 en PASA | T5 lleva los commits de T10 |
 
 ### Decisiones del plan
 
