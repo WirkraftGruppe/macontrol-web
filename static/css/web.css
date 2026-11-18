@@ -271,6 +271,25 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .hero-texto p { max-width: 560px; font-size: 18px; color: var(--text); }
 .hero-botones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .hero .btn-secundario { background: rgba(15, 20, 23, 0.7); }
+/* Escritorio (> 900 px): franja al pie. Texto a la izquierda y botones a la derecha, alineados con la base;
+   el velo es vertical y deja sin oscurecer la mitad superior del video. */
+@media (min-width: 901px) {
+  .hero { align-items: end; padding: 120px 0 48px; }
+  .hero-velo {
+    background: linear-gradient(to bottom, transparent 0%, transparent 40%, rgba(15, 20, 23, 0.93) 55%, rgba(15, 20, 23, 0.93) 100%);
+  }
+  .hero-texto { max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 48px; align-items: end; }
+  .hero-texto > .eyebrow, .hero-texto > h1, .hero-texto > p { grid-column: 1; }
+  .hero-texto > p { max-width: 640px; }
+  .hero h1 { font-size: clamp(56px, 5.2vw, 84px); white-space: nowrap; }
+  .hero-botones { grid-column: 2; grid-row: 1 / span 3; margin-top: 0; flex-wrap: nowrap; }
+}
+/* Entre 901 y 1100 px no entran juntos: los botones pasan debajo del texto y el h1 puede partirse sin bajar de 56 px. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .hero-texto { grid-template-columns: minmax(0, 1fr); }
+  .hero h1 { white-space: normal; }
+  .hero-botones { grid-column: 1; grid-row: auto; margin-top: 28px; flex-wrap: wrap; }
+}
 .hero-pausa, .video-cerrar {
   display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
   border: 1.5px solid var(--border-strong); border-radius: 50%; cursor: pointer;

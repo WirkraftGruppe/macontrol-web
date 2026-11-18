@@ -23,7 +23,16 @@ from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import humo_web as humo  # noqa: E402
 
-VIEWPORTS = {"escritorio": (1280, 800), "móvil": (375, 812)}
+VIEWPORTS = {"escritorio": (1280, 800), "angosto": (1000, 800), "móvil": (375, 812)}
+# Posiciones (top, bottom) en px relativas al top de `.hero`, medidas en 375x812
+# en main 54475f9, antes de la franja inferior: el diseño móvil no debe cambiar.
+REFERENCIA_MOVIL = {
+    "hero-texto": {"top": 199.8125, "bottom": 640.0},
+    "hero-botones": {"top": 472.0, "bottom": 640.0},
+}
+TOLERANCIA_MOVIL = 1
+DISTANCIA_PIE_MAXIMA = 60
+H1_MINIMO_ANGOSTO = 56
 SEGUNDOS = (0, 3, 7)
 CONTRASTE_MINIMO = 4.5
 OBJETIVO_MINIMO = 44
@@ -81,6 +90,60 @@ def evaluar(nombre, valor, minimo=None, maximo=None):
 
 def comprobar(nombre, cumple, detalle=""):
     return Medicion(nombre, bool(cumple), detalle or ("sí" if cumple else "no"))
+
+
+def h1_una_linea(alto_h1, alto_linea):
+    """El h1 ocupa una sola línea si su alto no llega a una línea y media."""
+    return comprobar(
+        "franja escritorio h1 una línea",
+        alto_h1 < alto_linea * 1.5,
+        f"alto {alto_h1:.1f} px, línea {alto_linea:.1f} px",
+    )
+
+
+def botones_al_pie(borde_botones, borde_hero):
+    """Los botones quedan a menos de 60 px del borde inferior de la portada."""
+    distancia = borde_hero - borde_botones
+    return comprobar(
+        "franja escritorio botones al pie",
+        distancia < DISTANCIA_PIE_MAXIMA,
+        f"{distancia:.1f} px del borde (máximo {DISTANCIA_PIE_MAXIMA} sin llegar)",
+    )
+
+
+def texto_abajo(top_texto, alto_hero):
+    """El texto empieza por debajo del 50 % de la altura de la portada."""
+    return comprobar(
+        "franja escritorio texto abajo",
+        top_texto > alto_hero * 0.5,
+        f"top {top_texto:.1f} px de {alto_hero:.1f} px",
+    )
+
+
+def h1_angosto(tamano, borde_der_botones, borde_der_hero):
+    """El h1 no baja de 56 px y los botones no se salen de la portada por la derecha."""
+    ok = tamano >= H1_MINIMO_ANGOSTO and borde_der_botones <= borde_der_hero
+    return comprobar(
+        "franja angosto h1 tamaño",
+        ok,
+        f"h1 {tamano:.1f} px (mínimo {H1_MINIMO_ANGOSTO}), botones hasta "
+        f"{borde_der_botones:.1f} de {borde_der_hero:.1f} px",
+    )
+
+
+def posicion_movil(nombre, medida, referencia):
+    """Compara (top, bottom) móviles con la referencia de main, tolerancia de 1 px."""
+    top, bottom = medida
+    ok = (
+        abs(top - referencia["top"]) <= TOLERANCIA_MOVIL
+        and abs(bottom - referencia["bottom"]) <= TOLERANCIA_MOVIL
+    )
+    return comprobar(
+        f"posición móvil {nombre}",
+        ok,
+        f"top {top:.1f} bottom {bottom:.1f} (referencia {referencia['top']:.1f}"
+        f" y {referencia['bottom']:.1f}, tolerancia {TOLERANCIA_MOVIL} px)",
+    )
 
 
 def pixel_mas_luminoso(imagen):
@@ -206,6 +269,41 @@ def medir_botones_y_objetivos(pagina, etiqueta, alto):
     return resultado
 
 
+def medir_franja(pagina, etiqueta):
+    """Posiciones de `.hero-texto`, `.hero-botones` y `h1` relativas a `.hero`."""
+    m = pagina.evaluate(
+        """() => {
+        const caja = s => document.querySelector(s).getBoundingClientRect();
+        const h = caja('#hero'), t = caja('#hero .hero-texto');
+        const b = caja('#hero .hero-botones'), u = caja('#hero h1');
+        const e = getComputedStyle(document.querySelector('#hero h1'));
+        return {h: [h.top, h.bottom, h.right], t: [t.top, t.bottom],
+            b: [b.top, b.bottom, b.right], alto_h1: u.height,
+            tam: parseFloat(e.fontSize), lin: parseFloat(e.lineHeight)}; }"""
+    )
+    top = m["h"][0]
+    if etiqueta == "móvil":
+        return [
+            posicion_movil(
+                "hero-texto",
+                (m["t"][0] - top, m["t"][1] - top),
+                REFERENCIA_MOVIL["hero-texto"],
+            ),
+            posicion_movil(
+                "hero-botones",
+                (m["b"][0] - top, m["b"][1] - top),
+                REFERENCIA_MOVIL["hero-botones"],
+            ),
+        ]
+    if etiqueta == "angosto":
+        return [h1_angosto(m["tam"], m["b"][2], m["h"][2])]
+    return [
+        h1_una_linea(m["alto_h1"], m["lin"]),
+        botones_al_pie(m["b"][1], m["h"][1]),
+        texto_abajo(m["t"][0] - top, m["h"][1] - top),
+    ]
+
+
 def medir_todo(navegador, base):
     mediciones = []
     for etiqueta, (ancho, alto) in VIEWPORTS.items():
@@ -216,6 +314,7 @@ def medir_todo(navegador, base):
         pagina.goto(base + "/", wait_until="load")
         pagina.wait_for_selector("#hero .hero-pausa:not([hidden])", timeout=8000)
         mediciones += medir_botones_y_objetivos(pagina, etiqueta, alto)
+        mediciones += medir_franja(pagina, etiqueta)
         mediciones += medir_contraste(pagina, etiqueta)
         contexto.close()
     from medir_portada_js import medir_comportamiento

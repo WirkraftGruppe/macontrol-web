@@ -44,3 +44,20 @@ class MedirPortadaTests(SimpleTestCase):
         buenas = [self.m.comprobar("a", True)]
         self.assertEqual(self.m.resumen(buenas)[1], 0)
         self.assertEqual(self.m.resumen([*buenas, self.m.comprobar("b", False)])[1], 1)
+
+    def test_botones_lejos_del_pie_es_falla(self):
+        # Hero de 800 px de alto: botones a 59 px del borde pasan, a 60 o más fallan.
+        self.assertTrue(self.m.botones_al_pie(741, 800).ok)
+        for borde in (740, 700):
+            medicion = self.m.botones_al_pie(borde, 800)
+            self.assertFalse(medicion.ok)
+            self.assertTrue(medicion.linea().startswith("FALLA"))
+
+    def test_posicion_movil_distinta_de_la_referencia_es_falla(self):
+        referencia = {"top": 200.0, "bottom": 640.0}
+        self.assertTrue(
+            self.m.posicion_movil("hero-texto", (200.9, 640.0), referencia).ok
+        )
+        corrida = self.m.posicion_movil("hero-texto", (202.0, 642.0), referencia)
+        self.assertFalse(corrida.ok)
+        self.assertTrue(corrida.linea().startswith("FALLA posición móvil hero-texto"))
