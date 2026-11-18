@@ -218,7 +218,9 @@ def medir_todo(navegador, base):
         mediciones += medir_botones_y_objetivos(pagina, etiqueta, alto)
         mediciones += medir_contraste(pagina, etiqueta)
         contexto.close()
-    return mediciones
+    from medir_portada_js import medir_comportamiento
+
+    return mediciones + medir_comportamiento(navegador, base)
 
 
 def resumen(mediciones):
