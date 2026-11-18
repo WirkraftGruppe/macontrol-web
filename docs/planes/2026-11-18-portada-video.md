@@ -348,6 +348,8 @@ commit_base: f8d5cf1
 | 2026-11-18 | T9 (verificador, verificador-b) | d867c82 | 14/14 criterios PASA; veredicto FALLA solo por contrato modificado (4bb14f4, decisión del usuario) | alcance: 8 archivos, todos en su Puede tocar |
 | 2026-11-18 | T5, T10 (verificador, verificador-b) | 5bce088 | 14/14 criterios PASA; veredicto FALLA solo por contrato modificado (4bb14f4, 130340a, decisiones del usuario) | `medir_portada.py`: PASA 58 mediciones; contraste mínimo 8,08:1 |
 | 2026-11-18 | T6 (integración) | 86869bb | 214 y 220 tests OK en `worktree-integrar.sh`; criterios de T6 en PASA | T5 lleva los commits de T10 |
+| 2026-11-18 | TODO previo al despliegue (verificador) | f60db7e | 82/83 PASA; única FALLA `congelado.sh` por contrato modificado (4bb14f4, 130340a) | 220 tests OK |
+| 2026-11-18 | plan entero (auditor-seguridad) | f60db7e | sin bloqueantes; H1 importante confirmado, H2 menor, H3 obs., H4 menor | H1–H3 → T11 por decisión del usuario; H4 queda como pendiente |
 
 ### Decisiones del plan
 
