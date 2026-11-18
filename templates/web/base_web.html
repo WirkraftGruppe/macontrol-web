@@ -8,6 +8,7 @@
   {% block og %}{% endblock %}
   <link rel="preload" href="{% static 'fonts/barlow-latin-400-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="{% static 'fonts/barlow-condensed-latin-800-normal.woff2' %}" as="font" type="font/woff2" crossorigin>
+  {% block precargas %}{% endblock %}
   {% include "web/_iconos.html" %}
   <link rel="stylesheet" href="{% static 'css/web.css' %}">
 </head>
@@ -81,5 +82,6 @@
       <p class="pie-legal">{% if config.cuit %}CUIT {{ config.cuit }} · {% endif %}{% if config.habilitacion %}{{ config.habilitacion }} · {% endif %}{% if config.director_tecnico %}Director técnico: {{ config.director_tecnico }} · {% endif %}© {% now "Y" %} MAControl S.A.</p>
     </div>
   </footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,20 +1,35 @@
 {% extends "web/paginas/publica.html" %}
+{% load static %}
+{% block precargas %}<link rel="preload" as="image" href="{% static 'img/portada-poster.webp' %}" fetchpriority="high">{% endblock %}
 {% block contenido %}
 <section class="hero" id="hero">
+  <video class="hero-video" muted loop playsinline autoplay poster="{% static 'img/portada-poster.webp' %}" aria-hidden="true">
+    <source src="{% static 'video/portada-bucle-480.mp4' %}" media="(max-width: 900px)" type="video/mp4">
+    <source src="{% static 'video/portada-bucle-720.mp4' %}" type="video/mp4">
+  </video>
+  <div class="hero-velo" aria-hidden="true"></div>
   <div class="contenedor">
     <div class="hero-texto">
       <span class="eyebrow">{{ config.razon_social }}</span>
       <h1>{{ config.eslogan }}</h1>
-      <p>{{ config.presentacion }}</p>
+      <p>{{ presentacion_corta }}</p>
       <div class="hero-botones">
         {% if config.telefono_href %}<a class="btn btn-primario" href="{{ config.telefono_href }}">Llamar ahora</a>{% endif %}
+        <a class="btn btn-secundario" id="ver-video" href="{% static 'video/video-institucional-720.mp4' %}">Ver video · 1 min</a>
         <a class="btn btn-secundario" href="#servicios">Ver servicios</a>
       </div>
     </div>
-    <div class="hero-imagen">
-      <img src="{{ hero.url }}" width="{{ hero.ancho }}" height="{{ hero.alto }}" alt="Operario pulverizando con mochila en un quincho" fetchpriority="high">
-    </div>
   </div>
+  <button class="hero-pausa" type="button" aria-label="Pausar el video de fondo" aria-pressed="false" hidden>
+    <svg class="icono-pausa" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    <svg class="icono-reanudar" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <dialog class="video-dialogo" id="video-dialogo" aria-label="Video institucional de MAControl">
+    <button class="video-cerrar" type="button" aria-label="Cerrar el video">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <video controls preload="none" src="{% static 'video/video-institucional-720.mp4' %}"></video>
+  </dialog>
 </section>
 
 <section id="respaldos" class="respaldos-seccion" aria-label="Respaldos de la empresa">
@@ -156,3 +171,4 @@
   </div>
 </section>
 {% endblock %}
+{% block scripts %}<script src="{% static 'js/portada.js' %}" defer></script>{% endblock %}

@@ -17,8 +17,9 @@
  *               .campo-imagen .respaldos .respaldo .respaldo-titulo .respaldo-texto
  *               .pasos .paso .paso-titulo .paso-texto .logos-clientes .logo-cliente .beneficios
  * Grillas:      .grilla .grilla-2 .grilla-3 .grilla-4
- * Home:         .hero .hero-texto .hero-imagen .hero-botones .banda-edilicia .banda-edilicia-imagen
+ * Home:         .hero .hero-texto .hero-video .hero-velo .hero-pausa .hero-botones .banda-edilicia .banda-edilicia-imagen
  *               .dos-columnas .valores .valor .valor-indice .valor-titulo .valor-texto
+ *               .video-dialogo .video-cerrar (portada con video)
  * Servicio:     .servicio .servicio-cabecera .servicio-principal .servicio-lateral
  *               .metodos .faq (details/summary) .relacionados
  * Responsive: a 900 px las grillas pasan a 1 columna y el lateral baja.
@@ -255,12 +256,34 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
 .grilla-4 { grid-template-columns: repeat(4, 1fr); }
 
 /* Home */
-.hero { padding: 72px 0 80px; }
-.hero .contenedor { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 56px; align-items: center; }
-.hero-texto p { max-width: 560px; font-size: 18px; color: var(--text-muted); }
+.hero {
+  position: relative; isolation: isolate; overflow: hidden; display: grid; align-items: center;
+  min-height: min(80vh, 720px); padding: 96px 0; background: var(--bg);
+}
+.hero .contenedor { width: 100%; }
+.hero-video { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+/* Velo oscuro: el texto va a la izquierda, donde el degradado es más opaco (contraste AA en todo el bucle). */
+.hero-velo {
+  position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to right, rgba(15, 20, 23, 0.94) 0%, rgba(15, 20, 23, 0.86) 50%, rgba(15, 20, 23, 0.35) 100%);
+}
+.hero-texto { max-width: 640px; }
+.hero-texto p { max-width: 560px; font-size: 18px; color: var(--text); }
 .hero-botones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-.hero-imagen { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-.hero-imagen img { width: 100%; max-height: 640px; object-fit: cover; }
+.hero .btn-secundario { background: rgba(15, 20, 23, 0.7); }
+.hero-pausa, .video-cerrar {
+  display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
+  border: 1.5px solid var(--border-strong); border-radius: 50%; cursor: pointer;
+  background: rgba(15, 20, 23, 0.8); color: var(--text);
+}
+.hero-pausa:hover, .video-cerrar:hover { border-color: var(--brand); color: var(--brand); }
+.hero-pausa { position: absolute; top: 16px; right: var(--margen); }
+.hero-pausa[hidden] { display: none; }
+.hero-pausa[aria-pressed="false"] .icono-reanudar, .hero-pausa[aria-pressed="true"] .icono-pausa { display: none; }
+.video-dialogo { width: min(960px, 92vw); max-height: 92vh; padding: 0; border: 0; border-radius: 8px; background: #000; overflow: visible; }
+.video-dialogo::backdrop { background: rgba(0, 0, 0, 0.82); }
+.video-dialogo video { display: block; width: 100%; max-height: 82vh; border-radius: 8px; }
+.video-cerrar { position: absolute; top: -52px; right: 0; }
 .banda-edilicia { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
 .banda-edilicia-imagen { border-radius: 8px; overflow: hidden; }
 .banda-edilicia-imagen img { width: 100%; max-height: 520px; object-fit: cover; }
@@ -301,12 +324,17 @@ a:hover { color: var(--brand-hover); text-decoration: underline; }
   .nav-telefono-icono { display: flex; grid-column: 3; }
   .nav-movil { display: block; grid-column: 4; position: static; }
   .nav-movil-panel { left: 0; right: 0; top: 100%; min-width: 0; max-height: calc(100vh - 72px); overflow-y: auto; border-radius: 0; border-width: 1px 0; }
+  /* Portada: el velo baja de arriba hacia abajo y el texto queda abajo, sobre la parte más oscura. */
+  .hero { align-items: end; min-height: min(88vh, 680px); padding: 120px 0 40px; }
+  .hero-velo { background: linear-gradient(to bottom, rgba(15, 20, 23, 0.25) 0%, rgba(15, 20, 23, 0.88) 38%, rgba(15, 20, 23, 0.95) 100%); }
+  .hero-botones .btn { flex: 1 1 100%; }
+  .video-cerrar { top: 8px; right: 8px; z-index: 1; }
   .pie { padding-bottom: 96px; }
   .franja-sectores { grid-template-columns: 1fr; gap: 24px; }
   .lista-sectores { grid-template-columns: repeat(2, 1fr); gap: 0 20px; }
   .cliente-nombre { font-size: 22px; }
   .grilla-2, .grilla-3, .grilla-4, .pie-grilla, .circulos, .valores, .metodos, .contacto, .contacto-datos, .beneficios,
-  .hero .contenedor, .banda-edilicia, .dos-columnas, .servicio { grid-template-columns: 1fr; }
+  .banda-edilicia, .dos-columnas, .servicio { grid-template-columns: 1fr; }
   .contacto { padding: 24px; gap: 28px; }
   .contacto-titulo { font-size: 32px; }
   .respaldos { grid-template-columns: 1fr 1fr; gap: 12px; }

@@ -18,8 +18,14 @@ class DisenoWebTests(TestCase):
             html, r"https?://(?!www\.w3\.org)[^\"'\s]*\.(css|js|woff2?)"
         )
         self.assertNotIn("fonts.googleapis", html)
+        # Un único script externo (la portada) y el bloque de datos JSON-LD, que no se ejecuta.
+        scripts = re.findall(r"<script\b[^>]*>", html)
         self.assertEqual(
-            re.findall(r"<script\b[^>]*>", html),
+            [s for s in scripts if "src=" in s],
+            ['<script src="/static/js/portada.js" defer>'],
+        )
+        self.assertEqual(
+            [s for s in scripts if "src=" not in s],
             ['<script type="application/ld+json">'],
         )
         self.assertNotIn("style=", html)
@@ -74,14 +80,3 @@ class DisenoWebTests(TestCase):
                 ancho = int(re.search(r'\bwidth="(\d+)"', etiqueta).group(1))
                 alto = int(re.search(r'\bheight="(\d+)"', etiqueta).group(1))
                 self.assertAlmostEqual(ancho / alto, 412 / 104, places=1)
-
-    def test_hero_con_fetchpriority_alta(self):
-        html = self.client.get("/").content.decode()
-        etiqueta = re.search(r"<img[^>]*hero-pulverizacion[^>]*>", html).group(0)
-        self.assertIn('fetchpriority="high"', etiqueta)
-        self.assertNotIn("loading=", etiqueta)
-        with Image.open(
-            settings.BASE_DIR / "static/img/hero-pulverizacion-quincho.webp"
-        ) as hero:
-            ancho, alto = hero.size
-        self.assertIn(f'width="{ancho}" height="{alto}"', etiqueta)
